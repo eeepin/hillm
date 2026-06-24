@@ -125,19 +125,21 @@ pub struct ChatCompletionResponse {
 }
 
 impl ChatCompletionResponse {
-    #[must_use]
-    pub fn estimated_cost(&self) -> Option<f64> {
-        let usage = self.usage.as_ref()?;
+    pub async fn estimated_cost(&self, provider: &str) -> Result<Option<f64>, cost::CostError> {
+        let Some(usage) = self.usage.as_ref() else {
+            return Ok(None);
+        };
         let cached = usage
             .prompt_tokens_details
             .as_ref()
             .map_or(0, |d| d.cached_tokens);
+        let provider_model = format!("{provider}/{}", self.model);
         cost::completion_cost_with_cache(
-            &self.model,
+            &provider_model,
             usage.prompt_tokens,
             cached,
             usage.completion_tokens,
-        )
+        ).await
     }
 }
 
@@ -224,8 +226,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn estimated_cost_applies_cache_discount_when_prompt_tokens_details_present() {
+    #[tokio::test]
+    #[ignore = "requires network access to models.dev"]
+    async fn estimated_cost_applies_cache_discount_when_prompt_tokens_details_present() {
         let resp = make_response(
             "claude-sonnet-4-5",
             Usage {
@@ -238,7 +241,7 @@ mod tests {
                 }),
             },
         );
-        let with_cache = resp.estimated_cost().expect("should price");
+        let with_cache = resp.estimated_cost("anthropic").await.unwrap().expect("should price");
         let no_cache = make_response(
             "claude-sonnet-4-5",
             Usage {
@@ -248,7 +251,9 @@ mod tests {
                 prompt_tokens_details: None,
             },
         )
-        .estimated_cost()
+        .estimated_cost("anthropic")
+        .await
+        .unwrap()
         .expect("should price");
         assert!(
             with_cache < no_cache,
@@ -256,8 +261,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn estimated_cost_ignores_cached_tokens_when_no_pricing_difference() {
+    #[tokio::test]
+    #[ignore = "requires network access to models.dev"]
+    async fn estimated_cost_ignores_cached_tokens_when_no_pricing_difference() {
         let usage_with_cached = Usage {
             prompt_tokens: 1_000,
             completion_tokens: 50,
@@ -274,10 +280,14 @@ mod tests {
             prompt_tokens_details: None,
         };
         let a = make_response("gpt-4", usage_with_cached)
-            .estimated_cost()
+            .estimated_cost("openai")
+            .await
+            .unwrap()
             .expect("cost estimation should succeed for known model");
         let b = make_response("gpt-4", usage_no_details)
-            .estimated_cost()
+            .estimated_cost("openai")
+            .await
+            .unwrap()
             .expect("cost estimation should succeed for known model");
         assert!((a - b).abs() < 1e-12);
     }
