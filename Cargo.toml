@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 base64 = "0.22.1"
-reqwest = { version = "0.13.4", default-features = false, features = ["json", "stream", "multipart", "form"] }
+reqwest = { version = "0.13.4", default-features = false, features = ["json", "stream", "multipart", "form", "rustls"] }
 secrecy = { version = "0.10", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
