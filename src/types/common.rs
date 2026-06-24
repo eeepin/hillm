@@ -481,6 +481,16 @@ impl Default for StopSequence {
     }
 }
 
+//  Modality
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Modality {
+    Text,
+    Audio,
+    Image,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

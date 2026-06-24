@@ -3,18 +3,9 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use super::common::{
-    AssistantMessage, Message, ResponseFormat, StopSequence, Tool, ToolChoice, ToolType, Usage,
+    AssistantMessage, Message, ResponseFormat, StopSequence, Tool, ToolChoice, ToolType, Usage, Modality
 };
 use crate::cost;
-
-/// Modality
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Modality {
-    Text,
-    Audio,
-    Image,
-}
 
 /// Finish Reason
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
