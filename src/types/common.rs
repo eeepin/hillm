@@ -446,7 +446,7 @@ impl JsonSchemaFormat {
 // Usage
 
 /// Token usage
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Usage {
     #[serde(default)]
     pub prompt_tokens: u64,
@@ -456,6 +456,14 @@ pub struct Usage {
     pub total_tokens: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prompt_tokens_details: Option<PromptTokensDetails>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub completion_tokens_details: Option<CompletionTokensDetails>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cost: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cost_details: Option<CostDetails>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_byok: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -464,6 +472,30 @@ pub struct PromptTokensDetails {
     pub cached_tokens: u64,
     #[serde(default)]
     pub audio_tokens: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache_write_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub video_tokens: Option<u64>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CompletionTokensDetails {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accepted_prediction_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audio_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rejected_prediction_tokens: Option<u64>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct CostDetails {
+    pub upstream_inference_completions_cost: f64,
+    pub upstream_inference_prompt_cost: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub upstream_inference_cost: Option<f64>,
 }
 
 // Stop Sequence
@@ -489,6 +521,8 @@ pub enum Modality {
     Text,
     Audio,
     Image,
+    Video,
+    Pdf,
 }
 
 #[cfg(test)]
