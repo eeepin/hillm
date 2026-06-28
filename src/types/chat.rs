@@ -3,9 +3,11 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use super::common::{
-    AssistantMessage, Message, ResponseFormat, StopSequence, Tool, ToolChoice, ToolType, Usage, Modality
+    AssistantMessage, Message, Modality, ResponseFormat, StopSequence, Tool, ToolChoice, ToolType,
+    Usage,
 };
-use crate::cost;
+use crate::provider::common::ProviderError;
+use crate::provider::cost::completion_cost_with_cache;
 
 /// Finish Reason
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -116,21 +118,27 @@ pub struct ChatCompletionResponse {
 }
 
 impl ChatCompletionResponse {
-    pub async fn estimated_cost(&self, provider: &str) -> Result<Option<f64>, cost::CostError> {
+    pub async fn estimated_cost(&self, provider: &str) -> Result<Option<f64>, ProviderError> {
         let Some(usage) = self.usage.as_ref() else {
             return Ok(None);
         };
-        let cached = usage
+        let cached_read = usage
             .prompt_tokens_details
             .as_ref()
             .map_or(0, |d| d.cached_tokens);
-        let provider_model = format!("{provider}/{}", self.model);
-        cost::completion_cost_with_cache(
-            &provider_model,
+        let cached_write = usage
+            .prompt_tokens_details
+            .as_ref()
+            .map_or(0, |d| d.cache_write_tokens.unwrap_or(0));
+        completion_cost_with_cache(
+            &provider,
+            &self.model,
             usage.prompt_tokens,
-            cached,
+            cached_read,
+            cached_write,
             usage.completion_tokens,
-        ).await
+        )
+        .await
     }
 }
 
@@ -229,10 +237,20 @@ mod tests {
                 prompt_tokens_details: Some(PromptTokensDetails {
                     cached_tokens: 200,
                     audio_tokens: 0,
+                    cache_write_tokens: None,
+                    video_tokens: None,
                 }),
+                completion_tokens_details: None,
+                cost: None,
+                cost_details: None,
+                is_byok: None,
             },
         );
-        let with_cache = resp.estimated_cost("anthropic").await.unwrap().expect("should price");
+        let with_cache = resp
+            .estimated_cost("anthropic")
+            .await
+            .unwrap()
+            .expect("should price");
         let no_cache = make_response(
             "claude-sonnet-4-5",
             Usage {
@@ -240,6 +258,10 @@ mod tests {
                 completion_tokens: 50,
                 total_tokens: 1_050,
                 prompt_tokens_details: None,
+                completion_tokens_details: None,
+                cost: None,
+                cost_details: None,
+                is_byok: None,
             },
         )
         .estimated_cost("anthropic")
@@ -262,13 +284,23 @@ mod tests {
             prompt_tokens_details: Some(PromptTokensDetails {
                 cached_tokens: 500,
                 audio_tokens: 0,
+                cache_write_tokens: None,
+                video_tokens: None,
             }),
+            completion_tokens_details: None,
+            cost: None,
+            cost_details: None,
+            is_byok: None,
         };
         let usage_no_details = Usage {
             prompt_tokens: 1_000,
             completion_tokens: 50,
             total_tokens: 1_050,
             prompt_tokens_details: None,
+            completion_tokens_details: None,
+            cost: None,
+            cost_details: None,
+            is_byok: None,
         };
         let a = make_response("gpt-4", usage_with_cached)
             .estimated_cost("openai")
