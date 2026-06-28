@@ -264,4 +264,4 @@ impl HiLlmError {
     }
 }
 
-pub type Result<T> = std::result::Result<T, HiLlmError>;
+pub type HiLlmResult<T> = std::result::Result<T, HiLlmError>;
