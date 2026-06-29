@@ -31,12 +31,23 @@ pub struct ProviderEntry {
     env: Vec<String>,
     #[serde(default)]
     api: String,
-    pub(crate) models: HashMap<String, Model>,
+    pub(crate) models: HashMap<String, ModelEntry>,
 }
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct Model {
+pub(crate) struct ModelEntry {
     id: String,
+    #[serde(default, flatten)]
+    capabilities: ModelCapabilities,
+    #[serde(default)]
+    limit: ModelLimit,
+    #[serde(default)]
+    pub(crate) cost: Option<ModelPrice>,
+}
+
+/// Provider model capability
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct ModelCapabilities {
     #[serde(default)]
     attachment: bool,
     #[serde(default)]
@@ -44,16 +55,28 @@ pub(crate) struct Model {
     #[serde(default)]
     tool_call: bool,
     #[serde(default)]
+    structured_output: bool,
+    #[serde(default)]
     temperature: bool,
     #[serde(default)]
     modalities: ModelModality,
-    #[serde(default)]
-    limit: ModelLimit,
-    #[serde(default)]
-    pub(crate) cost: Option<ModelPrice>,
 }
 
-#[derive(Debug, Default, Deserialize)]
+pub fn capabilities(provider_name: &str, model_name: &str) -> ModelCapabilities {
+    let Some(reg) = PROVIDER_REGISTRY.get() else {
+        return ModelCapabilities::default();
+    };
+    if let Some(model_entry) = reg
+        .get(provider_name)
+        .and_then(|provider_entry| provider_entry.models.get(model_name))
+    {
+        model_entry.capabilities.clone()
+    } else {
+        ModelCapabilities::default()
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct ModelModality {
     #[serde(default)]
     input: Vec<Modality>,
@@ -124,47 +147,6 @@ pub enum StreamFormat {
     #[default]
     Sse,
     AwsEventStream,
-}
-
-/// Provider capability
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub struct ProviderCapabilities {
-    pub vision: bool,
-    pub reasoning: bool,
-    pub structured_output: bool,
-    pub function_calling: bool,
-    pub audio_in: bool,
-    pub audio_out: bool,
-    pub video_in: bool,
-}
-
-impl ProviderCapabilities {
-    fn from_entry(provider_entry: ProviderEntry) -> Self {
-        // TODO
-        ProviderCapabilities::default()
-    }
-}
-
-/// Default is all false.
-static DEFAULT_CAPABILITIES: ProviderCapabilities = ProviderCapabilities {
-    vision: false,
-    reasoning: false,
-    structured_output: false,
-    function_calling: false,
-    audio_in: false,
-    audio_out: false,
-    video_in: false,
-};
-
-pub fn capabilities(provider_name: &str) -> ProviderCapabilities {
-    let Some(reg) = PROVIDER_REGISTRY.get() else {
-        return DEFAULT_CAPABILITIES;
-    };
-    if let Some(provider_entry) = &reg.get(provider_name) {
-        ProviderCapabilities::from_entry(provider_entry)
-    } else {
-        DEFAULT_CAPABILITIES
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
