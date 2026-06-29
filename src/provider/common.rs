@@ -1,3 +1,4 @@
+use crate::error::{HiLlmError, HiLlmResult};
 use crate::types::Modality;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -272,12 +273,12 @@ pub(crate) trait Provider: Send + Sync {
         true
     }
 
-    fn transform_request(&self, body: &mut serde_json::Value) -> Result<(), ()> {
+    fn transform_request(&self, body: &mut serde_json::Value) -> HiLlmResult<()> {
         let _ = body;
         Ok(())
     }
 
-    fn transform_response(&self, _body: &mut serde_json::Value) -> Result<(), ()> {
+    fn transform_response(&self, _body: &mut serde_json::Value) -> HiLlmResult<()> {
         Ok(())
     }
 
@@ -288,10 +289,10 @@ pub(crate) trait Provider: Send + Sync {
     fn parse_stream_event(
         &self,
         event_data: &str,
-    ) -> Result<Option<crate::types::ChatCompletionChunk>, ()> {
+    ) -> HiLlmResult<Option<crate::types::ChatCompletionChunk>> {
         serde_json::from_str::<crate::types::ChatCompletionChunk>(event_data)
             .map(Some)
-            .map_err(|e| LiterLlmError::Streaming {
+            .map_err(|e| HiLlmError::Streaming {
                 message: format!("failed to parse SSE data: {e}"),
             })
     }
@@ -309,7 +310,7 @@ pub(crate) trait Provider: Send + Sync {
         vec![]
     }
 
-    fn validate(&self) -> Result<(), ()> {
+    fn validate(&self) -> HiLlmResult<()> {
         Ok(())
     }
 
@@ -353,7 +354,8 @@ mod tests {
         let price = &registry.get("openai").unwrap().models["gpt-4"]
             .cost
             .as_ref()
-            .unwrap();
+            .unwrap()
+            .token_price;
         assert!((price.input / TOKENS_PER_MILLION - 0.00003).abs() < 1e-10);
         assert!((price.output / TOKENS_PER_MILLION - 0.00006).abs() < 1e-10);
         assert_eq!(price.cache_read.unwrap() / TOKENS_PER_MILLION, 0.000015);
