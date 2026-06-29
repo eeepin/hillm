@@ -94,10 +94,49 @@ struct ModelLimit {
 
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct ModelPrice {
+    #[serde(flatten)]
+    pub(crate) token_price: TokenPrice,
+    pub(crate) tiers: Option<Vec<TokenPriceTier>>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct TokenPrice {
     pub(crate) input: f64,
     pub(crate) output: f64,
     pub(crate) cache_read: Option<f64>,
     pub(crate) cache_write: Option<f64>,
+}
+
+impl TokenPrice {
+    pub fn cost(
+        self,
+        input_tokens: u64,
+        cache_read_tokens: u64,
+        cache_write_tokens: u64,
+        output_tokens: u64,
+    ) -> Result<Option<f64>, ProviderError> {
+        let cache_read_tokens = cache_read_tokens.min(input_tokens);
+        let cache_write_tokens = cache_write_tokens.min(input_tokens);
+        let uncached_input_tokens = (input_tokens - cache_read_tokens - cache_write_tokens).max(0);
+        let cost_per_million = (uncached_input_tokens as f64) * self.input
+            + (cache_read_tokens as f64) * self.cache_read.unwrap_or(self.input)
+            + (cache_write_tokens as f64) * self.cache_write.unwrap_or(self.input)
+            + (output_tokens as f64) * self.output;
+        Ok(Some(cost_per_million / TOKENS_PER_MILLION))
+    }
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct TokenPriceTier {
+    #[serde(flatten)]
+    pub(crate) token_price: TokenPrice,
+    pub(crate) tier: ContextTier,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(tag = "type", rename = "context")]
+pub struct ContextTier {
+    pub(crate) size: u64,
 }
 
 async fn fetch_provider() -> Result<ProviderRegistry, ProviderError> {
@@ -399,7 +438,8 @@ mod tests {
         let price = &registry.get("test").unwrap().models["model"]
             .cost
             .as_ref()
-            .unwrap();
+            .unwrap()
+            .token_price;
         assert!((price.input / TOKENS_PER_MILLION - 0.00001).abs() < 1e-10);
         assert_eq!(price.output / TOKENS_PER_MILLION, 0.0);
         assert_eq!(price.cache_read, None);

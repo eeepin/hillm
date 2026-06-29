@@ -1,11 +1,12 @@
-use super::common::{ModelPrice, ProviderError, TOKENS_PER_MILLION, registry};
+use super::common::{ProviderError, TOKENS_PER_MILLION, TokenPrice, registry};
 
-pub async fn model_price(provider: &str, model: &str) -> Result<Option<ModelPrice>, ProviderError> {
+pub async fn token_price(provider: &str, model: &str) -> Result<Option<TokenPrice>, ProviderError> {
     let registry = registry().await?;
     Ok(registry
         .get(provider)
         .and_then(|p| p.models.get(model))
-        .and_then(|m| m.cost.clone()))
+        .and_then(|m| m.cost.as_ref())
+        .and_then(|c| Some(c.token_price.clone())))
 }
 
 pub async fn completion_cost(
@@ -25,17 +26,13 @@ pub async fn completion_cost_with_cache(
     cached_write_tokens: u64,
     completion_tokens: u64,
 ) -> Result<Option<f64>, ProviderError> {
-    if let Some(price) = model_price(provider, model).await? {
-        let cached_read = cached_tokens.min(prompt_tokens);
-        let cached_write = cached_write_tokens.min(prompt_tokens);
-        let uncached = (prompt_tokens - cached_read - cached_write).max(0);
-        let read_cache = price.cache_read.unwrap_or(price.input);
-        let write_cache = price.cache_write.unwrap_or(price.input);
-        let cost_per_million = (uncached as f64) * price.input
-            + (cached_read as f64) * read_cache
-            + (cached_write as f64) * write_cache
-            + (completion_tokens as f64) * price.output;
-        Ok(Some(cost_per_million / TOKENS_PER_MILLION))
+    if let Some(price) = token_price(provider, model).await? {
+        price.cost(
+            prompt_tokens,
+            cached_tokens,
+            cached_write_tokens,
+            completion_tokens,
+        )
     } else {
         Ok(None)
     }
@@ -79,14 +76,14 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires network access to models.dev"]
     async fn model_pricing_returns_none_for_unknown_model() {
-        let result = model_price("does-not-exist", "does-not-exist").await;
+        let result = token_price("does-not-exist", "does-not-exist").await;
         assert!(result.is_ok(), "should not error: {:?}", result.err());
         assert!(result.unwrap().is_none());
     }
 
     #[test]
     fn completion_cost_with_cache_applies_discount_when_pricing_available() {
-        let price = ModelPrice {
+        let price = TokenPrice {
             input: 1e-5,
             output: 2e-5,
             cache_read: Some(1e-6),
