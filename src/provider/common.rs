@@ -47,7 +47,7 @@ pub(crate) struct ModelEntry {
 
 /// Provider model capability
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
-struct ModelCapabilities {
+pub struct ModelCapabilities {
     #[serde(default)]
     attachment: bool,
     #[serde(default)]
@@ -227,6 +227,8 @@ pub(crate) trait Provider: Send + Sync {
 
     fn auth_header<'a>(&'a self, api_key: &'a str) -> Option<(Cow<'static, str>, Cow<'a, str>)>;
 
+    async fn matches_model(&self, model: &str) -> bool;
+
     fn extra_headers(&self) -> &'static [(&'static str, &'static str)] {
         &[]
     }
@@ -234,8 +236,6 @@ pub(crate) trait Provider: Send + Sync {
     fn dynamic_headers(&self, _body: &serde_json::Value) -> Vec<(String, String)> {
         vec![]
     }
-
-    fn matches_model(&self, model: &str) -> bool;
 
     fn chat_completions_path(&self) -> &str {
         "/chat/completions"
