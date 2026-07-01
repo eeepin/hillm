@@ -1,5 +1,5 @@
 use super::common::{Provider, registry};
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::HiLlmResult;
 use std::borrow::Cow;
 
 pub(crate) struct OpenAiProvider;
