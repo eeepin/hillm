@@ -5,7 +5,7 @@ pub(crate) struct OpenAiCompatibleProvider {
     pub name: String,
     pub base_url: String,
     pub env_var: Option<&'static str>,
-    pub model_prefixes: Vec<String>,
+    pub models: Vec<String>,
 }
 
 impl Provider for OpenAiCompatibleProvider {
@@ -29,11 +29,6 @@ impl Provider for OpenAiCompatibleProvider {
     }
 
     async fn matches_model(&self, model: &str) -> bool {
-        if let Ok(reg) = registry().await {
-            reg.get(self.name())
-                .is_some_and(|p| p.models.contains_key(model))
-        } else {
-            false
-        }
+        self.models.iter().any(|model_name| model == model_name)
     }
 }
