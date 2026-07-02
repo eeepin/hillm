@@ -31,10 +31,36 @@ pub struct ProviderEntry {
     env: Vec<String>,
     #[serde(default)]
     api: String,
+    name: String,
     pub(crate) models: HashMap<String, ModelEntry>,
 }
 
-#[derive(Debug, Deserialize)]
+impl ProviderEntry {
+    pub fn to_config(&self) -> ProviderConfig {
+        let mut auth = None;
+        for e in &self.env {
+            if e.contains("API_KEY") || e.contains("API_TOKEN") {
+                auth = Some(AuthConfig {
+                    auth_type: AuthType::Bearer,
+                    env_var: Some(e.clone()),
+                });
+            }
+            break;
+        }
+        let models = self.models.iter().map(|(model, _)| model.clone()).collect();
+        ProviderConfig {
+            name: self.id.clone(),
+            display_name: Some(self.name.clone()),
+            base_url: Some(self.api.clone()),
+            auth: auth,
+            endpoints: None,
+            models: models,
+            param_mappings: None,
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, Deserialize)]
 pub(crate) struct ModelEntry {
     id: String,
     #[serde(default, flatten)]
@@ -84,7 +110,7 @@ struct ModelModality {
     output: Vec<Modality>,
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Default, Clone, Deserialize)]
 struct ModelLimit {
     #[serde(default)]
     context: u64,
@@ -195,6 +221,7 @@ pub struct ProviderConfig {
     pub base_url: Option<String>,
     pub auth: Option<AuthConfig>,
     pub endpoints: Option<Vec<String>>,
+    pub models: Vec<String>,
     pub param_mappings: Option<HashMap<String, String>>,
 }
 
