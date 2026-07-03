@@ -368,6 +368,16 @@ pub(crate) trait Provider: Send + Sync {
     }
 }
 
+pub async fn all_providers() -> HiLlmResult<Vec<ProviderConfig>> {
+    let registry = registry().await.map_err(|e| HiLlmError::InternalError {
+        message: e.to_string(),
+    })?;
+    Ok(registry
+        .iter()
+        .map(|(_, provider_entry)| provider_entry.to_config())
+        .collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
