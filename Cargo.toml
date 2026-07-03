@@ -5,6 +5,8 @@ edition = "2024"
 
 [dependencies]
 base64 = "0.22.1"
+bytes = "1.12.0"
+futures-core = "0.3.32"
 reqwest = { version = "0.13.4", default-features = false, features = ["json", "stream", "multipart", "form", "rustls"] }
 secrecy = { version = "0.10", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
