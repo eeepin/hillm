@@ -1,4 +1,4 @@
-use super::common::Provider;
+use super::Provider;
 use crate::error::{HiLlmError, HiLlmResult};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;

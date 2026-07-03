@@ -2,11 +2,11 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use super::common::{
+use super::{
     AssistantMessage, Message, Modality, ResponseFormat, StopSequence, Tool, ToolChoice, ToolType,
     Usage,
 };
-use crate::provider::common::ProviderError;
+use crate::provider::ProviderError;
 use crate::provider::cost::completion_cost_with_cache;
 
 /// Finish Reason
@@ -210,7 +210,7 @@ pub struct StreamFunctionCall {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::common::PromptTokensDetails;
+    use crate::types::PromptTokensDetails;
 
     fn make_response(model: &str, usage: Usage) -> ChatCompletionResponse {
         ChatCompletionResponse {

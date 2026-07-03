@@ -1,4 +1,4 @@
-use super::common::Provider;
+use super::Provider;
 use std::borrow::Cow;
 
 pub(crate) struct OpenAiCompatibleProvider {

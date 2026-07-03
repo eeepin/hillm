@@ -1,4 +1,4 @@
-use super::common::{Provider, registry};
+use super::{Provider, registry};
 use crate::error::HiLlmResult;
 use std::borrow::Cow;
 

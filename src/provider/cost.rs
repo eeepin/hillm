@@ -1,4 +1,4 @@
-use super::common::{ProviderError, TokenPrice, registry};
+use super::{ProviderError, TokenPrice, registry};
 
 pub async fn token_price(provider: &str, model: &str) -> Result<Option<TokenPrice>, ProviderError> {
     let registry = registry().await?;
@@ -40,7 +40,7 @@ pub async fn completion_cost_with_cache(
 
 #[cfg(test)]
 mod tests {
-    use super::super::common::TOKENS_PER_MILLION;
+    use super::super::TOKENS_PER_MILLION;
     use super::*;
 
     #[tokio::test]

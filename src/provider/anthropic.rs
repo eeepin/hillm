@@ -1,5 +1,5 @@
 use crate::error::{HiLlmError, HiLlmResult};
-use crate::provider::common::{Provider, registry, unix_timestamp_secs};
+use crate::provider::{Provider, registry, unix_timestamp_secs};
 use crate::types::{
     ChatCompletionChunk, FinishReason, StreamChoice, StreamDelta, StreamFunctionCall,
     StreamToolCall,

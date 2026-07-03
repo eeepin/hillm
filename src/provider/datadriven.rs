@@ -1,4 +1,4 @@
-use super::common::{AuthType, Provider, ProviderConfig};
+use super::{AuthType, Provider, ProviderConfig};
 use crate::error::HiLlmResult;
 use std::borrow::Cow;
 
