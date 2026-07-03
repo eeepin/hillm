@@ -134,7 +134,7 @@ impl Provider for CustomProvider {
         }
     }
 
-    async fn matches_model(&self, model: &str) -> bool {
+    fn matches_model(&self, model: &str) -> bool {
         self.config
             .models
             .iter()

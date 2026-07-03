@@ -28,7 +28,7 @@ impl Provider for OpenAiCompatibleProvider {
         ))
     }
 
-    async fn matches_model(&self, model: &str) -> bool {
+    fn matches_model(&self, model: &str) -> bool {
         self.models.iter().any(|model_name| model == model_name)
     }
 }

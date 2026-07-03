@@ -210,6 +210,11 @@ pub async fn registry() -> Result<Arc<ProviderRegistry>, ProviderError> {
         .map(Arc::clone)
 }
 
+/// Synchronously check if the registry has been initialized.
+pub(crate) fn registry_get() -> Option<&'static Arc<ProviderRegistry>> {
+    PROVIDER_REGISTRY.get()
+}
+
 /// Return the current Unix epoch timestamp in seconds.
 pub(crate) fn unix_timestamp_secs() -> u64 {
     SystemTime::now()
@@ -267,7 +272,7 @@ pub(crate) trait Provider: Send + Sync {
 
     fn auth_header<'a>(&'a self, api_key: &'a str) -> Option<(Cow<'static, str>, Cow<'a, str>)>;
 
-    async fn matches_model(&self, model: &str) -> bool;
+    fn matches_model(&self, model: &str) -> bool;
 
     fn extra_headers(&self) -> &'static [(&'static str, &'static str)] {
         &[]

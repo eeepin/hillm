@@ -1,5 +1,5 @@
 use crate::error::{HiLlmError, HiLlmResult};
-use crate::provider::{Provider, registry, unix_timestamp_secs};
+use crate::provider::{Provider, registry_get, unix_timestamp_secs};
 use crate::types::{
     ChatCompletionChunk, FinishReason, StreamChoice, StreamDelta, StreamFunctionCall,
     StreamToolCall,
@@ -89,12 +89,12 @@ impl Provider for AnthropicProvider {
         }
     }
 
-    async fn matches_model(&self, model: &str) -> bool {
-        registry()
-            .await
-            .unwrap_or_default()
-            .get("anthropic")
-            .is_some_and(|p| p.models.contains_key(model))
+    fn matches_model(&self, model: &str) -> bool {
+        registry_get()
+            .is_some_and(|reg| {
+                reg.get("anthropic")
+                    .is_some_and(|p| p.models.contains_key(model))
+            })
     }
 
     /// Anthropic uses `/messages` instead of `/chat/completions`.
