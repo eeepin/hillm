@@ -1,7 +1,9 @@
+pub mod batch;
 pub mod chat;
 pub mod image;
 pub mod model;
 
+pub use batch::*;
 pub use chat::*;
 pub use image::*;
 
