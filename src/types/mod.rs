@@ -1,11 +1,30 @@
+pub mod audio;
 pub mod batch;
 pub mod chat;
+pub mod embedding;
+pub mod file;
 pub mod image;
 pub mod model;
+pub mod moderation;
+pub mod ocr;
+pub mod raw;
+pub mod rerank;
+pub mod response;
+pub mod search;
 
+pub use audio::*;
 pub use batch::*;
 pub use chat::*;
+pub use embedding::*;
+pub use file::*;
 pub use image::*;
+pub use model::*;
+pub use moderation::*;
+pub use ocr::*;
+pub use raw::*;
+pub use rerank::*;
+pub use response::*;
+pub use search::*;
 
 use serde::{Deserialize, Serialize};
 
