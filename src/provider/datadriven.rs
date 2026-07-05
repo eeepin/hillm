@@ -3,12 +3,12 @@ use crate::error::HiLlmResult;
 use std::borrow::Cow;
 
 pub(crate) struct ConfigDrivenProvider {
-    config: &'static ProviderConfig,
+    config: ProviderConfig,
 }
 
 impl ConfigDrivenProvider {
     #[must_use]
-    pub(crate) fn new(config: &'static ProviderConfig) -> Self {
+    pub(crate) fn new(config: ProviderConfig) -> Self {
         Self { config }
     }
 }

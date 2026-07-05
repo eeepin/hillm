@@ -11,8 +11,12 @@ pub use outbound_policy::{
     validate_outbound_url_sync,
 };
 
-use super::error::{HiLlmError, HiLlmResult};
-use super::types::Modality;
+use anthropic::AnthropicProvider;
+use datadriven::ConfigDrivenProvider;
+use openai::OpenAiProvider;
+
+use crate::error::{HiLlmError, HiLlmResult};
+use crate::types::Modality;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -384,6 +388,37 @@ pub(crate) trait Provider: Send + Sync {
     fn env_var(&self) -> Option<&str> {
         None
     }
+}
+
+pub(crate) fn get_provider(name: &str) -> Option<Box<dyn Provider>> {
+    if let Some(provider) = custom::detect_custom_provider(name) {
+        return Some(provider);
+    }
+
+    match name {
+        "openai" => {
+            return Some(Box::new(OpenAiProvider));
+        }
+        "anthropic" => {
+            return Some(Box::new(AnthropicProvider));
+        }
+        _ => {
+            let reg = match PROVIDER_REGISTRY.get() {
+                Some(r) => r,
+                None => return None,
+            };
+            if let Some(entry) = reg
+                .values()
+                .collect::<Vec<&ProviderEntry>>()
+                .iter()
+                .find(|e| *e.id == *name)
+            {
+                return Some(Box::new(ConfigDrivenProvider::new(entry.to_config())));
+            }
+        }
+    }
+
+    None
 }
 
 pub async fn all_providers() -> HiLlmResult<Vec<ProviderConfig>> {
