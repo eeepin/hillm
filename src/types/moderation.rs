@@ -15,7 +15,6 @@ pub enum ModerationInput {
     Multiple(Vec<String>),
 }
 
-#[cfg_attr(alef, alef(skip))]
 impl Default for ModerationInput {
     fn default() -> Self {
         Self::Single(String::new())
