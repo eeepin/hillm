@@ -53,16 +53,16 @@ pub fn unregister_custom_provider(name: &str) -> HiLlmResult<bool> {
     Ok(providers.len() < before)
 }
 
-pub(crate) fn detect_custom_provider(name: &str) -> Option<CustomProvider> {
+pub(crate) fn detect_custom_provider(name: &str) -> Option<Box<dyn Provider>> {
     let providers = CUSTOM_PROVIDERS.read().ok()?;
 
     for cfg in providers.iter() {
         let matches = cfg.name == name;
 
         if matches {
-            return Some(CustomProvider {
+            return Some(Box::new(CustomProvider {
                 config: cfg.clone(),
-            });
+            }));
         }
     }
 
