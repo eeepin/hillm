@@ -233,7 +233,6 @@ pub(crate) fn unix_timestamp_secs() -> u64 {
 pub enum StreamFormat {
     #[default]
     Sse,
-    AwsEventStream,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
