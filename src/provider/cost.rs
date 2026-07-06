@@ -1,12 +1,11 @@
-use super::{ProviderError, TokenPrice, registry};
+use super::{ModelPrice, ProviderError, registry};
 
-pub async fn token_price(provider: &str, model: &str) -> Result<Option<TokenPrice>, ProviderError> {
+pub async fn model_price(provider: &str, model: &str) -> Result<Option<ModelPrice>, ProviderError> {
     let registry = registry().await?;
     Ok(registry
         .get(provider)
         .and_then(|p| p.models.get(model))
-        .and_then(|m| m.cost.as_ref())
-        .and_then(|c| Some(c.token_price.clone())))
+        .and_then(|m| m.cost.clone()))
 }
 
 pub async fn completion_cost(
@@ -26,8 +25,8 @@ pub async fn completion_cost_with_cache(
     cached_write_tokens: u64,
     completion_tokens: u64,
 ) -> Result<Option<f64>, ProviderError> {
-    if let Some(price) = token_price(provider, model).await? {
-        price.cost(
+    if let Some(price) = model_price(provider, model).await? {
+        price.token_price_by_tier(prompt_tokens).cost(
             prompt_tokens,
             cached_tokens,
             cached_write_tokens,
@@ -40,7 +39,7 @@ pub async fn completion_cost_with_cache(
 
 #[cfg(test)]
 mod tests {
-    use super::super::TOKENS_PER_MILLION;
+    use super::super::{TOKENS_PER_MILLION, TokenPrice};
     use super::*;
 
     #[tokio::test]
@@ -77,7 +76,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires network access to models.dev"]
     async fn model_pricing_returns_none_for_unknown_model() {
-        let result = token_price("does-not-exist", "does-not-exist").await;
+        let result = model_price("does-not-exist", "does-not-exist").await;
         assert!(result.is_ok(), "should not error: {:?}", result.err());
         assert!(result.unwrap().is_none());
     }

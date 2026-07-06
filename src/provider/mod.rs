@@ -142,6 +142,21 @@ pub struct ModelPrice {
     pub(crate) tiers: Option<Vec<TokenPriceTier>>,
 }
 
+impl ModelPrice {
+    pub fn token_price_by_tier(&self, context: u64) -> &TokenPrice {
+        if let Some(tiers) = &self.tiers {
+            let best = tiers
+                .iter()
+                .filter(|t| context >= t.tier.size)
+                .max_by_key(|t| t.tier.size);
+            if let Some(tier) = best {
+                return &tier.token_price;
+            }
+        }
+        &self.token_price
+    }
+}
+
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct TokenPrice {
     pub(crate) input: f64,
@@ -152,7 +167,7 @@ pub struct TokenPrice {
 
 impl TokenPrice {
     pub fn cost(
-        self,
+        &self,
         input_tokens: u64,
         cache_read_tokens: u64,
         cache_write_tokens: u64,
