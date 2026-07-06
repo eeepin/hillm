@@ -357,6 +357,12 @@ impl DefaultClient {
         }
 
         let provider = self.provider.clone();
+        if !provider.matches_model(model) {
+            return Err(HiLlmError::BadRequest {
+                message: format!("{} has no model named {}", provider.name(), model),
+                status: 400,
+            });
+        }
         let endpoint_path = endpoint_fn(provider.as_ref());
         let url = provider.build_url(endpoint_path, model);
 
