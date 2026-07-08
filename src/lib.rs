@@ -4,6 +4,7 @@ pub mod error;
 pub mod http;
 pub mod image;
 pub mod provider;
+pub mod tower;
 /// Requests/Response Data Transfer Objects.
 pub mod types;
 
