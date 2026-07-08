@@ -151,6 +151,7 @@ impl HiLlmError {
         }
     }
 
+    #[cfg(feature = "tower")]
     pub(crate) fn to_singleflight_error(&self) -> Self {
         match self {
             Self::Authentication { message, status } => Self::Authentication {
