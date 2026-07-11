@@ -4,6 +4,8 @@ pub mod error;
 pub mod http;
 pub mod image;
 pub mod provider;
+#[cfg(feature = "tokenizer")]
+pub mod tokenizer;
 pub mod tower;
 /// Requests/Response Data Transfer Objects.
 pub mod types;
