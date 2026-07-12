@@ -10,6 +10,8 @@ pub mod tokenizer;
 pub mod tower;
 /// Requests/Response Data Transfer Objects.
 pub mod types;
+pub mod util;
+pub mod vectorstore;
 
 pub use client::{
     BatchClient, BatchWaitError, BoxFuture, BoxStream, ClientBuilder, ClientConfig,
