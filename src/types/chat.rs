@@ -117,7 +117,7 @@ pub struct ChatCompletionResponse {
 }
 
 impl ChatCompletionResponse {
-    pub async fn estimated_cost(&self, provider: &str) -> Option<f64> {
+    pub fn estimated_cost(&self, provider: &str) -> Option<f64> {
         let Some(usage) = self.usage.as_ref() else {
             return None;
         };
@@ -137,7 +137,6 @@ impl ChatCompletionResponse {
             cached_write,
             usage.completion_tokens,
         )
-        .await
         .unwrap_or(None)
     }
 }
@@ -225,9 +224,9 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[test]
     #[ignore = "requires network access to models.dev"]
-    async fn estimated_cost_applies_cache_discount_when_prompt_tokens_details_present() {
+    fn estimated_cost_applies_cache_discount_when_prompt_tokens_details_present() {
         let resp = make_response(
             "claude-sonnet-4-5",
             Usage {
@@ -246,7 +245,7 @@ mod tests {
                 is_byok: None,
             },
         );
-        let with_cache = resp.estimated_cost("anthropic").await.unwrap();
+        let with_cache = resp.estimated_cost("anthropic").unwrap();
         let no_cache = make_response(
             "claude-sonnet-4-5",
             Usage {
@@ -261,7 +260,6 @@ mod tests {
             },
         )
         .estimated_cost("anthropic")
-        .await
         .unwrap();
         assert!(
             with_cache < no_cache,
@@ -269,9 +267,9 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[test]
     #[ignore = "requires network access to models.dev"]
-    async fn estimated_cost_ignores_cached_tokens_when_no_pricing_difference() {
+    fn estimated_cost_ignores_cached_tokens_when_no_pricing_difference() {
         let usage_with_cached = Usage {
             prompt_tokens: 1_000,
             completion_tokens: 50,
@@ -299,11 +297,9 @@ mod tests {
         };
         let a = make_response("gpt-4", usage_with_cached)
             .estimated_cost("openai")
-            .await
             .unwrap();
         let b = make_response("gpt-4", usage_no_details)
             .estimated_cost("openai")
-            .await
             .unwrap();
         assert!((a - b).abs() < 1e-12);
     }

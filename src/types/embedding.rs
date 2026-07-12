@@ -46,7 +46,7 @@ pub struct EmbeddingResponse {
 }
 
 impl EmbeddingResponse {
-    pub async fn estimated_cost(&self, provider: &str) -> Option<f64> {
+    pub fn estimated_cost(&self, provider: &str) -> Option<f64> {
         let usage = self.usage.as_ref()?;
         cost::completion_cost(
             provider,
@@ -54,7 +54,6 @@ impl EmbeddingResponse {
             usage.prompt_tokens,
             usage.completion_tokens,
         )
-        .await
         .unwrap_or(None)
     }
 }

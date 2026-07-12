@@ -1,35 +1,37 @@
-use super::{ModelPrice, ProviderError, registry};
+use super::{ModelPrice, PROVIDER_REGISTRY, ProviderError};
 
-pub async fn model_price(provider: &str, model: &str) -> Result<Option<ModelPrice>, ProviderError> {
-    let registry = registry().await?;
+pub fn model_price(provider: &str, model: &str) -> Result<Option<ModelPrice>, ProviderError> {
+    let Some(registry) = PROVIDER_REGISTRY.get() else {
+        return Ok(None);
+    };
     Ok(registry
         .get(provider)
         .and_then(|p| p.models.get(model))
         .and_then(|m| m.cost.clone()))
 }
 
-pub async fn completion_cost(
+pub fn completion_cost(
     provider: &str,
     model: &str,
     prompt_tokens: u64,
     completion_tokens: u64,
 ) -> Result<Option<f64>, ProviderError> {
-    completion_cost_with_cache(provider, model, prompt_tokens, 0, 0, completion_tokens).await
+    completion_cost_with_cache(provider, model, prompt_tokens, 0, 0, completion_tokens)
 }
 
-pub async fn completion_cost_with_cache(
+pub fn completion_cost_with_cache(
     provider: &str,
     model: &str,
     prompt_tokens: u64,
     cached_tokens: u64,
-    cached_write_tokens: u64,
+    cache_write_tokens: u64,
     completion_tokens: u64,
 ) -> Result<Option<f64>, ProviderError> {
-    if let Some(price) = model_price(provider, model).await? {
+    if let Some(price) = model_price(provider, model)? {
         price.token_price_by_tier(prompt_tokens).cost(
             prompt_tokens,
             cached_tokens,
-            cached_write_tokens,
+            cache_write_tokens,
             completion_tokens,
         )
     } else {
@@ -42,20 +44,20 @@ mod tests {
     use super::super::{TOKENS_PER_MILLION, TokenPrice};
     use super::*;
 
-    #[tokio::test]
+    #[test]
     #[ignore = "requires network access to models.dev"]
-    async fn completion_cost_known_model_returns_positive_value() {
-        let result = completion_cost("openai", "gpt-4", 100, 50).await;
+    fn completion_cost_known_model_returns_positive_value() {
+        let result = completion_cost("openai", "gpt-4", 100, 50);
         assert!(result.is_ok(), "should not error: {:?}", result.err());
         let cost = result.unwrap();
         assert!(cost.is_some(), "gpt-4 should be in registry");
         assert!(cost.unwrap() > 0.0, "cost should be positive");
     }
 
-    #[tokio::test]
+    #[test]
     #[ignore = "requires network access to models.dev"]
-    async fn completion_cost_unknown_model_returns_none() {
-        let result = completion_cost("unknown-provider", "unknown-model-xyz", 100, 50).await;
+    fn completion_cost_unknown_model_returns_none() {
+        let result = completion_cost("unknown-provider", "unknown-model-xyz", 100, 50);
         assert!(result.is_ok(), "should not error: {:?}", result.err());
         assert!(
             result.unwrap().is_none(),
@@ -63,20 +65,20 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[test]
     #[ignore = "requires network access to models.dev"]
-    async fn completion_cost_gpt4o_returns_positive_value() {
-        let result = completion_cost("openai", "gpt-4o", 1_000, 500).await;
+    fn completion_cost_gpt4o_returns_positive_value() {
+        let result = completion_cost("openai", "gpt-4o", 1_000, 500);
         assert!(result.is_ok(), "should not error: {:?}", result.err());
         let cost = result.unwrap();
         assert!(cost.is_some(), "gpt-4o should be in registry");
         assert!(cost.unwrap() > 0.0, "cost should be positive");
     }
 
-    #[tokio::test]
+    #[test]
     #[ignore = "requires network access to models.dev"]
-    async fn model_pricing_returns_none_for_unknown_model() {
-        let result = model_price("does-not-exist", "does-not-exist").await;
+    fn model_pricing_returns_none_for_unknown_model() {
+        let result = model_price("does-not-exist", "does-not-exist");
         assert!(result.is_ok(), "should not error: {:?}", result.err());
         assert!(result.unwrap().is_none());
     }
@@ -101,26 +103,23 @@ mod tests {
         assert!((actual - expected).abs() < 1e-12);
     }
 
-    #[tokio::test]
+    #[test]
     #[ignore = "requires network access to models.dev"]
-    async fn completion_cost_with_cache_clamps_cached_tokens_to_prompt_tokens() {
+    fn completion_cost_with_cache_clamps_cached_tokens_to_prompt_tokens() {
         let cost = completion_cost_with_cache("openai", "gpt-4", 100, 500, 0, 0)
-            .await
             .unwrap()
             .expect("gpt-4 must be in registry");
         let clamped = completion_cost_with_cache("openai", "gpt-4", 100, 100, 0, 0)
-            .await
             .unwrap()
             .expect("gpt-4 must be in registry");
         assert!((cost - clamped).abs() < 1e-12);
     }
 
-    #[tokio::test]
+    #[test]
     #[ignore = "requires network access to models.dev"]
-    async fn completion_cost_with_cache_unknown_model_returns_none() {
+    fn completion_cost_with_cache_unknown_model_returns_none() {
         let result =
-            completion_cost_with_cache("unknown-provider", "unknown-model-xyz", 100, 10, 0, 50)
-                .await;
+            completion_cost_with_cache("unknown-provider", "unknown-model-xyz", 100, 10, 0, 50);
         assert!(result.is_ok(), "should not error: {:?}", result.err());
         assert!(result.unwrap().is_none());
     }
