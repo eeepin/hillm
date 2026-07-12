@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod client;
+#[cfg(feature = "tower")]
 pub mod embedding;
 pub mod error;
 pub mod http;

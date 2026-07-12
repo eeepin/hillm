@@ -1,0 +1,7 @@
+/// Usage events and pluggable sinks.
+pub mod usage;
+
+pub use usage::{
+    CacheState, LoggingUsageSink, MultiUsageSink, UsageEvent, UsageEventOutcome, UsageSink,
+    UsageSinkErased, UsageSinkError,
+};
