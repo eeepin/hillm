@@ -83,7 +83,7 @@ impl UsageSink for LoggingUsageSink {
     async fn emit(&self, event: UsageEvent) -> Result<(), UsageSinkError> {
         #[cfg(feature = "tracing")]
         tracing::info!(
-            target: "gen_ai.usage",
+            target: "ai.usage",
             tenant_id = event.tenant_id.as_ref().map(|t| t.as_ref()),
             request_id = %event.request_id,
             model = %event.model,
@@ -141,7 +141,7 @@ impl UsageSink for MultiUsageSink {
             if let Err(_err) = sink.emit_erased(event.clone()).await {
                 #[cfg(feature = "tracing")]
                 tracing::warn!(
-                    target: "gen_ai.usage",
+                    target: "ai.usage",
                     error = %_err,
                     "usage sink emit failed"
                 );
