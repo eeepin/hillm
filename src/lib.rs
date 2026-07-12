@@ -4,7 +4,9 @@ pub mod embedding;
 pub mod error;
 pub mod http;
 pub mod image;
+pub mod observability;
 pub mod provider;
+pub mod tenant;
 #[cfg(feature = "tokenizer")]
 pub mod tokenizer;
 pub mod tower;
