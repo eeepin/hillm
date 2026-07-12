@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod client;
+pub mod embedding;
 pub mod error;
 pub mod http;
 pub mod image;
