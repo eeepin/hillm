@@ -609,7 +609,6 @@ where
                     usage.prompt_tokens,
                     usage.completion_tokens,
                 )
-                .await
             {
                 state.record(&model, cost);
                 if config.enforcement == Enforcement::Soft {
