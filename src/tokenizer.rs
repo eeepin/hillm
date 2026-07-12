@@ -6,6 +6,7 @@ use tokenizers::Tokenizer;
 use tokio::sync::OnceCell;
 
 use crate::error::{HiLlmError, HiLlmResult};
+use crate::types::{ChatCompletionRequest, ContentPart, Message, MessageContent};
 
 static TOKENIZER_CACHE: OnceCell<ArcSwap<HashMap<String, Arc<Tokenizer>>>> = OnceCell::const_new();
 
@@ -86,4 +87,91 @@ async fn get_tokenizer(model: &str) -> HiLlmResult<Arc<Tokenizer>> {
     cache.store(Arc::new(new_map));
 
     Ok(tokenizer)
+}
+
+pub async fn count_tokens(model: &str, text: &str) -> HiLlmResult<usize> {
+    let tokenizer = get_tokenizer(model).await?;
+    let encoding = tokenizer
+        .encode(text, false)
+        .map_err(|e| HiLlmError::BadRequest {
+            message: format!("Tokenization failed: {e}"),
+            status: 400,
+        })?;
+    Ok(encoding.get_ids().len())
+}
+
+fn content_part_text(part: &ContentPart) -> Option<&str> {
+    match part {
+        ContentPart::Text { text } => Some(text.as_str()),
+        ContentPart::ImageUrl { .. }
+        | ContentPart::Document { .. }
+        | ContentPart::InputAudio { .. }
+        | ContentPart::Refusal { .. }
+        | ContentPart::OutputImage { .. }
+        | ContentPart::OutputAudio { .. } => None,
+    }
+}
+
+fn count_message_content_tokens(
+    tokenizer: &Tokenizer,
+    content: &MessageContent,
+) -> HiLlmResult<usize> {
+    let mut total = 0usize;
+    match &content {
+        MessageContent::Text(t) => total += encode(tokenizer, t)?,
+        MessageContent::Parts(parts) => {
+            for part in parts {
+                if let Some(text) = content_part_text(part) {
+                    total += encode(tokenizer, text)?;
+                }
+            }
+        }
+    }
+    Ok(total)
+}
+
+fn encode(tokenizer: &Tokenizer, text: &str) -> HiLlmResult<usize> {
+    let encoding = tokenizer
+        .encode(text, false)
+        .map_err(|e| HiLlmError::BadRequest {
+            message: format!("Tokenization failed: {e}"),
+            status: 400,
+        })?;
+    Ok(encoding.get_ids().len())
+}
+
+/// Count tokens for a full [`ChatCompletionRequest`].
+pub async fn count_request_tokens(model: &str, req: &ChatCompletionRequest) -> HiLlmResult<usize> {
+    let tokenizer = get_tokenizer(model).await?;
+    let mut total = 0usize;
+
+    for msg in &req.messages {
+        match msg {
+            Message::System(m) => total += count_message_content_tokens(&tokenizer, &m.content)?,
+            Message::User(m) => total += count_message_content_tokens(&tokenizer, &m.content)?,
+            Message::Assistant(m) => {
+                if m.content.is_none()
+                    && let Some(ref calls) = m.tool_calls
+                {
+                    for call in calls {
+                        total += encode(&tokenizer, call.function.arguments.as_str())?;
+                    }
+                } else {
+                    total += count_message_content_tokens(
+                        &tokenizer,
+                        &m.content
+                            .as_ref()
+                            .unwrap_or(&MessageContent::Text(String::default())),
+                    )?;
+                }
+            }
+            Message::Tool(m) => total += count_message_content_tokens(&tokenizer, &m.content)?,
+            Message::Developer(m) => total += count_message_content_tokens(&tokenizer, &m.content)?,
+        }
+    }
+
+    // About 4 tokens of per-message overhead (for role, separators, and formatting metadata)
+    total += req.messages.len() * 4;
+
+    Ok(total)
 }
