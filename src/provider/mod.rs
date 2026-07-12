@@ -79,10 +79,12 @@ impl ProviderEntry {
 
 #[derive(Debug, Default, Clone, Deserialize)]
 pub(crate) struct ModelEntry {
+    #[allow(dead_code)]
     id: String,
     #[serde(default, flatten)]
     capabilities: ModelCapabilities,
     #[serde(default)]
+    #[allow(dead_code)]
     limit: ModelLimit,
     #[serde(default)]
     pub(crate) cost: Option<ModelPrice>,
@@ -130,8 +132,10 @@ struct ModelModality {
 #[derive(Debug, Default, Clone, Deserialize)]
 struct ModelLimit {
     #[serde(default)]
+    #[allow(dead_code)]
     context: u64,
     #[serde(default)]
+    #[allow(dead_code)]
     output: u32,
 }
 
