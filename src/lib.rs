@@ -11,6 +11,7 @@ pub mod realtime;
 pub mod tenant;
 #[cfg(feature = "tokenizer")]
 pub mod tokenizer;
+#[cfg(feature = "tower")]
 pub mod tower;
 /// Requests/Response Data Transfer Objects.
 pub mod types;
