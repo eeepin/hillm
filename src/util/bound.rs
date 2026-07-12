@@ -12,7 +12,12 @@ pub const RESPONSE_BODY_MAX_BYTES: usize = 32 * 1024 * 1024;
 pub const CHUNK_ACCUMULATION_MAX_BYTES: usize = RESPONSE_BODY_MAX_BYTES;
 
 /// Bound check helper. Assert that `current_len + incoming` does not exceed `limit`.
-pub fn check_bound(context: &str, current_len: usize, incoming: usize, limit: usize) -> Result<()> {
+pub fn check_bound(
+    context: &str,
+    current_len: usize,
+    incoming: usize,
+    limit: usize,
+) -> HiLlmResult<()> {
     if current_len.saturating_add(incoming) > limit {
         #[cfg(feature = "tracing")]
         tracing::warn!(
