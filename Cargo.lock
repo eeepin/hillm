@@ -841,6 +841,7 @@ dependencies = [
 name = "hillm"
 version = "0.1.0"
 dependencies = [
+ "ahash 0.8.12",
  "arc-swap",
  "async-trait",
  "base64 0.22.1",
