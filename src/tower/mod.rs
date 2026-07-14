@@ -4,4 +4,5 @@ pub mod cache_policy;
 pub mod cost;
 pub mod hash;
 pub mod hooks;
+pub mod metrics;
 pub mod types;
