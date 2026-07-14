@@ -1,4 +1,10 @@
 pub mod memory;
+#[cfg(feature = "opendal")]
+pub mod opendal;
+
+pub use memory::InMemoryVectorStore;
+#[cfg(feature = "opendal")]
+pub use opendal::OpenDalVectorStore;
 
 use std::collections::HashMap;
 use std::future::Future;
