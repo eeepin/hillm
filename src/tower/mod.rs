@@ -13,6 +13,7 @@ pub mod fallback_chain;
 pub mod guardrail;
 pub mod hash;
 pub mod health;
+pub mod hedge;
 pub mod hook;
 pub mod metrics;
 pub mod tracing;
