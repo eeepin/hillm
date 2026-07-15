@@ -20,5 +20,6 @@ pub mod metrics;
 pub mod rate_limit;
 pub mod route_classify;
 pub mod router;
+pub mod service;
 pub mod tracing;
 pub mod types;
