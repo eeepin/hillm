@@ -5,6 +5,7 @@ pub mod cache_opendal;
 pub mod cache_policy;
 pub mod cache_singleflight;
 pub mod circuit;
+pub mod cooldown;
 pub mod cost;
 pub mod hash;
 pub mod hook;
