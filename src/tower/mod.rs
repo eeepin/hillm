@@ -7,6 +7,7 @@ pub mod cache_singleflight;
 pub mod circuit;
 pub mod cooldown;
 pub mod cost;
+pub mod error;
 pub mod hash;
 pub mod hook;
 pub mod metrics;
