@@ -13,4 +13,5 @@ pub mod fallback_chain;
 pub mod hash;
 pub mod hook;
 pub mod metrics;
+pub mod tracing;
 pub mod types;
