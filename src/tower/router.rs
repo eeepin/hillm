@@ -333,7 +333,7 @@ where
                             .iter()
                             .rev()
                             .find_map(|m| {
-                                if let crate::types::Message::User(u) = m {
+                                if let Message::User(u) = m {
                                     match &u.content {
                                         MessageContent::Text(t) => Some(t.clone()),
                                         MessageContent::Parts(_) => None,
