@@ -1,6 +1,7 @@
 pub mod budget;
 pub mod cache;
 pub mod cache_negative;
+pub mod cache_opendal;
 pub mod cache_policy;
 pub mod cost;
 pub mod hash;
