@@ -3,6 +3,7 @@ pub mod client;
 #[cfg(feature = "tower")]
 pub mod embedding;
 pub mod error;
+pub mod guardrail;
 pub mod http;
 pub mod image;
 pub mod observability;
