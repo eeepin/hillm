@@ -8,6 +8,8 @@ pub mod circuit;
 pub mod cooldown;
 pub mod cost;
 pub mod error;
+pub mod fallback;
+pub mod fallback_chain;
 pub mod hash;
 pub mod hook;
 pub mod metrics;
