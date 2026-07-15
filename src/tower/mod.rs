@@ -18,5 +18,7 @@ pub mod hook;
 pub mod idempotency;
 pub mod metrics;
 pub mod rate_limit;
+pub mod route_classify;
+pub mod router;
 pub mod tracing;
 pub mod types;

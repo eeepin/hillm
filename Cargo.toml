@@ -50,7 +50,17 @@ tokenizers = { version = "0.23.1", optional = true, features = ["http"] }
 tokio = { version = "1", optional = true, features = ["full"] }
 tokio-util = { version = "0.7.18", optional = true }
 toml = "1.1.2"
-tower = { version = "0.5.3", optional = true }
+tower = { version = "0.5.3", optional = true, features = [
+    "retry",
+    "limit",
+    "timeout",
+    "buffer",
+    "load-shed",
+    "steer",
+    "util",
+    "discover",
+    "ready-cache",
+] }
 tower-http = { version = "0.7.0", optional = true }
 tracing = { version = "0.1.44", optional = true }
 url = "2.5.8"
