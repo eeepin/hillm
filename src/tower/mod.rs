@@ -4,6 +4,7 @@ pub mod cache_negative;
 pub mod cache_opendal;
 pub mod cache_policy;
 pub mod cache_singleflight;
+pub mod circuit;
 pub mod cost;
 pub mod hash;
 pub mod hook;
