@@ -15,6 +15,7 @@ pub mod hash;
 pub mod health;
 pub mod hedge;
 pub mod hook;
+pub mod idempotency;
 pub mod metrics;
 pub mod tracing;
 pub mod types;
