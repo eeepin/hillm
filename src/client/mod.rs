@@ -1,21 +1,26 @@
 pub mod builder;
 pub mod config;
 pub mod config_file;
+#[cfg(all(feature = "default-http", feature = "tower"))]
+pub mod managed;
 
 use std::future::Future;
 use std::pin::Pin;
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
 use std::sync::Arc;
 use std::time::Duration;
 
 use futures_core::Stream;
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
 use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::error::{HiLlmError, HiLlmResult};
 use crate::types::audio::{CreateSpeechRequest, CreateTranscriptionRequest, TranscriptionResponse};
-use crate::types::batch::BatchStatus;
-use crate::types::batch::{BatchListQuery, BatchListResponse, BatchObject, CreateBatchRequest};
+use crate::types::batch::{
+    BatchListQuery, BatchListResponse, BatchObject, BatchStatus, CreateBatchRequest,
+};
 use crate::types::chat::{ChatCompletionChunk, ChatCompletionRequest, ChatCompletionResponse};
 use crate::types::embedding::{EmbeddingRequest, EmbeddingResponse};
 use crate::types::file::{
@@ -30,11 +35,14 @@ use crate::types::rerank::{RerankRequest, RerankResponse};
 use crate::types::response::{CreateResponseRequest, ResponseObject};
 use crate::types::search::{SearchRequest, SearchResponse};
 
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
 use crate::auth::Credential;
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
 use crate::http;
-use crate::provider::openai::OpenAiProvider;
-use crate::provider::openai_compatible::OpenAiCompatibleProvider;
-use crate::provider::{self, Provider};
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
+use crate::provider::{
+    self, Provider, openai::OpenAiProvider, openai_compatible::OpenAiCompatibleProvider,
+};
 
 pub use builder::{ClientBuilder, NoApiKey, NoProvider, WithApiKey, WithProvider};
 pub use config::{ClientConfig, ClientConfigBuilder};
@@ -78,10 +86,13 @@ impl From<HiLlmError> for BatchWaitError {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
+#[cfg(not(target_arch = "wasm32"))]
 pub type BoxStream<'a, T> = Pin<Box<dyn Stream<Item = T> + Send + 'a>>;
 
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
 struct PreparedRequest {
     url: String,
     provider: Arc<dyn Provider>,
@@ -89,11 +100,13 @@ struct PreparedRequest {
     body_bytes: bytes::Bytes,
 }
 
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
 fn str_pair(pair: &(String, String)) -> (&str, &str) {
     (pair.0.as_str(), pair.1.as_str())
 }
 
 /// The LLM Client trait
+#[cfg(not(target_arch = "wasm32"))]
 pub trait LlmClient: Send + Sync {
     fn chat(
         &self,
@@ -225,8 +238,8 @@ pub struct DefaultClient {
 }
 
 impl DefaultClient {
-    pub fn new(config: ClientConfig, provider_name: Option<String>) -> HiLlmResult<Self> {
-        let provider = build_provider(&config, provider_name);
+    pub fn new(config: ClientConfig, provider: Option<String>) -> HiLlmResult<Self> {
+        let provider = build_provider(&config, provider);
 
         provider.validate()?;
 
