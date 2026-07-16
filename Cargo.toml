@@ -4,20 +4,26 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-default = ["default-http"]
 default-http = [
     "dep:reqwest",
+    "reqwest/http2",
     "dep:rustls",
     "dep:tokio",
     "dep:tokio-util",
     "dep:memchr",
     "dep:gcp_auth",
 ]
-opendal = ["dep:opendal", "tower"]
+wasm-http = ["dep:reqwest", "dep:memchr", "dep:gloo-timers", "dep:web-time"]
+tracing = ["dep:tracing"]
 tower = ["dep:tower", "dep:tower-http", "dep:futures-util", "tracing"]
+opendal = ["dep:opendal", "tower"]
 tokenizer = ["dep:tokenizers", "dep:hf-hub"]
 otel = ["tracing", "dep:tracing-opentelemetry", "dep:opentelemetry"]
 guardrail = ["dep:cel-interpreter"]
+http3 = ["default-http"]
+
+default = ["default-http"]
+full = ["default-http", "tower", "tracing", "otel", "tokenizer", "opendal"]
 
 [dependencies]
 arc-swap = "1.9.2"
@@ -72,3 +78,5 @@ tracing-opentelemetry = { version = "0.33.0", optional = true }
 opentelemetry = { version = "0.32.0", optional = true }
 cel-interpreter = { version = "0.10.0", optional = true }
 regex = "1.13.0"
+web-time = { version = "1.1.0", optional = true }
+gloo-timers = { version = "0.4.0", optional = true }
