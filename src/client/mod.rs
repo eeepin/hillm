@@ -625,6 +625,19 @@ impl LlmClient for DefaultClient {
                     .await?;
                     Ok(stream)
                 }
+                provider::StreamFormat::AwsEventStream => {
+                    let stream = http::eventstream::post_eventstream(
+                        &self.http_client,
+                        &url,
+                        auth,
+                        &extra,
+                        prepared.body_bytes,
+                        self.config.max_retries,
+                        provider::bedrock::parse_bedrock_stream_event,
+                    )
+                    .await?;
+                    Ok(stream)
+                }
             }
         })
     }
@@ -1028,6 +1041,18 @@ impl LlmClientRaw for DefaultClient {
                         prepared.body_bytes,
                         self.config.max_retries,
                         parse_event,
+                    )
+                    .await?
+                }
+                provider::StreamFormat::AwsEventStream => {
+                    http::eventstream::post_eventstream(
+                        &self.http_client,
+                        &url,
+                        auth,
+                        &extra,
+                        prepared.body_bytes,
+                        self.config.max_retries,
+                        provider::bedrock::parse_bedrock_stream_event,
                     )
                     .await?
                 }
