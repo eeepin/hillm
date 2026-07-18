@@ -36,7 +36,11 @@ where
 
         if let Some(delay) = retry::should_retry(status, attempt, max_retries, server_retry_after) {
             attempt += 1;
+            #[cfg(not(target_arch = "wasm32"))]
             tokio::time::sleep(delay).await;
+            #[cfg(target_arch = "wasm32")]
+            gloo_timers::future::sleep(std::time::Duration::from_millis(delay.as_millis() as u64))
+                .await;
             continue;
         }
 
@@ -48,6 +52,18 @@ where
     }
 }
 
+#[cfg_attr(
+    feature = "tracing",
+    tracing::instrument(
+        skip_all,
+        fields(
+            http.method = "POST",
+            http.url = %url,
+            http.status_code = tracing::field::Empty,
+            http.retry_count = tracing::field::Empty,
+        )
+    )
+)]
 pub async fn post_json_raw(
     client: &reqwest::Client,
     url: &str,
@@ -73,11 +89,31 @@ pub async fn post_json_raw(
         builder.send()
     })
     .await?;
+
+    #[cfg(feature = "tracing")]
+    {
+        let span = tracing::Span::current();
+        span.record("http.status_code", resp.status().as_u16());
+        span.record("http.retry_count", retry_count.saturating_sub(1));
+    }
+
     resp.json::<serde_json::Value>()
         .await
         .map_err(HiLlmError::from)
 }
 
+#[cfg_attr(
+    feature = "tracing",
+    tracing::instrument(
+        skip_all,
+        fields(
+            http.method = "POST",
+            http.url = %url,
+            http.status_code = tracing::field::Empty,
+            http.retry_count = tracing::field::Empty,
+        )
+    )
+)]
 pub async fn post_binary(
     client: &reqwest::Client,
     url: &str,
@@ -104,9 +140,27 @@ pub async fn post_binary(
     })
     .await?;
 
+    #[cfg(feature = "tracing")]
+    {
+        let span = tracing::Span::current();
+        span.record("http.status_code", resp.status().as_u16());
+        span.record("http.retry_count", retry_count.saturating_sub(1));
+    }
+
     resp.bytes().await.map_err(HiLlmError::from)
 }
 
+#[cfg_attr(
+    feature = "tracing",
+    tracing::instrument(
+        skip_all,
+        fields(
+            http.method = "POST",
+            http.url = %url,
+            http.status_code = tracing::field::Empty,
+        )
+    )
+)]
 pub async fn post_multipart(
     client: &reqwest::Client,
     url: &str,
@@ -124,6 +178,12 @@ pub async fn post_multipart(
 
     let resp = builder.send().await?;
 
+    #[cfg(feature = "tracing")]
+    {
+        let span = tracing::Span::current();
+        span.record("http.status_code", resp.status().as_u16());
+    }
+
     let status = resp.status().as_u16();
     if !resp.status().is_success() {
         let server_retry_after = retry_after_from_response(&resp);
@@ -139,6 +199,18 @@ pub async fn post_multipart(
         .map_err(HiLlmError::from)
 }
 
+#[cfg_attr(
+    feature = "tracing",
+    tracing::instrument(
+        skip_all,
+        fields(
+            http.method = "GET",
+            http.url = %url,
+            http.status_code = tracing::field::Empty,
+            http.retry_count = tracing::field::Empty,
+        )
+    )
+)]
 pub async fn get_json_raw(
     client: &reqwest::Client,
     url: &str,
@@ -161,11 +233,30 @@ pub async fn get_json_raw(
     })
     .await?;
 
+    #[cfg(feature = "tracing")]
+    {
+        let span = tracing::Span::current();
+        span.record("http.status_code", resp.status().as_u16());
+        span.record("http.retry_count", retry_count.saturating_sub(1));
+    }
+
     resp.json::<serde_json::Value>()
         .await
         .map_err(HiLlmError::from)
 }
 
+#[cfg_attr(
+    feature = "tracing",
+    tracing::instrument(
+        skip_all,
+        fields(
+            http.method = "DELETE",
+            http.url = %url,
+            http.status_code = tracing::field::Empty,
+            http.retry_count = tracing::field::Empty,
+        )
+    )
+)]
 pub async fn delete_json(
     client: &reqwest::Client,
     url: &str,
@@ -188,11 +279,30 @@ pub async fn delete_json(
     })
     .await?;
 
+    #[cfg(feature = "tracing")]
+    {
+        let span = tracing::Span::current();
+        span.record("http.status_code", resp.status().as_u16());
+        span.record("http.retry_count", retry_count.saturating_sub(1));
+    }
+
     resp.json::<serde_json::Value>()
         .await
         .map_err(HiLlmError::from)
 }
 
+#[cfg_attr(
+    feature = "tracing",
+    tracing::instrument(
+        skip_all,
+        fields(
+            http.method = "GET",
+            http.url = %url,
+            http.status_code = tracing::field::Empty,
+            http.retry_count = tracing::field::Empty,
+        )
+    )
+)]
 pub async fn get_binary(
     client: &reqwest::Client,
     url: &str,
@@ -214,6 +324,13 @@ pub async fn get_binary(
         builder.send()
     })
     .await?;
+
+    #[cfg(feature = "tracing")]
+    {
+        let span = tracing::Span::current();
+        span.record("http.status_code", resp.status().as_u16());
+        span.record("http.retry_count", retry_count.saturating_sub(1));
+    }
 
     resp.bytes().await.map_err(HiLlmError::from)
 }
