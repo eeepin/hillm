@@ -89,8 +89,14 @@ impl From<HiLlmError> for BatchWaitError {
 #[cfg(not(target_arch = "wasm32"))]
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
+#[cfg(target_arch = "wasm32")]
+pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
+
 #[cfg(not(target_arch = "wasm32"))]
 pub type BoxStream<'a, T> = Pin<Box<dyn Stream<Item = T> + Send + 'a>>;
+
+#[cfg(target_arch = "wasm32")]
+pub type BoxStream<'a, T> = Pin<Box<dyn Stream<Item = T> + 'a>>;
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 struct PreparedRequest {
@@ -108,6 +114,41 @@ fn str_pair(pair: &(String, String)) -> (&str, &str) {
 /// The LLM Client trait
 #[cfg(not(target_arch = "wasm32"))]
 pub trait LlmClient: Send + Sync {
+    fn chat(
+        &self,
+        req: ChatCompletionRequest,
+    ) -> BoxFuture<'_, HiLlmResult<ChatCompletionResponse>>;
+
+    fn chat_stream(
+        &self,
+        req: ChatCompletionRequest,
+    ) -> BoxFuture<'_, HiLlmResult<BoxStream<'static, HiLlmResult<ChatCompletionChunk>>>>;
+
+    fn embed(&self, req: EmbeddingRequest) -> BoxFuture<'_, HiLlmResult<EmbeddingResponse>>;
+
+    fn list_models(&self) -> BoxFuture<'_, HiLlmResult<ModelsListResponse>>;
+
+    fn image_generate(&self, req: CreateImageRequest)
+    -> BoxFuture<'_, HiLlmResult<ImagesResponse>>;
+
+    fn speech(&self, req: CreateSpeechRequest) -> BoxFuture<'_, HiLlmResult<bytes::Bytes>>;
+
+    fn transcribe(
+        &self,
+        req: CreateTranscriptionRequest,
+    ) -> BoxFuture<'_, HiLlmResult<TranscriptionResponse>>;
+
+    fn moderate(&self, req: ModerationRequest) -> BoxFuture<'_, HiLlmResult<ModerationResponse>>;
+
+    fn rerank(&self, req: RerankRequest) -> BoxFuture<'_, HiLlmResult<RerankResponse>>;
+
+    fn search(&self, req: SearchRequest) -> BoxFuture<'_, HiLlmResult<SearchResponse>>;
+
+    fn ocr(&self, req: OcrRequest) -> BoxFuture<'_, HiLlmResult<OcrResponse>>;
+}
+
+#[cfg(target_arch = "wasm32")]
+pub trait LlmClient {
     fn chat(
         &self,
         req: ChatCompletionRequest,
@@ -188,6 +229,7 @@ pub trait LlmClientRaw: LlmClient {
     fn ocr_raw(&self, req: OcrRequest) -> BoxFuture<'_, HiLlmResult<RawExchange<OcrResponse>>>;
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub trait FileClient: Send + Sync {
     fn create_file(&self, req: CreateFileRequest) -> BoxFuture<'_, HiLlmResult<FileObject>>;
 
@@ -203,6 +245,23 @@ pub trait FileClient: Send + Sync {
     fn file_content(&self, file_id: &str) -> BoxFuture<'_, HiLlmResult<bytes::Bytes>>;
 }
 
+#[cfg(target_arch = "wasm32")]
+pub trait FileClient {
+    fn create_file(&self, req: CreateFileRequest) -> BoxFuture<'_, HiLlmResult<FileObject>>;
+
+    fn retrieve_file(&self, file_id: &str) -> BoxFuture<'_, HiLlmResult<FileObject>>;
+
+    fn delete_file(&self, file_id: &str) -> BoxFuture<'_, HiLlmResult<DeleteResponse>>;
+
+    fn list_files(
+        &self,
+        query: Option<FileListQuery>,
+    ) -> BoxFuture<'_, HiLlmResult<FileListResponse>>;
+
+    fn file_content(&self, file_id: &str) -> BoxFuture<'_, HiLlmResult<bytes::Bytes>>;
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 pub trait BatchClient: Send + Sync {
     fn create_batch(&self, req: CreateBatchRequest) -> BoxFuture<'_, HiLlmResult<BatchObject>>;
 
@@ -216,6 +275,21 @@ pub trait BatchClient: Send + Sync {
     fn cancel_batch(&self, batch_id: &str) -> BoxFuture<'_, HiLlmResult<BatchObject>>;
 }
 
+#[cfg(target_arch = "wasm32")]
+pub trait BatchClient {
+    fn create_batch(&self, req: CreateBatchRequest) -> BoxFuture<'_, HiLlmResult<BatchObject>>;
+
+    fn retrieve_batch(&self, batch_id: &str) -> BoxFuture<'_, ReHiLlmResultsult<BatchObject>>;
+
+    fn list_batches(
+        &self,
+        query: Option<BatchListQuery>,
+    ) -> BoxFuture<'_, HiLlmResult<BatchListResponse>>;
+
+    fn cancel_batch(&self, batch_id: &str) -> BoxFuture<'_, HiLlmResult<BatchObject>>;
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 pub trait ResponseClient: Send + Sync {
     fn create_response(
         &self,
@@ -227,7 +301,20 @@ pub trait ResponseClient: Send + Sync {
     fn cancel_response(&self, response_id: &str) -> BoxFuture<'_, HiLlmResult<ResponseObject>>;
 }
 
+#[cfg(target_arch = "wasm32")]
+pub trait ResponseClient {
+    fn create_response(
+        &self,
+        req: CreateResponseRequest,
+    ) -> BoxFuture<'_, HiLlmResult<ResponseObject>>;
+
+    fn retrieve_response(&self, response_id: &str) -> BoxFuture<'_, HiLlmResult<ResponseObject>>;
+
+    fn cancel_response(&self, response_id: &str) -> BoxFuture<'_, HiLlmResult<ResponseObject>>;
+}
+
 /// Default client based on `reqwest`.
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
 #[derive(Clone)]
 pub struct DefaultClient {
     config: ClientConfig,
@@ -237,13 +324,16 @@ pub struct DefaultClient {
     cached_extra_headers: Vec<(String, String)>,
 }
 
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
 impl DefaultClient {
     pub fn new(config: ClientConfig, provider: Option<String>) -> HiLlmResult<Self> {
         let provider = build_provider(&config, provider);
 
         provider.validate()?;
 
+        #[cfg(not(target_arch = "wasm32"))]
         let mut config = config;
+        #[cfg(not(target_arch = "wasm32"))]
         if config.load_env
             && config.api_key.expose_secret().is_empty()
             && let Some(env_var_name) = provider.env_var()
@@ -280,8 +370,10 @@ impl DefaultClient {
             header_map.insert(name, val);
         }
         let http_client = {
+            #[cfg(feature = "default-http")]
             crate::ensure_crypto_provider();
             let builder = reqwest::Client::builder().default_headers(header_map);
+            #[cfg(all(feature = "default-http", not(target_arch = "wasm32")))]
             let builder = {
                 if !matches!(
                     crate::provider::current_policy(),
@@ -292,8 +384,9 @@ impl DefaultClient {
                     builder
                 }
             };
-
+            #[cfg(not(target_arch = "wasm32"))]
             let builder = builder.timeout(config.timeout);
+            #[cfg(not(target_arch = "wasm32"))]
             let builder = config.transport.apply_to_builder(builder);
             builder.build().map_err(HiLlmError::from)?
         };
@@ -427,6 +520,7 @@ impl DefaultClient {
     }
 }
 
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
 fn build_provider(config: &ClientConfig, provider_name: Option<String>) -> Arc<dyn Provider> {
     if let Some(ref base_url) = config.base_url {
         // TODO: make different special provider match
@@ -447,6 +541,7 @@ fn build_provider(config: &ClientConfig, provider_name: Option<String>) -> Arc<d
     Arc::new(OpenAiProvider)
 }
 
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
 impl LlmClient for DefaultClient {
     fn chat(
         &self,
@@ -840,6 +935,7 @@ impl LlmClient for DefaultClient {
     }
 }
 
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
 impl LlmClientRaw for DefaultClient {
     fn chat_raw(
         &self,
@@ -1271,6 +1367,7 @@ impl LlmClientRaw for DefaultClient {
     }
 }
 
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
 impl FileClient for DefaultClient {
     fn create_file(&self, req: CreateFileRequest) -> BoxFuture<'_, HiLlmResult<FileObject>> {
         Box::pin(async move {
@@ -1436,6 +1533,7 @@ impl FileClient for DefaultClient {
     }
 }
 
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
 impl BatchClient for DefaultClient {
     fn create_batch(&self, req: CreateBatchRequest) -> BoxFuture<'_, HiLlmResult<BatchObject>> {
         Box::pin(async move {
@@ -1566,24 +1664,32 @@ impl BatchClient for DefaultClient {
     }
 }
 
-#[async_trait::async_trait]
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 pub trait BatchRetriever {
     async fn fetch_batch_for_polling(&self, batch_id: &str) -> HiLlmResult<BatchObject>;
 }
 
-#[async_trait::async_trait]
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl BatchRetriever for DefaultClient {
     async fn fetch_batch_for_polling(&self, batch_id: &str) -> HiLlmResult<BatchObject> {
         self.retrieve_batch(batch_id).await
     }
 }
 
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
 pub async fn wait_for_batch_impl<R: BatchRetriever>(
     retriever: &R,
     batch_id: &str,
     config: WaitForBatchConfig,
-) -> std::result::Result<BatchObject, BatchWaitError> {
+) -> Result<BatchObject, BatchWaitError> {
+    #[cfg(not(target_arch = "wasm32"))]
     let started = tokio::time::Instant::now();
+    #[cfg(target_arch = "wasm32")]
+    let started = web_time::Instant::now();
     let mut interval_secs = config.initial_interval_secs;
 
     loop {
@@ -1606,7 +1712,10 @@ pub async fn wait_for_batch_impl<R: BatchRetriever>(
                         return Err(BatchWaitError::Timeout { timeout_secs });
                     }
                 }
+                #[cfg(not(target_arch = "wasm32"))]
                 tokio::time::sleep(Duration::from_secs_f64(interval_secs)).await;
+                #[cfg(target_arch = "wasm32")]
+                gloo_timers::future::sleep(Duration::from_secs_f64(interval_secs)).await;
                 let next = (interval_secs as f32 * config.backoff_multiplier)
                     .min(config.max_interval_secs as f32) as f64;
                 interval_secs = next;
@@ -1615,6 +1724,7 @@ pub async fn wait_for_batch_impl<R: BatchRetriever>(
     }
 }
 
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
 impl DefaultClient {
     pub async fn wait_for_batch(
         &self,
@@ -1625,6 +1735,7 @@ impl DefaultClient {
     }
 }
 
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
 impl ResponseClient for DefaultClient {
     fn create_response(
         &self,
