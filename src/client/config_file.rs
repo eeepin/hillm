@@ -15,6 +15,46 @@ pub struct FileConfig {
     pub max_retries: Option<u32>,
     pub extra_headers: Option<HashMap<String, String>>,
     pub providers: Option<Vec<FileProviderConfig>>,
+    pub cache: Option<FileCacheConfig>,
+    pub budget: Option<FileBudgetConfig>,
+    pub cooldown_secs: Option<u64>,
+    pub rate_limit: Option<FileRateLimitConfig>,
+    pub health_check_secs: Option<u64>,
+    pub cost_tracking: Option<bool>,
+    pub tracing: Option<bool>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FileCacheConfig {
+    pub max_entries: Option<usize>,
+    pub ttl_seconds: Option<u64>,
+    pub backend: Option<String>,
+    pub backend_config: Option<HashMap<String, String>>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FileBudgetConfig {
+    pub global_limit: Option<f64>,
+    pub model_limits: Option<HashMap<String, f64>>,
+    pub enforcement: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FileRateLimitConfig {
+    pub rpm: Option<u32>,
+    pub tpm: Option<u64>,
+    pub window_seconds: Option<u64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FileProviderConfig {
+    pub name: String,
+    pub base_url: String,
+    pub auth_header: Option<String>,
 }
 
 impl FileConfig {
@@ -62,6 +102,8 @@ impl FileConfig {
         if let Some(r) = self.max_retries {
             builder = builder.max_retries(r);
         }
+
+        #[cfg(any(feature = "default-http", feature = "wasm-http"))]
         if let Some(headers) = self.extra_headers {
             for (k, v) in headers {
                 if reqwest::header::HeaderName::from_bytes(k.as_bytes()).is_ok()
@@ -71,20 +113,72 @@ impl FileConfig {
                 }
             }
         }
+
+        #[cfg(feature = "tower")]
+        {
+            if let Some(cache) = self.cache {
+                use crate::tower::{CacheBackend, CacheConfig};
+                let backend = match cache.backend.as_deref() {
+                    Some("memory") | None => CacheBackend::Memory,
+                    #[cfg(feature = "opendal")]
+                    Some(scheme) => CacheBackend::OpenDal {
+                        scheme: scheme.to_string(),
+                        config: cache.backend_config.unwrap_or_default(),
+                    },
+                    #[cfg(not(feature = "opendal"))]
+                    Some(_) => CacheBackend::Memory,
+                };
+                builder = builder.cache(CacheConfig {
+                    max_entries: cache.max_entries.unwrap_or(256),
+                    ttl: Duration::from_secs(cache.ttl_seconds.unwrap_or(300)),
+                    backend,
+                });
+            }
+
+            if let Some(budget) = self.budget {
+                use crate::tower::{BudgetConfig, Enforcement};
+                builder = builder.budget(BudgetConfig {
+                    global_limit: budget.global_limit,
+                    model_limits: budget.model_limits.unwrap_or_default(),
+                    enforcement: match budget.enforcement.as_deref() {
+                        Some("soft") => Enforcement::Soft,
+                        _ => Enforcement::Hard,
+                    },
+                });
+            }
+
+            if let Some(secs) = self.cooldown_secs {
+                builder = builder.cooldown(Duration::from_secs(secs));
+            }
+
+            if let Some(rl) = self.rate_limit {
+                use crate::tower::RateLimitConfig;
+                builder = builder.rate_limit(RateLimitConfig {
+                    rpm: rl.rpm,
+                    tpm: rl.tpm,
+                    window: Duration::from_secs(rl.window_seconds.unwrap_or(60)),
+                });
+            }
+
+            if let Some(secs) = self.health_check_secs {
+                builder = builder.health_check(Duration::from_secs(secs));
+            }
+
+            if let Some(ct) = self.cost_tracking {
+                builder = builder.cost_tracking(ct);
+            }
+
+            if let Some(t) = self.tracing {
+                builder = builder.tracing(t);
+            }
+        }
+
         builder
     }
 
     pub fn providers(&self) -> &[FileProviderConfig] {
         self.providers.as_deref().unwrap_or(&[])
     }
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct FileProviderConfig {
-    pub name: String,
-    pub base_url: String,
-    pub auth_header: Option<String>,
 }
 
 #[cfg(test)]
