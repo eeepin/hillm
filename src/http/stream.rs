@@ -5,6 +5,7 @@ use bytes::Bytes;
 use futures_core::Stream;
 use memchr::memchr;
 use pin_project_lite::pin_project;
+#[cfg(feature = "default-http")]
 pub use tokio_util::sync::CancellationToken;
 
 use crate::error::{HiLlmError, HiLlmResult};
@@ -14,6 +15,18 @@ use super::request::with_retry;
 
 const MAX_BUFFER_BYTES: usize = 1024 * 1024; // 1 MiB
 
+#[cfg_attr(
+    feature = "tracing",
+    tracing::instrument(
+        skip_all,
+        fields(
+            http.method = "POST",
+            http.url = %url,
+            http.status_code = tracing::field::Empty,
+            http.retry_count = tracing::field::Empty,
+        )
+    )
+)]
 pub async fn post_stream<P>(
     client: &reqwest::Client,
     url: &str,
@@ -44,13 +57,33 @@ where
     })
     .await?;
 
+    #[cfg(feature = "tracing")]
+    {
+        let span = tracing::Span::current();
+        span.record("http.status_code", resp.status().as_u16());
+        span.record("http.retry_count", retry_count.saturating_sub(1));
+    }
+
     let byte_stream = resp.bytes_stream();
     let stream = SseParser::new(byte_stream, parse_event, None);
     Ok(Box::pin(stream))
 }
 
+#[cfg(feature = "default-http")]
 #[allow(dead_code)]
 #[allow(clippy::too_many_arguments)] // The cancel token is the necessary 8th arg.
+#[cfg_attr(
+    feature = "tracing",
+    tracing::instrument(
+        skip_all,
+        fields(
+            http.method = "POST",
+            http.url = %url,
+            http.status_code = tracing::field::Empty,
+            http.retry_count = tracing::field::Empty,
+        )
+    )
+)]
 pub async fn post_stream_with_cancel<P>(
     client: &reqwest::Client,
     url: &str,
@@ -82,12 +115,23 @@ where
     })
     .await?;
 
+    #[cfg(feature = "tracing")]
+    {
+        let span = tracing::Span::current();
+        span.record("http.status_code", resp.status().as_u16());
+        span.record("http.retry_count", retry_count.saturating_sub(1));
+    }
+
     let byte_stream = resp.bytes_stream();
     let stream = SseParser::new(byte_stream, parse_event, Some(cancel));
     Ok(Box::pin(stream))
 }
 
+#[cfg(feature = "default-http")]
 type CancelField = Option<CancellationToken>;
+
+#[cfg(not(feature = "default-http"))]
+type CancelField = Option<std::convert::Infallible>;
 
 pin_project! {
     struct SseParser<S, P> {
@@ -133,7 +177,10 @@ where
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
 
+        #[cfg(feature = "default-http")]
         if this.cancel.as_ref().is_some_and(|t| t.is_cancelled()) {
+            #[cfg(feature = "tracing")]
+            tracing::debug!("SSE stream cancelled by downstream disconnect");
             *this.done = true;
             return Poll::Ready(None);
         }
@@ -177,9 +224,23 @@ where
             if *this.done {
                 let remaining = this.buffer.len() - *this.cursor;
                 if remaining > 0 {
+                    #[cfg(feature = "tracing")]
+                    tracing::warn!(
+                        leftover_bytes = remaining,
+                        preview = &this.buffer[*this.cursor..(*this.cursor + remaining.min(64))],
+                        "SSE stream ended with unterminated data in buffer; dropping partial line"
+                    );
                     this.buffer.clear();
                     *this.cursor = 0;
                 }
+                return Poll::Ready(None);
+            }
+
+            #[cfg(feature = "default-http")]
+            if this.cancel.as_ref().is_some_and(|t| t.is_cancelled()) {
+                #[cfg(feature = "tracing")]
+                tracing::debug!("SSE stream cancelled while waiting for next chunk");
+                *this.done = true;
                 return Poll::Ready(None);
             }
 
