@@ -1,4 +1,5 @@
 use std::time::Duration;
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub fn should_retry(
@@ -27,6 +28,7 @@ pub fn should_retry(
     Some(jittered(capped))
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn jittered(delay: Duration) -> Duration {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -36,12 +38,24 @@ fn jittered(delay: Duration) -> Duration {
     delay.mul_f64(jitter_factor)
 }
 
+#[cfg(target_arch = "wasm32")]
+fn jittered(delay: Duration) -> Duration {
+    delay
+}
+
 pub fn parse_retry_after(value: &str) -> Option<Duration> {
     let trimmed = value.trim();
 
     if let Ok(secs) = trimmed.parse::<u64>() {
         return Some(Duration::from_secs(secs));
     }
+
+    #[cfg(feature = "tracing")]
+    tracing::warn!(
+        retry_after = trimmed,
+        "Retry-After header uses HTTP-date format which is not yet supported; \
+         falling back to exponential backoff"
+    );
 
     None
 }
