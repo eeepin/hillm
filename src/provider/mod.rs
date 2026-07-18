@@ -1,4 +1,5 @@
 pub(crate) mod anthropic;
+pub(crate) mod bedrock;
 pub mod cost;
 pub(crate) mod custom;
 pub(crate) mod datadriven;
@@ -12,6 +13,7 @@ pub use outbound_policy::{
 };
 
 use anthropic::AnthropicProvider;
+use bedrock::BedrockProvider;
 use datadriven::ConfigDrivenProvider;
 use openai::OpenAiProvider;
 
@@ -252,6 +254,7 @@ pub(crate) fn unix_timestamp_secs() -> u64 {
 pub enum StreamFormat {
     #[default]
     Sse,
+    AwsEventStream,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -420,6 +423,7 @@ pub(crate) fn get_provider(name: &str) -> Option<Box<dyn Provider>> {
         "anthropic" => {
             return Some(Box::new(AnthropicProvider));
         }
+        "bedrock" => return Some(Box::new(BedrockProvider::from_env())),
         _ => {
             let reg = match PROVIDER_REGISTRY.get() {
                 Some(r) => r,
