@@ -1,7 +1,8 @@
 use std::borrow::Cow;
 
 #[cfg(feature = "bedrock")]
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::HiLlmError;
+use crate::error::HiLlmResult;
 use crate::provider::{Provider, StreamFormat, registry_get};
 use crate::types::ChatCompletionChunk;
 
