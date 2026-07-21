@@ -7,7 +7,7 @@ use bytes::{Bytes, BytesMut};
 use futures_core::Stream;
 use pin_project_lite::pin_project;
 
-use crate::error::{LiterLlmError, Result};
+use crate::error::{HiLlmError, HiLlmResult};
 use crate::provider::StreamFormat;
 use crate::types::ChatCompletionChunk;
 
@@ -44,11 +44,11 @@ pub(crate) fn pool_release(buf: BytesMut) {
 }
 
 pub trait ChunkMiddleware: Send + Sync {
-    fn process(&self, chunk: ChatCompletionChunk) -> Result<Option<ChatCompletionChunk>>;
+    fn process(&self, chunk: ChatCompletionChunk) -> HiLlmResult<Option<ChatCompletionChunk>>;
 }
 
 impl<M: ChunkMiddleware + ?Sized> ChunkMiddleware for Arc<M> {
-    fn process(&self, chunk: ChatCompletionChunk) -> Result<Option<ChatCompletionChunk>> {
+    fn process(&self, chunk: ChatCompletionChunk) -> HiLlmResult<Option<ChatCompletionChunk>> {
         (**self).process(chunk)
     }
 }
@@ -67,7 +67,7 @@ pin_project! {
 
 impl<S, P> IngressStream<S, P>
 where
-    P: Fn(&str) -> Result<Option<ChatCompletionChunk>>,
+    P: Fn(&str) -> HiLlmHiLlmResult<Option<ChatCompletionChunk>>,
 {
     pub fn new_sse(inner: S, parse_event: P, cancel: CancelField) -> Self {
         Self {
@@ -83,11 +83,11 @@ where
 
 impl<S, P, E> Stream for IngressStream<S, P>
 where
-    S: Stream<Item = std::result::Result<Bytes, E>>,
-    E: Into<LiterLlmError>,
-    P: Fn(&str) -> Result<Option<ChatCompletionChunk>>,
+    S: Stream<Item = Result<Bytes, E>>,
+    E: Into<HiLlmError>,
+    P: Fn(&str) -> HiLlmResult<Option<ChatCompletionChunk>>,
 {
-    type Item = Result<ChatCompletionChunk>;
+    type Item = HiLlmResult<ChatCompletionChunk>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
@@ -153,7 +153,7 @@ where
                     const MAX_BUFFER_BYTES: usize = 1024 * 1024; // 1 MiB
                     if this.buffer.len() + bytes.len() > MAX_BUFFER_BYTES {
                         *this.done = true;
-                        return Poll::Ready(Some(Err(LiterLlmError::Streaming {
+                        return Poll::Ready(Some(Err(HiLlmError::Streaming {
                             message: format!(
                                 "SSE buffer exceeded {MAX_BUFFER_BYTES} bytes; stream aborted"
                             ),
@@ -163,7 +163,7 @@ where
                         Ok(s) => this.buffer.push_str(s),
                         Err(e) => {
                             *this.done = true;
-                            return Poll::Ready(Some(Err(LiterLlmError::Streaming {
+                            return Poll::Ready(Some(Err(HiLlmError::Streaming {
                                 message: format!("invalid UTF-8 in SSE stream: {e}"),
                             })));
                         }
@@ -205,9 +205,9 @@ impl<S> StreamPipeline<S> {
 
 impl<S> Stream for StreamPipeline<S>
 where
-    S: Stream<Item = Result<ChatCompletionChunk>>,
+    S: Stream<Item = HiLlmResult<ChatCompletionChunk>>,
 {
-    type Item = Result<ChatCompletionChunk>;
+    type Item = HiLlmResult<ChatCompletionChunk>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
@@ -238,7 +238,7 @@ where
                 Poll::Ready(Some(Err(e))) => return Poll::Ready(Some(Err(e))),
                 Poll::Ready(Some(Ok(chunk))) => {
                     let mut accumulator: Option<ChatCompletionChunk> = Some(chunk);
-                    let mut error: Option<LiterLlmError> = None;
+                    let mut error: Option<HiLlmError> = None;
 
                     for mw in this.middleware.iter() {
                         match accumulator.take() {
@@ -271,5 +271,122 @@ where
                 }
             }
         }
+    }
+}
+
+enum EgressMode {
+    Passthrough,
+    ParseAndEncode(EgressEncoding),
+}
+
+enum EgressEncoding {
+    OpenAiSse,
+}
+
+pin_project! {
+    pub struct EgressStream<S> {
+        #[pin]
+        inner: S,
+        mode: EgressMode,
+        cancel: CancelField,
+        done: bool,
+    }
+}
+
+impl<S> EgressStream<S> {
+    pub fn new(
+        inner: S,
+        ingress_format: StreamFormat,
+        egress_format: StreamFormat,
+        middleware_count: usize,
+        cancel: CancelField,
+    ) -> Self {
+        let mode = if ingress_format == egress_format && middleware_count == 0 {
+            EgressMode::Passthrough
+        } else {
+            let encoding = match egress_format {
+                StreamFormat::Sse | StreamFormat::AwsEventStream => EgressEncoding::OpenAiSse,
+            };
+            EgressMode::ParseAndEncode(encoding)
+        };
+
+        Self {
+            inner,
+            mode,
+            cancel,
+            done: false,
+        }
+    }
+}
+
+impl<S> Stream for EgressStream<S>
+where
+    S: Stream<Item = HiLlmResult<ChatCompletionChunk>>,
+{
+    type Item = HiLlmResult<Bytes>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut this = self.project();
+
+        if *this.done {
+            return Poll::Ready(None);
+        }
+
+        #[cfg(feature = "default-http")]
+        if this.cancel.as_ref().is_some_and(|t| t.is_cancelled()) {
+            *this.done = true;
+            return Poll::Ready(None);
+        }
+
+        match this.inner.as_mut().poll_next(cx) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(None) => {
+                *this.done = true;
+                Poll::Ready(None)
+            }
+            Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(e))),
+            Poll::Ready(Some(Ok(chunk))) => {
+                #[cfg(feature = "default-http")]
+                if this.cancel.as_ref().is_some_and(|t| t.is_cancelled()) {
+                    *this.done = true;
+                    return Poll::Ready(None);
+                }
+
+                match this.mode {
+                    EgressMode::Passthrough => Poll::Ready(Some(encode_sse_chunk(&chunk))),
+                    EgressMode::ParseAndEncode(EgressEncoding::OpenAiSse) => {
+                        Poll::Ready(Some(encode_sse_chunk(&chunk)))
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn encode_sse_chunk(chunk: &ChatCompletionChunk) -> HiLlmResult<Bytes> {
+    let json = serde_json::to_string(chunk).map_err(|e| HiLlmError::Streaming {
+        message: format!("failed to serialise chunk: {e}"),
+    })?;
+
+    let mut buf = pool_acquire();
+    buf.extend_from_slice(b"data: ");
+    buf.extend_from_slice(json.as_bytes());
+    buf.extend_from_slice(b"\n\n");
+
+    let frozen = Bytes::copy_from_slice(&buf);
+    buf.clear();
+    pool_release(buf);
+    Ok(frozen)
+}
+
+#[inline]
+fn memchr_newline(haystack: &[u8]) -> Option<usize> {
+    haystack.iter().position(|&b| b == b'\n')
+}
+
+fn compact_buffer(buffer: &mut String, cursor: &mut usize) {
+    if *cursor > buffer.len() / 2 {
+        buffer.drain(..*cursor);
+        *cursor = 0;
     }
 }
