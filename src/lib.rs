@@ -9,6 +9,7 @@ pub mod image;
 pub mod observability;
 pub mod provider;
 pub mod realtime;
+pub mod streaming;
 pub mod tenant;
 #[cfg(feature = "tokenizer")]
 pub mod tokenizer;
