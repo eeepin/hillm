@@ -181,3 +181,95 @@ where
         }
     }
 }
+
+pin_project! {
+    pub struct StreamPipeline<S> {
+        #[pin]
+        inner: S,
+        middleware: Vec<Box<dyn ChunkMiddleware>>,
+        cancel: CancelField,
+        done: bool,
+    }
+}
+
+impl<S> StreamPipeline<S> {
+    pub fn new(inner: S, middleware: Vec<Box<dyn ChunkMiddleware>>, cancel: CancelField) -> Self {
+        Self {
+            inner,
+            middleware,
+            cancel,
+            done: false,
+        }
+    }
+}
+
+impl<S> Stream for StreamPipeline<S>
+where
+    S: Stream<Item = Result<ChatCompletionChunk>>,
+{
+    type Item = Result<ChatCompletionChunk>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut this = self.project();
+
+        if *this.done {
+            return Poll::Ready(None);
+        }
+
+        #[cfg(feature = "default-http")]
+        if this.cancel.as_ref().is_some_and(|t| t.is_cancelled()) {
+            *this.done = true;
+            return Poll::Ready(None);
+        }
+
+        loop {
+            #[cfg(feature = "default-http")]
+            if this.cancel.as_ref().is_some_and(|t| t.is_cancelled()) {
+                *this.done = true;
+                return Poll::Ready(None);
+            }
+
+            match this.inner.as_mut().poll_next(cx) {
+                Poll::Pending => return Poll::Pending,
+                Poll::Ready(None) => {
+                    *this.done = true;
+                    return Poll::Ready(None);
+                }
+                Poll::Ready(Some(Err(e))) => return Poll::Ready(Some(Err(e))),
+                Poll::Ready(Some(Ok(chunk))) => {
+                    let mut accumulator: Option<ChatCompletionChunk> = Some(chunk);
+                    let mut error: Option<LiterLlmError> = None;
+
+                    for mw in this.middleware.iter() {
+                        match accumulator.take() {
+                            None => break,
+                            Some(c) => match mw.process(c) {
+                                Ok(Some(next)) => accumulator = Some(next),
+                                Ok(None) => {
+                                    // Middleware dropped the chunk.
+                                    accumulator = None;
+                                    break;
+                                }
+                                Err(e) => {
+                                    error = Some(e);
+                                    break;
+                                }
+                            },
+                        }
+                    }
+
+                    if let Some(e) = error {
+                        return Poll::Ready(Some(Err(e)));
+                    }
+
+                    match accumulator {
+                        None => {
+                            continue;
+                        }
+                        Some(final_chunk) => return Poll::Ready(Some(Ok(final_chunk))),
+                    }
+                }
+            }
+        }
+    }
+}
