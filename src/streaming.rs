@@ -67,7 +67,7 @@ pin_project! {
 
 impl<S, P> IngressStream<S, P>
 where
-    P: Fn(&str) -> HiLlmHiLlmResult<Option<ChatCompletionChunk>>,
+    P: Fn(&str) -> HiLlmResult<Option<ChatCompletionChunk>>,
 {
     pub fn new_sse(inner: S, parse_event: P, cancel: CancelField) -> Self {
         Self {
