@@ -52,3 +52,132 @@ impl<M: ChunkMiddleware + ?Sized> ChunkMiddleware for Arc<M> {
         (**self).process(chunk)
     }
 }
+
+pin_project! {
+    pub struct IngressStream<S, P> {
+        #[pin]
+        inner: S,
+        buffer: String,
+        cursor: usize,
+        done: bool,
+        parse_event: P,
+        cancel: CancelField,
+    }
+}
+
+impl<S, P> IngressStream<S, P>
+where
+    P: Fn(&str) -> Result<Option<ChatCompletionChunk>>,
+{
+    pub fn new_sse(inner: S, parse_event: P, cancel: CancelField) -> Self {
+        Self {
+            inner,
+            buffer: String::with_capacity(4096),
+            cursor: 0,
+            done: false,
+            parse_event,
+            cancel,
+        }
+    }
+}
+
+impl<S, P, E> Stream for IngressStream<S, P>
+where
+    S: Stream<Item = std::result::Result<Bytes, E>>,
+    E: Into<LiterLlmError>,
+    P: Fn(&str) -> Result<Option<ChatCompletionChunk>>,
+{
+    type Item = Result<ChatCompletionChunk>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut this = self.project();
+
+        #[cfg(feature = "default-http")]
+        if this.cancel.as_ref().is_some_and(|t| t.is_cancelled()) {
+            *this.done = true;
+            return Poll::Ready(None);
+        }
+
+        loop {
+            if let Some(offset) = memchr_newline(&this.buffer.as_bytes()[*this.cursor..]) {
+                let newline_pos = *this.cursor + offset;
+                let line = this.buffer[*this.cursor..newline_pos]
+                    .trim_end_matches('\r')
+                    .trim();
+
+                if line.is_empty() || line.starts_with(':') {
+                    *this.cursor = newline_pos + 1;
+                    compact_buffer(this.buffer, this.cursor);
+                    continue;
+                }
+
+                if let Some(raw) = line.strip_prefix("data:") {
+                    let data = raw.strip_prefix(' ').unwrap_or(raw).trim();
+                    if data == "[DONE]" {
+                        *this.cursor = newline_pos + 1;
+                        compact_buffer(this.buffer, this.cursor);
+                        return Poll::Ready(None);
+                    }
+                    let result = (this.parse_event)(data);
+                    *this.cursor = newline_pos + 1;
+                    compact_buffer(this.buffer, this.cursor);
+                    match result {
+                        Ok(None) => continue,
+                        Ok(Some(chunk)) => return Poll::Ready(Some(Ok(chunk))),
+                        Err(e) => return Poll::Ready(Some(Err(e))),
+                    }
+                }
+
+                *this.cursor = newline_pos + 1;
+                compact_buffer(this.buffer, this.cursor);
+                continue;
+            }
+
+            if *this.done {
+                let remaining = this.buffer.len() - *this.cursor;
+                if remaining > 0 {
+                    this.buffer.clear();
+                    *this.cursor = 0;
+                }
+                return Poll::Ready(None);
+            }
+
+            #[cfg(feature = "default-http")]
+            if this.cancel.as_ref().is_some_and(|t| t.is_cancelled()) {
+                *this.done = true;
+                return Poll::Ready(None);
+            }
+
+            match this.inner.as_mut().poll_next(cx) {
+                Poll::Ready(Some(Ok(bytes))) => {
+                    const MAX_BUFFER_BYTES: usize = 1024 * 1024; // 1 MiB
+                    if this.buffer.len() + bytes.len() > MAX_BUFFER_BYTES {
+                        *this.done = true;
+                        return Poll::Ready(Some(Err(LiterLlmError::Streaming {
+                            message: format!(
+                                "SSE buffer exceeded {MAX_BUFFER_BYTES} bytes; stream aborted"
+                            ),
+                        })));
+                    }
+                    match std::str::from_utf8(&bytes) {
+                        Ok(s) => this.buffer.push_str(s),
+                        Err(e) => {
+                            *this.done = true;
+                            return Poll::Ready(Some(Err(LiterLlmError::Streaming {
+                                message: format!("invalid UTF-8 in SSE stream: {e}"),
+                            })));
+                        }
+                    }
+                }
+                Poll::Ready(Some(Err(e))) => {
+                    return Poll::Ready(Some(Err(e.into())));
+                }
+                Poll::Ready(None) => {
+                    *this.done = true;
+                    continue;
+                }
+                Poll::Pending => return Poll::Pending,
+            }
+        }
+    }
+}
