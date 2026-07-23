@@ -1,4 +1,5 @@
 pub mod auth;
+/// Client for make llm requests
 pub mod client;
 #[cfg(feature = "tower")]
 pub mod embedding;
