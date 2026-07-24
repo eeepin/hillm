@@ -1,6 +1,6 @@
 /// Provider authentications like api-keys, OAuth tokens...
 pub mod auth;
-/// Client for make llm requests
+/// Client traits for make llm requests with reqwest-backend [`client::DefaultClient`].
 pub mod client;
 #[cfg(feature = "tower")]
 pub mod embedding;
