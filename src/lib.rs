@@ -9,6 +9,7 @@ pub mod guardrail;
 pub mod http;
 pub mod image;
 pub mod observability;
+/// Providers like OpenAI, Anthropic and custom providers...
 pub mod provider;
 pub mod realtime;
 pub mod streaming;
