@@ -17,6 +17,7 @@ pub mod tenant;
 #[cfg(feature = "tokenizer")]
 pub mod tokenizer;
 #[cfg(feature = "tower")]
+/// `tower` middleware layers like retries, rate limiting, observability, and so on...
 pub mod tower;
 /// Requests/Response Data Transfer Objects.
 pub mod types;
