@@ -35,7 +35,7 @@ hillm 已经具备比较完整的 LLM 基础设施能力：多 provider、流式
 
 ```rust
 enum ApiRoute {
-    OpenAiChat,
+    OpenAiChatCompletions,
     OpenAiResponses,
     AnthropicMessages,
 }
@@ -44,12 +44,12 @@ enum ApiRoute {
 建议的稳定序列化名称：
 
 ```text
-openai_chat
+openai_chat_completions
 openai_responses
 anthropic_messages
 ```
 
-不要使用模糊的 `openai_compatible` 作为协议类型；兼容性应由 provider 声明其支持 `OpenAiChat`，而不是成为第四种协议。
+不要使用模糊的 `openai_compatible` 作为协议类型；兼容性应由 provider 声明其支持 `OpenAiChatCompletions`，而不是成为第四种协议。
 
 ### provider 能力与 provider 实例选择分离
 
@@ -103,7 +103,7 @@ enum ModelMatch {
 
 | API 路由 | 默认 endpoint | 请求/响应形状 | 流式结束语义 |
 | --- | --- | --- | --- |
-| `OpenAiChat` | `/chat/completions` | OpenAI Chat Completion | OpenAI chat chunk，支持 `[DONE]` |
+| `OpenAiChatCompletions` | `/chat/completions` | OpenAI Chat Completion | OpenAI chat chunk，支持 `[DONE]` |
 | `OpenAiResponses` | `/responses` | OpenAI Responses API | Responses 原生事件和 response item |
 | `AnthropicMessages` | `/messages` | Anthropic Messages API | Anthropic 原生 message/content block 事件 |
 
@@ -112,7 +112,7 @@ enum ModelMatch {
 最低兼容策略：
 
 - 保留现有 `LlmClient::chat` 和 `ResponseClient`，避免立即破坏已有调用方。
-- `LlmClient::chat` 只直接对应 `OpenAiChat`；如果用它调用 `AnthropicMessages`，兼容转换必须是显式 adapter，而不是 provider 的隐藏默认行为。
+- `LlmClient::chat` 只直接对应 `OpenAiChatCompletions`；如果用它调用 `AnthropicMessages`，兼容转换必须是显式 adapter，而不是 provider 的隐藏默认行为。
 - `ResponseClient` 只对应 `OpenAiResponses`。
 - 新增 Anthropic Messages 的原生 request/response/event 类型和独立 client trait，避免把 Anthropic 的 content block、cache usage、stop reason 和 tool use 有损压缩成 OpenAI chat 类型。
 - 不在第一版中实现三种协议之间任意互转；只提供现有 Chat → Anthropic 的兼容 adapter，并标注可能丢失的信息。
@@ -158,7 +158,7 @@ enum ModelMatch {
 - [ ] 同时识别 `\n\n`、`\r\n\r\n`，并正确处理分隔符本身跨 chunk 的情况。
 - [ ] 支持 `data`、`event`、`id`、`retry` 和 comment；按规范将多个 `data:` 行以换行连接。
 - [ ] 仅在空行结束事件时将事件交给 route-specific decoder。
-- [ ] 将 `[DONE]` 判断移动到 `OpenAiChat` 流事件 decoder；通用 SSE decoder 不理解业务 payload。
+- [ ] 将 `[DONE]` 判断移动到 `OpenAiChatCompletions` 流事件 decoder；通用 SSE decoder 不理解业务 payload。
 - [ ] 让 `http/stream.rs` 和 `IngressStream` 复用同一个 decoder，删除重复状态机。
 - [ ] 统一使用 `SSE_BUFFER_MAX_BYTES`，限制“尚未消费的数据”，事件过大时返回明确错误。
 - [ ] 明确 EOF 行为：完整但没有最终空行的事件是否派发应由兼容策略决定；半个 UTF-8 字符或半个字段必须返回截断错误，不能静默丢弃。
@@ -171,7 +171,7 @@ enum ModelMatch {
 - [ ] 一个 chunk 包含多个事件。
 - [ ] 一个事件包含多条 `data:` 行。
 - [ ] comment/heartbeat 不产生业务事件。
-- [ ] OpenAI `[DONE]` 只终止 `OpenAiChat` decoder。
+- [ ] OpenAI `[DONE]` 只终止 `OpenAiChatCompletions` decoder。
 - [ ] Anthropic `event:` 与 JSON `type` 能正确传递给 Anthropic decoder。
 - [ ] 超过大小上限、非法 UTF-8、流错误、EOF 残帧返回确定性错误。
 - [ ] cancellation 后不再轮询底层 stream，也不派发残留事件。
@@ -182,7 +182,7 @@ enum ModelMatch {
 
 ### 1. 先增加纯配置模型，不改变网络行为
 
-- [ ] 新增 `ApiRoute`，包含且仅包含 `OpenAiChat`、`OpenAiResponses`、`AnthropicMessages`。
+- [ ] 新增 `ApiRoute`，包含且仅包含 `OpenAiChatCompletions`、`OpenAiResponses`、`AnthropicMessages`。
 - [ ] 为静态、远端数据驱动和 custom provider 配置增加 `available_routes` 与 `default_route`。
 - [ ] 为文件配置增加相同字段，并对未知值、空列表和非法 default 做严格校验。
 - [ ] 给内置 provider 设置明确能力：OpenAI 至少支持 Chat 和 Responses；Anthropic 支持 Messages；其他 provider 依据真实端点配置，不进行乐观推断。
@@ -203,7 +203,7 @@ enum ModelMatch {
 ### 3. 将 endpoint 和 codec 绑定到 route
 
 - [ ] 为每种 `ApiRoute` 提供 route-specific codec：请求编码、非流响应解码、SSE 事件解码和结束条件。
-- [ ] `OpenAiChat` 使用 `/chat/completions` 与 Chat Completion 原生类型。
+- [ ] `OpenAiChatCompletions` 使用 `/chat/completions` 与 Chat Completion 原生类型。
 - [ ] `OpenAiResponses` 使用 `/responses` 与 Responses 原生类型；补齐其流式 API，而不是先转换成 chat chunk。
 - [ ] `AnthropicMessages` 使用 `/messages` 与 Anthropic 原生类型；新增原生 request、response、usage、content block 和 stream event 类型。
 - [ ] 将现有 Anthropic → OpenAI chat 的转换保留为显式 compatibility adapter。
