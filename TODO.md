@@ -34,7 +34,7 @@ hillm 已经具备比较完整的 LLM 基础设施能力：多 provider、流式
 本文中的“API 路由”表示请求和响应所使用的上游协议，不表示负载均衡或 Tower Router 的流量选择策略。建议使用独立类型，避免与现有 `tower::router` 混淆：
 
 ```rust
-enum ApiRoute {
+enum APIType {
     OpenAiChatCompletions,
     OpenAiResponses,
     AnthropicMessages,
@@ -58,8 +58,8 @@ provider 配置描述可用能力：
 ```rust
 ProviderConfig {
     // 现有字段……
-    available_routes: Vec<ApiRoute>,
-    default_route: Option<ApiRoute>,
+    available_api_types: Vec<APIType>,
+    default_api_type: Option<APIType>,
 }
 ```
 
@@ -68,17 +68,17 @@ ProviderConfig {
 ```rust
 ProviderInstance {
     config: Arc<ProviderConfig>,
-    selected_route: ApiRoute,
+    api_type: APIType,
 }
 ```
 
 约束：
 
-- `available_routes` 不得为空。
-- `default_route` 必须属于 `available_routes`。
-- 显式传入的 `selected_route` 必须属于 `available_routes`，否则创建时立即返回结构化错误。
+- `available_api_types` 不得为空。
+- `default_api_type` 必须属于 `available_api_types`。
+- 显式传入的 `api_type` 必须属于 `available_api_types`，否则创建时立即返回结构化错误。
 - 一个 provider 实例在生命周期内不自动切换协议，避免同一对象的 endpoint、header、序列化和流式解码规则发生隐式变化。
-- 如果需要同一 provider 同时使用两种协议，应创建两个选择不同 route 的实例；共享 HTTP client 和凭据可以作为后续优化。
+- 如果需要同一 provider 同时使用两种协议，应创建两个选择不同 api type 的实例；共享 HTTP client 和凭据可以作为后续优化。
 
 ### provider 匹配顺序
 
@@ -86,8 +86,8 @@ ProviderInstance {
 
 1. 如果调用方显式指定 provider，先按 provider 名称查找。
 2. 如果未指定 provider，再按 model 的精确规则或明确的前缀规则匹配。
-3. 使用 `selected_route` 过滤不支持该协议的 provider。
-4. 没有匹配时返回 `ProviderNotFound` 或 `RouteUnsupported`。
+3. 使用 `api_type` 过滤不支持该协议的 provider。
+4. 没有匹配时返回 `ProviderNotFound` 或 `APITypeUnsupported`。
 5. 多个 provider 同时匹配时返回歧义错误；不要依赖注册顺序，也不要静默回退到 OpenAI。
 
 模型规则需要明确区分精确值和前缀，避免当前 `models: Vec<String>` 同时被测试理解为“前缀”、被实现理解为“精确名称”的问题。最小配置可以使用：
@@ -182,8 +182,8 @@ enum ModelMatch {
 
 ### 1. 先增加纯配置模型，不改变网络行为
 
-- [ ] 新增 `ApiRoute`，包含且仅包含 `OpenAiChatCompletions`、`OpenAiResponses`、`AnthropicMessages`。
-- [ ] 为静态、远端数据驱动和 custom provider 配置增加 `available_routes` 与 `default_route`。
+- [ ] 新增 `APIType`，包含且仅包含 `OpenAiChatCompletions`、`OpenAiResponses`、`AnthropicMessages`。
+- [ ] 为静态、远端数据驱动和 custom provider 配置增加 `available_api_types` 与 `default_route`。
 - [ ] 为文件配置增加相同字段，并对未知值、空列表和非法 default 做严格校验。
 - [ ] 给内置 provider 设置明确能力：OpenAI 至少支持 Chat 和 Responses；Anthropic 支持 Messages；其他 provider 依据真实端点配置，不进行乐观推断。
 - [ ] 保留旧配置的兼容默认值：只在旧配置未填写 routes 时推导原行为，并输出迁移说明；新配置必须显式声明。
@@ -202,7 +202,7 @@ enum ModelMatch {
 
 ### 3. 将 endpoint 和 codec 绑定到 route
 
-- [ ] 为每种 `ApiRoute` 提供 route-specific codec：请求编码、非流响应解码、SSE 事件解码和结束条件。
+- [ ] 为每种 `APIType` 提供 route-specific codec：请求编码、非流响应解码、SSE 事件解码和结束条件。
 - [ ] `OpenAiChatCompletions` 使用 `/chat/completions` 与 Chat Completion 原生类型。
 - [ ] `OpenAiResponses` 使用 `/responses` 与 Responses 原生类型；补齐其流式 API，而不是先转换成 chat chunk。
 - [ ] `AnthropicMessages` 使用 `/messages` 与 Anthropic 原生类型；新增原生 request、response、usage、content block 和 stream event 类型。
@@ -228,7 +228,7 @@ enum ModelMatch {
 
 1. **基线修复**：修复现有 9 个测试、token 下溢、env 扫描和 Clippy。
 2. **SSE decoder**：只替换传输层状态机并补分片测试，不同时改 provider API。
-3. **路由配置模型**：加入 `ApiRoute`、`available_routes`、`default_route` 和校验，但暂不改变发送路径。
+3. **路由配置模型**：加入 `APIType`、`available_api_types`、`default_route` 和校验，但暂不改变发送路径。
 4. **provider 实例选择**：工厂创建时选择 route，修复 provider/model 匹配和 silent fallback。
 5. **OpenAI Chat codec**：先把现有行为迁入第一个 route-specific codec，保持兼容。
 6. **OpenAI Responses codec**：接入现有 ResponseClient，补原生 streaming。
@@ -271,7 +271,7 @@ enum ModelMatch {
 - [ ] 添加 README、LICENSE、CHANGELOG、examples、CI、贡献指南和安全策略。
 - [ ] 补齐 Cargo package metadata：description、license、repository、documentation、keywords、categories、rust-version。
 - [ ] 为 feature、provider route、SSE 限制、兼容 adapter 和安全默认值提供公开文档。
-- [ ] 在 0.2 发布前明确 Provider、ApiRoute、错误类型和配置文件的稳定契约。
+- [ ] 在 0.2 发布前明确 Provider、APIType、错误类型和配置文件的稳定契约。
 
 ## 暂不纳入最小方案
 
