@@ -1,0 +1,299 @@
+# hillm 优化 TODO
+
+## 目标与范围
+
+本文档基于当前代码和本地验证结果，整理 hillm 的优缺点、风险以及最小化改进顺序。
+
+当前阶段的核心目标不是继续增加功能，而是先建立可信的正确性基线，并完成以下两项结构性修复：
+
+1. 将 SSE 处理改为与 HTTP chunk 边界无关、符合事件语义的增量解析。
+2. 将上游 API 协议显式建模为 OpenAI Chat、OpenAI Responses 和 Anthropic Messages 三种路由，使 provider 可以声明支持的路由，并在创建 provider 实例时选择其中一种。
+
+本文档只描述工作项，不包含代码修改。
+
+## 当前结论
+
+hillm 已经具备比较完整的 LLM 基础设施能力：多 provider、流式响应、Tower 中间件、缓存、singleflight、熔断、限流、预算、健康检查、租户、guardrail、可观测性和向量存储。Provider、Client、CacheStore、BudgetLedger 等 trait 的抽象方向合理，API Key 脱敏、出站地址校验、重试退避等安全和可靠性意识也较好。
+
+主要问题是功能规模已经达到基础设施库级别，但测试、feature 边界、协议模型和发布工程仍处于原型阶段：
+
+- `cargo test --locked` 当前为 74 通过、9 失败、9 忽略。
+- `cargo clippy --locked --all-targets -- -D warnings` 当前有 11 项错误。
+- `cargo check --locked --no-default-features` 当前有 19 个编译错误。
+- `--all-features` 需要外部 `protoc`，当前环境无法完成构建。
+- 复杂 Tower 中间件、streaming、realtime、tenant 和 vectorstore 的行为测试明显不足。
+- `client/mod.rs` 等文件过大，公开 API 和内部职责逐渐耦合。
+- 仓库缺少 README、examples、CI、CHANGELOG、LICENSE 和独立集成测试。
+
+因此建议暂缓新增中间件，按照下述 P0 → P1 → P2 顺序推进。
+
+## 需要先确定的协议模型
+
+### API 路由不是 provider 路由算法
+
+本文中的“API 路由”表示请求和响应所使用的上游协议，不表示负载均衡或 Tower Router 的流量选择策略。建议使用独立类型，避免与现有 `tower::router` 混淆：
+
+```rust
+enum ApiRoute {
+    OpenAiChat,
+    OpenAiResponses,
+    AnthropicMessages,
+}
+```
+
+建议的稳定序列化名称：
+
+```text
+openai_chat
+openai_responses
+anthropic_messages
+```
+
+不要使用模糊的 `openai_compatible` 作为协议类型；兼容性应由 provider 声明其支持 `OpenAiChat`，而不是成为第四种协议。
+
+### provider 能力与 provider 实例选择分离
+
+provider 配置描述可用能力：
+
+```rust
+ProviderConfig {
+    // 现有字段……
+    available_routes: Vec<ApiRoute>,
+    default_route: Option<ApiRoute>,
+}
+```
+
+创建出来的 provider 对象只选择一种实际路由：
+
+```rust
+ProviderInstance {
+    config: Arc<ProviderConfig>,
+    selected_route: ApiRoute,
+}
+```
+
+约束：
+
+- `available_routes` 不得为空。
+- `default_route` 必须属于 `available_routes`。
+- 显式传入的 `selected_route` 必须属于 `available_routes`，否则创建时立即返回结构化错误。
+- 一个 provider 实例在生命周期内不自动切换协议，避免同一对象的 endpoint、header、序列化和流式解码规则发生隐式变化。
+- 如果需要同一 provider 同时使用两种协议，应创建两个选择不同 route 的实例；共享 HTTP client 和凭据可以作为后续优化。
+
+### provider 匹配顺序
+
+最小、可预测的匹配顺序：
+
+1. 如果调用方显式指定 provider，先按 provider 名称查找。
+2. 如果未指定 provider，再按 model 的精确规则或明确的前缀规则匹配。
+3. 使用 `selected_route` 过滤不支持该协议的 provider。
+4. 没有匹配时返回 `ProviderNotFound` 或 `RouteUnsupported`。
+5. 多个 provider 同时匹配时返回歧义错误；不要依赖注册顺序，也不要静默回退到 OpenAI。
+
+模型规则需要明确区分精确值和前缀，避免当前 `models: Vec<String>` 同时被测试理解为“前缀”、被实现理解为“精确名称”的问题。最小配置可以使用：
+
+```rust
+enum ModelMatch {
+    Exact(String),
+    Prefix(String),
+}
+```
+
+### 三种路由的职责
+
+| API 路由 | 默认 endpoint | 请求/响应形状 | 流式结束语义 |
+| --- | --- | --- | --- |
+| `OpenAiChat` | `/chat/completions` | OpenAI Chat Completion | OpenAI chat chunk，支持 `[DONE]` |
+| `OpenAiResponses` | `/responses` | OpenAI Responses API | Responses 原生事件和 response item |
+| `AnthropicMessages` | `/messages` | Anthropic Messages API | Anthropic 原生 message/content block 事件 |
+
+三个路由应分别拥有 endpoint、请求编码、响应解码和流事件解码逻辑。通用 Provider trait 不应再通过一组默认的 `chat_completions_path()`、`responses_path()` 和一个无类型的 `transform_request(Value)` 来隐式判断协议。
+
+最低兼容策略：
+
+- 保留现有 `LlmClient::chat` 和 `ResponseClient`，避免立即破坏已有调用方。
+- `LlmClient::chat` 只直接对应 `OpenAiChat`；如果用它调用 `AnthropicMessages`，兼容转换必须是显式 adapter，而不是 provider 的隐藏默认行为。
+- `ResponseClient` 只对应 `OpenAiResponses`。
+- 新增 Anthropic Messages 的原生 request/response/event 类型和独立 client trait，避免把 Anthropic 的 content block、cache usage、stop reason 和 tool use 有损压缩成 OpenAI chat 类型。
+- 不在第一版中实现三种协议之间任意互转；只提供现有 Chat → Anthropic 的兼容 adapter，并标注可能丢失的信息。
+
+## P0：恢复可信基线
+
+### 1. 修复现有默认测试
+
+- [ ] 明确 custom provider 的模型匹配语义，修复 `detect_custom_provider()` 只比较 provider 名称、完全不使用 `models` 的问题。
+- [ ] 将 custom provider 的全局注册表测试隔离；避免测试并发清空共享状态。
+- [ ] 更新 provider registry 的 JSON fixture，使其符合当前 `ProviderEntry` 和 `ModelEntry` 的反序列化结构。
+- [ ] 保证 `cargo test --locked` 零失败；需要网络的测试继续独立标注，但不得用网络测试代替本地 fixture 测试。
+
+完成标准：默认测试稳定全绿，连续和并行执行结果一致。
+
+### 2. 修复已知正确性问题
+
+- [ ] 用 `saturating_sub` 或显式校验修复 cache read/write token 总和超过 input token 时的无符号下溢。
+- [ ] 修复 provider 环境变量扫描只检查第一个元素的问题。
+- [ ] 处理 `cargo clippy --locked --all-targets -- -D warnings` 的全部错误。
+- [ ] 为上述两个逻辑问题添加不依赖网络的回归测试。
+
+完成标准：fmt、默认测试和严格 Clippy 均通过。
+
+## P0：重写 SSE 增量解析边界
+
+### 当前问题
+
+当前 `http/stream.rs` 和 `streaming.rs::IngressStream` 已经维护跨 HTTP chunk 的行缓冲，因此“普通 JSON 行只是在任意 chunk 位置断开”在部分情况下可以工作；但它们仍然不是完整、健壮的 SSE decoder：
+
+- 遇到一条 `data:` 行便立刻调用 JSON parser，没有等待空行表示的完整 SSE 事件结束。
+- 不能将同一事件中的多条 `data:` 行按 SSE 规则使用 `\n` 合并。
+- HTTP chunk 被单独执行 UTF-8 校验；一个多字节 UTF-8 字符跨 chunk 时会被错误拒绝。
+- `event:`、`id:`、`retry:` 字段没有形成事件对象，协议 decoder 无法使用事件类型。
+- `[DONE]` 被硬编码进通用传输 parser，而它只属于特定上游协议。
+- `http/stream.rs` 和 `streaming.rs` 有两套近似的 SSE 解析逻辑，容易继续漂移。
+- 当前没有针对任意 chunk 分割、CRLF 分割、多行 data、UTF-8 分割和 EOF 残帧的单元测试。
+
+### 最小实现步骤
+
+- [ ] 提取唯一的、与 reqwest 解耦的 `SseDecoder`，输入 `Bytes`，输出完整 `SseEvent`。
+- [ ] 内部使用字节缓冲而不是对每个 HTTP chunk 转为 `&str`；只在完整字段行或完整事件形成后校验 UTF-8。
+- [ ] 同时识别 `\n\n`、`\r\n\r\n`，并正确处理分隔符本身跨 chunk 的情况。
+- [ ] 支持 `data`、`event`、`id`、`retry` 和 comment；按规范将多个 `data:` 行以换行连接。
+- [ ] 仅在空行结束事件时将事件交给 route-specific decoder。
+- [ ] 将 `[DONE]` 判断移动到 `OpenAiChat` 流事件 decoder；通用 SSE decoder 不理解业务 payload。
+- [ ] 让 `http/stream.rs` 和 `IngressStream` 复用同一个 decoder，删除重复状态机。
+- [ ] 统一使用 `SSE_BUFFER_MAX_BYTES`，限制“尚未消费的数据”，事件过大时返回明确错误。
+- [ ] 明确 EOF 行为：完整但没有最终空行的事件是否派发应由兼容策略决定；半个 UTF-8 字符或半个字段必须返回截断错误，不能静默丢弃。
+
+### 必需的回归测试
+
+- [ ] JSON 在每一个可能的字节位置切成两个或多个 HTTP chunk，解析结果保持一致。
+- [ ] 中文、emoji 等 UTF-8 字符在每个字节位置切分。
+- [ ] `data:`、字段名、冒号、`\r\n` 和事件终止空行分别跨 chunk。
+- [ ] 一个 chunk 包含多个事件。
+- [ ] 一个事件包含多条 `data:` 行。
+- [ ] comment/heartbeat 不产生业务事件。
+- [ ] OpenAI `[DONE]` 只终止 `OpenAiChat` decoder。
+- [ ] Anthropic `event:` 与 JSON `type` 能正确传递给 Anthropic decoder。
+- [ ] 超过大小上限、非法 UTF-8、流错误、EOF 残帧返回确定性错误。
+- [ ] cancellation 后不再轮询底层 stream，也不派发残留事件。
+
+完成标准：任意 HTTP chunk 分割不会改变事件序列；传输 decoder 完全不知道 OpenAI 或 Anthropic 类型。
+
+## P0：引入三种显式 API 路由
+
+### 1. 先增加纯配置模型，不改变网络行为
+
+- [ ] 新增 `ApiRoute`，包含且仅包含 `OpenAiChat`、`OpenAiResponses`、`AnthropicMessages`。
+- [ ] 为静态、远端数据驱动和 custom provider 配置增加 `available_routes` 与 `default_route`。
+- [ ] 为文件配置增加相同字段，并对未知值、空列表和非法 default 做严格校验。
+- [ ] 给内置 provider 设置明确能力：OpenAI 至少支持 Chat 和 Responses；Anthropic 支持 Messages；其他 provider 依据真实端点配置，不进行乐观推断。
+- [ ] 保留旧配置的兼容默认值：只在旧配置未填写 routes 时推导原行为，并输出迁移说明；新配置必须显式声明。
+
+完成标准：配置可以 round-trip，所有非法组合在 provider 创建前失败。
+
+### 2. provider 工厂在创建实例时选择路由
+
+- [ ] 将 `get_provider(name)` 演进为显式选择 route 的工厂接口，例如 `create_provider(name, selected_route)`。
+- [ ] custom provider 检测同时校验 provider/model match 和 route 支持。
+- [ ] `base_url` 不再无条件创建 `OpenAiCompatibleProvider`；使用自定义 base URL 时必须给出 route，或使用明确的兼容默认值并标为待弃用。
+- [ ] provider 实例暴露只读 `selected_route()`，实例创建后不得改变。
+- [ ] 增加 `RouteUnsupported`、`AmbiguousProvider` 等结构化错误，避免统一返回 `BadRequest(String)`。
+
+完成标准：每个 provider 实例的 route 唯一、可观察且已验证；不再静默回退到 OpenAI。
+
+### 3. 将 endpoint 和 codec 绑定到 route
+
+- [ ] 为每种 `ApiRoute` 提供 route-specific codec：请求编码、非流响应解码、SSE 事件解码和结束条件。
+- [ ] `OpenAiChat` 使用 `/chat/completions` 与 Chat Completion 原生类型。
+- [ ] `OpenAiResponses` 使用 `/responses` 与 Responses 原生类型；补齐其流式 API，而不是先转换成 chat chunk。
+- [ ] `AnthropicMessages` 使用 `/messages` 与 Anthropic 原生类型；新增原生 request、response、usage、content block 和 stream event 类型。
+- [ ] 将现有 Anthropic → OpenAI chat 的转换保留为显式 compatibility adapter。
+- [ ] 逐步淘汰通用 `transform_request(&mut Value)` / `transform_response(&mut Value)` 在核心协议路由中的使用；无法静态表达的 provider 参数映射可以保留为最后一层扩展。
+
+完成标准：三条路由分别能执行非流请求；三类类型不会被强制归一成 OpenAI Chat 后再发送。
+
+### 4. 路由集成测试
+
+- [ ] 用本地 mock HTTP service 断言三种 route 的 URL、header 和 JSON body。
+- [ ] 断言 provider 不支持 route 时在发送请求前失败。
+- [ ] 断言显式 provider、model match、route filter 和歧义处理的优先级。
+- [ ] 断言三种非流响应保留各自的原生字段。
+- [ ] 断言三种流式响应在任意 chunk 分割下保持一致。
+- [ ] 断言旧 Chat API 兼容路径仍可用，并记录发生了哪种 adapter 转换。
+
+完成标准：三种 route 各有至少一个完整的非流和流式端到端测试，测试不访问公网。
+
+## 建议的最小交付切片
+
+为控制风险，建议按以下顺序形成小而独立的改动，每一步都保持测试可运行：
+
+1. **基线修复**：修复现有 9 个测试、token 下溢、env 扫描和 Clippy。
+2. **SSE decoder**：只替换传输层状态机并补分片测试，不同时改 provider API。
+3. **路由配置模型**：加入 `ApiRoute`、`available_routes`、`default_route` 和校验，但暂不改变发送路径。
+4. **provider 实例选择**：工厂创建时选择 route，修复 provider/model 匹配和 silent fallback。
+5. **OpenAI Chat codec**：先把现有行为迁入第一个 route-specific codec，保持兼容。
+6. **OpenAI Responses codec**：接入现有 ResponseClient，补原生 streaming。
+7. **Anthropic Messages codec**：增加原生类型和 client；将旧转换降级为显式 adapter。
+8. **三路由集成测试**：本地 mock server + 任意 SSE chunk 分割测试。
+
+不要在一个改动中同时重写 SSE、provider registry、三套 DTO 和全部 Client trait；否则失败时很难区分传输、匹配、序列化还是兼容层问题。
+
+## P1：feature、网络和安全边界
+
+- [ ] 修复 `--no-default-features`，为所有 `reqwest`、`tokio`、`rustls`、`DefaultClient` 和 cancellation 类型补齐条件编译边界。
+- [ ] 建立 CI feature 矩阵：default、no-default、tower、wasm、bedrock、all-features。
+- [ ] 在 CI 提供 `protoc`，或采用可复现的 vendored protoc 方案验证 etcd feature。
+- [ ] 将 JSON、binary、错误 body、SSE 和 EventStream 全部接入统一的有界读取策略；当前 `RESPONSE_BODY_MAX_BYTES` 等常量不能只定义不使用。
+- [ ] 即使 `OutboundPolicy::Off`，也始终解析 URL 并限制为 http/https；策略只控制 DNS 和地址范围。
+- [ ] 对服务端场景提供安全默认配置 `DenyPrivate`。
+- [ ] 将进程级全局 outbound policy 和 custom provider registry 演进为 client/registry 实例，避免不同租户互相影响。
+- [ ] provider registry 内置版本化快照，远端数据只作为显式刷新来源；离线时仍可查询能力和成本。
+- [ ] 为配置文件增加 `api_key_env`，文档中不再推荐明文 `api_key`。
+
+## P1：关键基础设施测试
+
+- [ ] cache：过期、驱逐、哈希碰撞、错误缓存和 TTL override。
+- [ ] singleflight：leader 取消/panic、follower lag、关闭通道和多并发一致性。
+- [ ] circuit/fallback/hedge/timeout：状态迁移和中间件顺序。
+- [ ] budget/rate limit：并发请求是否超卖、窗口切换和精度。
+- [ ] router/health：ready 状态、动态 discover、健康状态切换和无可用上游。
+- [ ] idempotency：并发重复请求、失败结果和过期。
+- [ ] guardrail：输入/输出阶段顺序和全局 registry 隔离。
+- [ ] realtime、tenant、vectorstore 的错误和并发行为。
+
+测试应优先使用暂停的 Tokio 时间、可注入时钟、mock `Service` 和本地 HTTP service，不依赖 sleep 或公网。
+
+## P2：结构与发布质量
+
+- [ ] 拆分 `client/mod.rs`：traits、core、chat、responses、anthropic_messages、files、batches、streaming。
+- [ ] 拆分大 provider 文件，将 DTO/codec 与 provider 配置分离。
+- [ ] 收窄根模块的 `pub use types::*`，减少未来的 API 兼容负担。
+- [ ] 评估在 API 稳定后拆分 `hillm-core`、`hillm-http`、`hillm-tower` 和 provider crates；当前先做文件级拆分。
+- [ ] 添加 README、LICENSE、CHANGELOG、examples、CI、贡献指南和安全策略。
+- [ ] 补齐 Cargo package metadata：description、license、repository、documentation、keywords、categories、rust-version。
+- [ ] 为 feature、provider route、SSE 限制、兼容 adapter 和安全默认值提供公开文档。
+- [ ] 在 0.2 发布前明确 Provider、ApiRoute、错误类型和配置文件的稳定契约。
+
+## 暂不纳入最小方案
+
+以下事项有价值，但不应阻塞三路由和 SSE 修复的第一版：
+
+- 自动根据一次请求失败在三种 API route 之间探测或切换。
+- 将 OpenAI Responses 与 Anthropic Messages 完整无损转换为 Chat Completion。
+- 同一 provider 实例按请求动态选择 route。
+- 基于模型能力自动选择最优协议。
+- 重新设计全部 Tower `LlmRequestKind` 和缓存键。
+- 立即拆成多个 crate。
+
+这些行为会引入隐式决策、缓存键变化和难以解释的 fallback。第一版应坚持“配置声明能力、创建实例时显式选择、发送期间保持不变”。
+
+## 最终验收门槛
+
+- [ ] `cargo fmt --all -- --check` 通过。
+- [ ] `cargo clippy --locked --all-targets -- -D warnings` 通过。
+- [ ] `cargo test --locked` 零失败。
+- [ ] 受支持的 feature 矩阵全部编译；all-features 在有 protoc 的 CI 中通过。
+- [ ] 任意 HTTP chunk 分割不改变三种路由的流式事件结果。
+- [ ] provider 的可用 route 列表、默认 route、实例选择 route 均可配置且经过校验。
+- [ ] OpenAI Chat、OpenAI Responses、Anthropic Messages 各有原生非流和流式集成测试。
+- [ ] 不支持、未匹配和歧义情况均返回结构化错误，不静默回退到 OpenAI。
+- [ ] 现有 Chat 调用方有明确、经过测试的兼容迁移路径。
