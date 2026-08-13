@@ -211,7 +211,7 @@ enum EgressMode {
 }
 
 enum EgressEncoding {
-    OpenAiSse,
+    OpenAiSSE,
 }
 
 pin_project! {
@@ -236,7 +236,7 @@ impl<S> EgressStream<S> {
             EgressMode::Passthrough
         } else {
             let encoding = match egress_format {
-                StreamFormat::Sse | StreamFormat::AwsEventStream => EgressEncoding::OpenAiSse,
+                StreamFormat::SSE | StreamFormat::AwsEventStream => EgressEncoding::OpenAiSSE,
             };
             EgressMode::ParseAndEncode(encoding)
         };
@@ -285,7 +285,7 @@ where
 
                 match this.mode {
                     EgressMode::Passthrough => Poll::Ready(Some(encode_sse_chunk(&chunk))),
-                    EgressMode::ParseAndEncode(EgressEncoding::OpenAiSse) => {
+                    EgressMode::ParseAndEncode(EgressEncoding::OpenAiSSE) => {
                         Poll::Ready(Some(encode_sse_chunk(&chunk)))
                     }
                 }

@@ -63,7 +63,7 @@ where
     }
 
     let byte_stream = resp.bytes_stream();
-    let stream = SseParser::new(byte_stream, parse_event, None);
+    let stream = SSEParser::new(byte_stream, parse_event, None);
     Ok(Box::pin(stream))
 }
 
@@ -121,7 +121,7 @@ where
     }
 
     let byte_stream = resp.bytes_stream();
-    let stream = SseParser::new(byte_stream, parse_event, Some(cancel));
+    let stream = SSEParser::new(byte_stream, parse_event, Some(cancel));
     Ok(Box::pin(stream))
 }
 
@@ -134,7 +134,7 @@ type CancelField = Option<std::convert::Infallible>;
 pin_project! {
     /// Thin wrapper around SSEStream that adds cancel-token support and
     /// maps SSEEvent to ChatCompletionChunk via the parse_event closure.
-    struct SseParser<S, P> {
+    struct SSEParser<S, P> {
         #[pin]
         stream: SSEStream<S>,
         parse_event: P,
@@ -142,7 +142,7 @@ pin_project! {
     }
 }
 
-impl<S, P> SseParser<S, P>
+impl<S, P> SSEParser<S, P>
 where
     P: Fn(&str) -> HiLlmResult<Option<ChatCompletionChunk>>,
 {
@@ -155,7 +155,7 @@ where
     }
 }
 
-impl<S, P> Stream for SseParser<S, P>
+impl<S, P> Stream for SSEParser<S, P>
 where
     S: Stream<Item = Result<Bytes, reqwest::Error>>,
     P: Fn(&str) -> HiLlmResult<Option<ChatCompletionChunk>>,
