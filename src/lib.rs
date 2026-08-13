@@ -12,6 +12,7 @@ pub mod observability;
 /// Providers like OpenAI, Anthropic and custom providers...
 pub mod provider;
 pub mod realtime;
+pub mod sse;
 pub mod streaming;
 pub mod tenant;
 #[cfg(feature = "tokenizer")]
