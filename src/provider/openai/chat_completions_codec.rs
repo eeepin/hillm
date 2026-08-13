@@ -6,7 +6,7 @@ use serde_json;
 use crate::error::{HiLlmError, HiLlmResult};
 use crate::provider::APIType;
 use crate::provider::codec::APITypeCodec;
-use crate::types::chat::{ChatCompletionRequest, ChatCompletionResponse, ChatCompletionChunk};
+use crate::types::chat::{ChatCompletionChunk, ChatCompletionRequest, ChatCompletionResponse};
 
 /// Codec for OpenAI Chat Completions API.
 pub struct OpenAIChatCodec;
@@ -55,23 +55,23 @@ impl APITypeCodec for OpenAIChatCodec {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::chat::{ChatCompletionRequest, ChatCompletionResponse, ChatCompletionChunk};
-    use crate::types::message::{Message, UserMessage, MessageContent};
+    use crate::types::chat::{ChatCompletionChunk, ChatCompletionRequest, ChatCompletionResponse};
+    use crate::types::message::{Message, MessageContent, UserMessage};
 
     #[test]
-    fn test_openai_chat_codec_api_type() {
+    fn test_openai_chat_completions_codec_api_type() {
         let codec = OpenAIChatCodec;
         assert_eq!(codec.api_type(), APIType::OpenAIChatCompletions);
     }
 
     #[test]
-    fn test_openai_chat_codec_endpoint_path() {
+    fn test_openai_chat_completions_codec_endpoint_path() {
         let codec = OpenAIChatCodec;
         assert_eq!(codec.endpoint_path(), "/chat/completions");
     }
 
     #[test]
-    fn test_openai_chat_codec_encode_request() {
+    fn test_openai_chat_completions_codec_encode_request() {
         let codec = OpenAIChatCodec;
         let request = ChatCompletionRequest {
             model: "gpt-4".to_string(),
@@ -91,14 +91,14 @@ mod tests {
     }
 
     #[test]
-    fn test_openai_chat_codec_parse_stream_event_done() {
+    fn test_openai_chat_completions_codec_parse_stream_event_done() {
         let codec = OpenAIChatCodec;
         let result = codec.parse_stream_event("[DONE]").unwrap();
         assert!(result.is_none());
     }
 
     #[test]
-    fn test_openai_chat_codec_parse_stream_event_chunk() {
+    fn test_openai_chat_completions_codec_parse_stream_event_chunk() {
         let codec = OpenAIChatCodec;
         let chunk_json = r#"{
             "id": "chatcmpl-123",
