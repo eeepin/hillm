@@ -7,6 +7,7 @@ use super::{
     Usage,
 };
 use crate::provider::cost::completion_cost_with_cache;
+use crate::types::{APIRequest, APIResponse};
 
 /// Finish Reason
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -346,3 +347,20 @@ mod tests {
         assert!(reser.contains("\"cached_tokens\":30"));
     }
 }
+
+// APIRequest/APIResponse trait implementations
+
+impl APIRequest for ChatCompletionRequest {
+    type Response = ChatCompletionResponse;
+    type StreamEvent = ChatCompletionChunk;
+
+    fn model(&self) -> &str {
+        &self.model
+    }
+
+    fn stream(&self) -> bool {
+        self.stream.unwrap_or(false)
+    }
+}
+
+impl APIResponse for ChatCompletionResponse {}
