@@ -279,7 +279,7 @@ pub trait BatchClient: Send + Sync {
 pub trait BatchClient {
     fn create_batch(&self, req: CreateBatchRequest) -> BoxFuture<'_, HiLlmResult<BatchObject>>;
 
-    fn retrieve_batch(&self, batch_id: &str) -> BoxFuture<'_, ReHiLlmResultsult<BatchObject>>;
+    fn retrieve_batch(&self, batch_id: &str) -> BoxFuture<'_, HiLlmResult<BatchObject>>;
 
     fn list_batches(
         &self,
