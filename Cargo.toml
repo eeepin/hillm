@@ -10,10 +10,9 @@ default-http = [
     "dep:rustls",
     "dep:tokio",
     "dep:tokio-util",
-    "dep:memchr",
     "dep:gcp_auth",
 ]
-wasm-http = ["dep:reqwest", "dep:memchr", "dep:gloo-timers", "dep:web-time"]
+wasm-http = ["dep:reqwest", "dep:gloo-timers", "dep:web-time"]
 tracing = ["dep:tracing"]
 tower = ["dep:tower", "dep:tower-http", "dep:futures-util", "tracing"]
 opendal = ["dep:opendal", "tower"]
@@ -49,7 +48,7 @@ hf-hub = { version = "0.4", optional = true, default-features = false, features 
     "rustls-tls",
 ] }
 gcp_auth = { version = "0.12.7", optional = true }
-memchr = { version = "2.8.2", optional = true }
+memchr = "2.8.2"
 pin-project-lite = "0.2.17"
 reqwest = { version = "0.13.4", optional = true, default-features = false, features = [
     "json",
