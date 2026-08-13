@@ -121,19 +121,19 @@ enum ModelMatch {
 
 ### 1. 修复现有默认测试
 
-- [ ] 明确 custom provider 的模型匹配语义，修复 `detect_custom_provider()` 只比较 provider 名称、完全不使用 `models` 的问题。
-- [ ] 将 custom provider 的全局注册表测试隔离；避免测试并发清空共享状态。
-- [ ] 更新 provider registry 的 JSON fixture，使其符合当前 `ProviderEntry` 和 `ModelEntry` 的反序列化结构。
-- [ ] 保证 `cargo test --locked` 零失败；需要网络的测试继续独立标注，但不得用网络测试代替本地 fixture 测试。
+- [x] 明确 custom provider 的模型匹配语义，修复 `detect_custom_provider()` 只比较 provider 名称、完全不使用 `models` 的问题。
+- [x] 将 custom provider 的全局注册表测试隔离；避免测试并发清空共享状态。
+- [x] 更新 provider registry 的 JSON fixture，使其符合当前 `ProviderEntry` 和 `ModelEntry` 的反序列化结构。
+- [x] 保证 `cargo test --locked` 零失败；需要网络的测试继续独立标注，但不得用网络测试代替本地 fixture 测试。
 
 完成标准：默认测试稳定全绿，连续和并行执行结果一致。
 
 ### 2. 修复已知正确性问题
 
-- [ ] 用 `saturating_sub` 或显式校验修复 cache read/write token 总和超过 input token 时的无符号下溢。
-- [ ] 修复 provider 环境变量扫描只检查第一个元素的问题。
-- [ ] 处理 `cargo clippy --locked --all-targets -- -D warnings` 的全部错误。
-- [ ] 为上述两个逻辑问题添加不依赖网络的回归测试。
+- [x] 用 `saturating_sub` 或显式校验修复 cache read/write token 总和超过 input token 时的无符号下溢。
+- [x] 修复 provider 环境变量扫描只检查第一个元素的问题。
+- [x] 处理 `cargo clippy --locked --all-targets -- -D warnings` 的全部错误。
+- [x] 为上述两个逻辑问题添加不依赖网络的回归测试。
 
 完成标准：fmt、默认测试和严格 Clippy 均通过。
 
@@ -288,9 +288,9 @@ enum ModelMatch {
 
 ## 最终验收门槛
 
-- [ ] `cargo fmt --all -- --check` 通过。
-- [ ] `cargo clippy --locked --all-targets -- -D warnings` 通过。
-- [ ] `cargo test --locked` 零失败。
+- [x] `cargo fmt --all -- --check` 通过。
+- [x] `cargo clippy --locked --all-targets -- -D warnings` 通过。
+- [x] `cargo test --locked` 零失败。
 - [ ] 受支持的 feature 矩阵全部编译；all-features 在有 protoc 的 CI 中通过。
 - [ ] 任意 HTTP chunk 分割不改变三种路由的流式事件结果。
 - [ ] provider 的可用 route 列表、默认 route、实例选择 route 均可配置且经过校验。
