@@ -1,3 +1,4 @@
+pub mod api;
 pub mod audio;
 pub mod batch;
 pub mod chat;
@@ -12,6 +13,7 @@ pub mod rerank;
 pub mod response;
 pub mod search;
 
+pub use api::*;
 pub use audio::*;
 pub use batch::*;
 pub use chat::*;

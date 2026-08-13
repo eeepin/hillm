@@ -1,4 +1,6 @@
 pub mod api_type;
+pub mod base;
+pub mod codec;
 pub(crate) mod anthropic;
 pub(crate) mod bedrock;
 pub mod cost;
@@ -9,6 +11,8 @@ pub(crate) mod openai_compatible;
 pub mod outbound_policy;
 
 pub use api_type::APIType;
+pub use base::BaseProvider;
+pub use codec::APITypeCodec;
 pub use outbound_policy::{
     OutboundPolicy, current_policy, set_outbound_policy, validate_outbound_url,
     validate_outbound_url_sync,
