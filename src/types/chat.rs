@@ -118,9 +118,7 @@ pub struct ChatCompletionResponse {
 
 impl ChatCompletionResponse {
     pub fn estimated_cost(&self, provider: &str) -> Option<f64> {
-        let Some(usage) = self.usage.as_ref() else {
-            return None;
-        };
+        let usage = self.usage.as_ref()?;
         let cached_read = usage
             .prompt_tokens_details
             .as_ref()
@@ -130,7 +128,7 @@ impl ChatCompletionResponse {
             .as_ref()
             .map_or(0, |d| d.cache_write_tokens.unwrap_or(0));
         completion_cost_with_cache(
-            &provider,
+            provider,
             &self.model,
             usage.prompt_tokens,
             cached_read,

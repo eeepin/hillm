@@ -115,14 +115,14 @@ impl HiLlmError {
 
     #[must_use]
     pub fn is_transient(&self) -> bool {
-        match self {
+        matches!(
+            self,
             Self::RateLimited { .. }
-            | Self::ServiceUnavailable { .. }
-            | Self::Timeout
-            | Self::ServerError { .. } => true,
-            Self::Network(_) => true,
-            _ => false,
-        }
+                | Self::ServiceUnavailable { .. }
+                | Self::Timeout
+                | Self::ServerError { .. }
+                | Self::Network(_)
+        )
     }
 
     #[must_use]

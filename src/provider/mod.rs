@@ -67,14 +67,14 @@ impl ProviderEntry {
                 break;
             }
         }
-        let models = self.models.iter().map(|(model, _)| model.clone()).collect();
+        let models = self.models.keys().cloned().collect();
         ProviderConfig {
             name: self.id.clone(),
             display_name: Some(self.name.clone()),
             base_url: Some(self.api.clone()),
-            auth: auth,
+            auth,
             endpoints: None,
-            models: models,
+            models,
             param_mappings: None,
         }
     }
@@ -426,10 +426,7 @@ pub(crate) fn get_provider(name: &str) -> Option<Box<dyn Provider>> {
         }
         "bedrock" => return Some(Box::new(BedrockProvider::from_env())),
         _ => {
-            let reg = match PROVIDER_REGISTRY.get() {
-                Some(r) => r,
-                None => return None,
-            };
+            let reg = PROVIDER_REGISTRY.get()?;
             if let Some(entry) = reg
                 .values()
                 .collect::<Vec<&ProviderEntry>>()
@@ -449,8 +446,8 @@ pub async fn all_providers() -> HiLlmResult<Vec<ProviderConfig>> {
         message: e.to_string(),
     })?;
     Ok(registry
-        .iter()
-        .map(|(_, provider_entry)| provider_entry.to_config())
+        .values()
+        .map(|provider_entry| provider_entry.to_config())
         .collect())
 }
 

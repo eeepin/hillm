@@ -485,7 +485,7 @@ impl DefaultClient {
 
         Ok(PreparedRequest {
             url,
-            provider: provider,
+            provider,
             body_json: body,
             body_bytes,
         })
