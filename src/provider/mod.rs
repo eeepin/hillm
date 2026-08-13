@@ -1,8 +1,8 @@
+pub(crate) mod anthropic;
 pub mod api_type;
 pub mod base;
-pub mod codec;
-pub(crate) mod anthropic;
 pub(crate) mod bedrock;
+pub mod codec;
 pub mod cost;
 pub(crate) mod custom;
 pub(crate) mod datadriven;
@@ -260,7 +260,7 @@ pub(crate) fn unix_timestamp_secs() -> u64 {
 #[serde(rename_all = "snake_case")]
 pub enum StreamFormat {
     #[default]
-    Sse,
+    SSE,
     AwsEventStream,
 }
 
@@ -396,7 +396,7 @@ pub(crate) trait Provider: Send + Sync {
     }
 
     fn stream_format(&self) -> StreamFormat {
-        StreamFormat::Sse
+        StreamFormat::SSE
     }
 
     fn build_stream_url(&self, endpoint_path: &str, model: &str) -> String {

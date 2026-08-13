@@ -9,9 +9,9 @@ use crate::provider::codec::APITypeCodec;
 use crate::types::chat::{ChatCompletionChunk, ChatCompletionRequest, ChatCompletionResponse};
 
 /// Codec for OpenAI Chat Completions API.
-pub struct OpenAIChatCodec;
+pub struct OpenAIChatCompletionsCodec;
 
-impl APITypeCodec for OpenAIChatCodec {
+impl APITypeCodec for OpenAIChatCompletionsCodec {
     type Request = ChatCompletionRequest;
     type Response = ChatCompletionResponse;
     type StreamEvent = ChatCompletionChunk;
@@ -60,19 +60,19 @@ mod tests {
 
     #[test]
     fn test_openai_chat_completions_codec_api_type() {
-        let codec = OpenAIChatCodec;
+        let codec = OpenAIChatCompletionsCodec;
         assert_eq!(codec.api_type(), APIType::OpenAIChatCompletions);
     }
 
     #[test]
     fn test_openai_chat_completions_codec_endpoint_path() {
-        let codec = OpenAIChatCodec;
+        let codec = OpenAIChatCompletionsCodec;
         assert_eq!(codec.endpoint_path(), "/chat/completions");
     }
 
     #[test]
     fn test_openai_chat_completions_codec_encode_request() {
-        let codec = OpenAIChatCodec;
+        let codec = OpenAIChatCompletionsCodec;
         let request = ChatCompletionRequest {
             model: "gpt-4".to_string(),
             messages: vec![Message::User(UserMessage {
@@ -92,14 +92,14 @@ mod tests {
 
     #[test]
     fn test_openai_chat_completions_codec_parse_stream_event_done() {
-        let codec = OpenAIChatCodec;
+        let codec = OpenAIChatCompletionsCodec;
         let result = codec.parse_stream_event("[DONE]").unwrap();
         assert!(result.is_none());
     }
 
     #[test]
     fn test_openai_chat_completions_codec_parse_stream_event_chunk() {
-        let codec = OpenAIChatCodec;
+        let codec = OpenAIChatCompletionsCodec;
         let chunk_json = r#"{
             "id": "chatcmpl-123",
             "object": "chat.completion.chunk",
