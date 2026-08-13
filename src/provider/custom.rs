@@ -279,12 +279,12 @@ mod tests {
             name: "bearer-provider".into(),
             base_url: "https://api.bearer.com/v1".into(),
             auth_header: AuthHeaderFormat::Bearer,
-            models: vec!["bearer/".into()],
+            models: vec!["bearer-model".into()],
         };
 
         register_custom_provider(config).expect("registration should succeed");
 
-        let provider = detect_custom_provider("bearer/model").expect("should detect provider");
+        let provider = detect_custom_provider("", "bearer-model").expect("should detect provider");
         let (header_name, header_value) = provider
             .auth_header("my-token")
             .expect("should return auth header");
@@ -300,7 +300,7 @@ mod tests {
             name: "updatable".into(),
             base_url: "https://old.example.com/v1".into(),
             auth_header: AuthHeaderFormat::Bearer,
-            models: vec!["upd/".into()],
+            models: vec!["upd-model".into()],
         };
         register_custom_provider(config1).expect("first registration should succeed");
 
@@ -308,11 +308,11 @@ mod tests {
             name: "updatable".into(),
             base_url: "https://new.example.com/v1".into(),
             auth_header: AuthHeaderFormat::Bearer,
-            models: vec!["upd/".into()],
+            models: vec!["upd-model".into()],
         };
         register_custom_provider(config2).expect("second registration should succeed");
 
-        let provider = detect_custom_provider("upd/model").expect("should detect provider");
+        let provider = detect_custom_provider("", "upd-model").expect("should detect provider");
         assert_eq!(
             provider.base_url(),
             "https://new.example.com/v1",
@@ -328,7 +328,7 @@ mod tests {
             name: String::new(),
             base_url: "https://example.com".into(),
             auth_header: AuthHeaderFormat::Bearer,
-            models: vec!["x/".into()],
+            models: vec!["model-a".into()],
         };
         let result = register_custom_provider(config);
         assert!(result.is_err(), "should reject empty name");
@@ -342,14 +342,14 @@ mod tests {
             name: "valid-name".into(),
             base_url: String::new(),
             auth_header: AuthHeaderFormat::Bearer,
-            models: vec!["x/".into()],
+            models: vec!["model-b".into()],
         };
         let result = register_custom_provider(config);
         assert!(result.is_err(), "should reject empty base_url");
     }
 
     #[test]
-    fn validation_rejects_no_prefixes() {
+    fn validation_rejects_no_models() {
         let _guard = setup();
 
         let config = CustomProviderConfig {
@@ -368,7 +368,7 @@ mod tests {
             name: "serde-test".into(),
             base_url: "https://example.com/v1".into(),
             auth_header: AuthHeaderFormat::ApiKey("X-Api-Key".into()),
-            models: vec!["serde/".into()],
+            models: vec!["serde-model".into()],
         };
 
         let json = serde_json::to_string(&config).expect("should serialize");
@@ -376,6 +376,6 @@ mod tests {
 
         assert_eq!(parsed.name, "serde-test");
         assert_eq!(parsed.base_url, "https://example.com/v1");
-        assert_eq!(parsed.models, vec!["serde/"]);
+        assert_eq!(parsed.models, vec!["serde-model"]);
     }
 }
