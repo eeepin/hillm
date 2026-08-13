@@ -50,6 +50,7 @@ pub struct ProviderEntry {
     env: Vec<String>,
     #[serde(default)]
     api: String,
+    #[serde(default)]
     name: String,
     pub(crate) models: HashMap<String, ModelEntry>,
 }
@@ -63,8 +64,8 @@ impl ProviderEntry {
                     auth_type: AuthType::Bearer,
                     env_var: Some(e.clone()),
                 });
+                break;
             }
-            break;
         }
         let models = self.models.iter().map(|(model, _)| model.clone()).collect();
         ProviderConfig {
@@ -180,8 +181,8 @@ impl TokenPrice {
         output_tokens: u64,
     ) -> Result<Option<f64>, ProviderError> {
         let cache_read_tokens = cache_read_tokens.min(input_tokens);
-        let cache_write_tokens = cache_write_tokens.min(input_tokens);
-        let uncached_input_tokens = (input_tokens - cache_read_tokens - cache_write_tokens).max(0);
+        let cache_write_tokens = cache_write_tokens.min(input_tokens - cache_read_tokens);
+        let uncached_input_tokens = input_tokens - cache_read_tokens - cache_write_tokens;
         let cost_per_million = (uncached_input_tokens as f64) * self.input
             + (cache_read_tokens as f64) * self.cache_read.unwrap_or(self.input)
             + (cache_write_tokens as f64) * self.cache_write.unwrap_or(self.input)
@@ -412,7 +413,7 @@ pub(crate) trait Provider: Send + Sync {
 }
 
 pub(crate) fn get_provider(name: &str) -> Option<Box<dyn Provider>> {
-    if let Some(provider) = custom::detect_custom_provider(name) {
+    if let Some(provider) = custom::detect_custom_provider(name, "") {
         return Some(provider);
     }
 

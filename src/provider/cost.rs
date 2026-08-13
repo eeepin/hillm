@@ -104,6 +104,25 @@ mod tests {
     }
 
     #[test]
+    fn token_price_cost_does_not_underflow_when_cache_exceeds_input() {
+        let price = TokenPrice {
+            input: 1e-5,
+            output: 2e-5,
+            cache_read: Some(1e-6),
+            cache_write: Some(2e-6),
+        };
+        // cache_read(500) + cache_write(600) = 1100 > input_tokens(1000)
+        // Should not panic; uncached should be clamped to 0
+        let result = price.cost(1000, 500, 600, 100);
+        assert!(result.is_ok());
+        let cost = result.unwrap().expect("should return Some");
+        // uncached=0, cache_read=500, cache_write=500 (clamped to 1000-500)
+        let expected =
+            (500.0 * 1e-6 + 500.0 * 2e-6 + 100.0 * 2e-5) / TOKENS_PER_MILLION;
+        assert!((cost - expected).abs() < 1e-15);
+    }
+
+    #[test]
     #[ignore = "requires network access to models.dev"]
     fn completion_cost_with_cache_clamps_cached_tokens_to_prompt_tokens() {
         let cost = completion_cost_with_cache("openai", "gpt-4", 100, 500, 0, 0)

@@ -53,16 +53,25 @@ pub fn unregister_custom_provider(name: &str) -> HiLlmResult<bool> {
     Ok(providers.len() < before)
 }
 
-pub(crate) fn detect_custom_provider(name: &str) -> Option<Box<dyn Provider>> {
+pub(crate) fn detect_custom_provider(name: &str, model: &str) -> Option<Box<dyn Provider>> {
     let providers = CUSTOM_PROVIDERS.read().ok()?;
 
+    // First, try to match by provider name (exact match)
     for cfg in providers.iter() {
-        let matches = cfg.name == name;
-
-        if matches {
+        if cfg.name == name {
             return Some(Box::new(CustomProvider {
                 config: cfg.clone(),
             }));
+        }
+    }
+
+    // If no match by name, try to match by model
+    for cfg in providers.iter() {
+        let provider = CustomProvider {
+            config: cfg.clone(),
+        };
+        if provider.matches_model(model) {
+            return Some(Box::new(provider));
         }
     }
 
@@ -157,36 +166,36 @@ mod tests {
     }
 
     #[test]
-    fn register_and_detect_by_model_prefix() {
+    fn register_and_detect_by_model_name() {
         let _guard = setup();
 
         let config = CustomProviderConfig {
             name: "my-provider".into(),
             base_url: "https://api.my-provider.com/v1".into(),
             auth_header: AuthHeaderFormat::Bearer,
-            models: vec!["my-".into(), "my-provider/".into()],
+            models: vec!["my-model-7b".into(), "my-provider-llama-70b".into()],
         };
 
         register_custom_provider(config).expect("registration should succeed");
 
-        let provider = detect_custom_provider("my-model-7b");
+        let provider = detect_custom_provider("", "my-model-7b");
         assert!(
             provider.is_some(),
-            "should detect custom provider by prefix 'my-'"
+            "should detect custom provider by model name 'my-model-7b'"
         );
         let provider = provider.expect("custom provider should be found");
         assert_eq!(provider.name(), "my-provider");
         assert_eq!(provider.base_url(), "https://api.my-provider.com/v1");
 
-        // Also detect via slash-prefix routing.
-        let provider2 = detect_custom_provider("my-provider/llama-70b");
+        // Also detect via second model name.
+        let provider2 = detect_custom_provider("", "my-provider-llama-70b");
         assert!(
             provider2.is_some(),
-            "should detect custom provider by slash prefix"
+            "should detect custom provider by model name 'my-provider-llama-70b'"
         );
 
         // Non-matching model should not detect.
-        let none = detect_custom_provider("gpt-4");
+        let none = detect_custom_provider("", "gpt-4");
         assert!(none.is_none(), "should not match unrelated model");
     }
 
@@ -198,17 +207,17 @@ mod tests {
             name: "ephemeral".into(),
             base_url: "https://api.ephemeral.com/v1".into(),
             auth_header: AuthHeaderFormat::Bearer,
-            models: vec!["eph-".into()],
+            models: vec!["eph-model".into()],
         };
 
         register_custom_provider(config).expect("registration should succeed");
-        assert!(detect_custom_provider("eph-model").is_some());
+        assert!(detect_custom_provider("", "eph-model").is_some());
 
         let removed = unregister_custom_provider("ephemeral").expect("unregister should succeed");
         assert!(removed, "should return true when provider was found");
 
         assert!(
-            detect_custom_provider("eph-model").is_none(),
+            detect_custom_provider("", "eph-model").is_none(),
             "should no longer detect after unregister"
         );
 
@@ -229,12 +238,12 @@ mod tests {
             name: "secure-provider".into(),
             base_url: "https://api.secure.com/v1".into(),
             auth_header: AuthHeaderFormat::ApiKey("X-Custom-Auth".into()),
-            models: vec!["secure/".into()],
+            models: vec!["secure-model-1".into()],
         };
 
         register_custom_provider(config).expect("registration should succeed");
 
-        let provider = detect_custom_provider("secure/model-1").expect("should detect provider");
+        let provider = detect_custom_provider("", "secure-model-1").expect("should detect provider");
         let (header_name, header_value) = provider
             .auth_header("my-secret-key")
             .expect("should return auth header");
@@ -250,12 +259,12 @@ mod tests {
             name: "local-provider".into(),
             base_url: "http://localhost:8080/v1".into(),
             auth_header: AuthHeaderFormat::None,
-            models: vec!["local/".into()],
+            models: vec!["local-model".into()],
         };
 
         register_custom_provider(config).expect("registration should succeed");
 
-        let provider = detect_custom_provider("local/model").expect("should detect provider");
+        let provider = detect_custom_provider("", "local-model").expect("should detect provider");
         assert!(
             provider.auth_header("unused").is_none(),
             "no-auth provider should return None"
