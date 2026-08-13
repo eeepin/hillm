@@ -139,9 +139,11 @@ enum ModelMatch {
 
 ## P0：重写 SSE 增量解析边界
 
+- [x] 完成
+
 ### 当前问题
 
-当前 `http/stream.rs` 和 `streaming.rs::IngressStream` 已经维护跨 HTTP chunk 的行缓冲，因此“普通 JSON 行只是在任意 chunk 位置断开”在部分情况下可以工作；但它们仍然不是完整、健壮的 SSE decoder：
+当前 `http/stream.rs` 和 `streaming.rs::IngressStream` 已经维护跨 HTTP chunk 的行缓冲，因此”普通 JSON 行只是在任意 chunk 位置断开”在部分情况下可以工作；但它们仍然不是完整、健壮的 SSE decoder：
 
 - 遇到一条 `data:` 行便立刻调用 JSON parser，没有等待空行表示的完整 SSE 事件结束。
 - 不能将同一事件中的多条 `data:` 行按 SSE 规则使用 `\n` 合并。
@@ -153,28 +155,28 @@ enum ModelMatch {
 
 ### 最小实现步骤
 
-- [ ] 提取唯一的、与 reqwest 解耦的 `SseDecoder`，输入 `Bytes`，输出完整 `SseEvent`。
-- [ ] 内部使用字节缓冲而不是对每个 HTTP chunk 转为 `&str`；只在完整字段行或完整事件形成后校验 UTF-8。
-- [ ] 同时识别 `\n\n`、`\r\n\r\n`，并正确处理分隔符本身跨 chunk 的情况。
-- [ ] 支持 `data`、`event`、`id`、`retry` 和 comment；按规范将多个 `data:` 行以换行连接。
-- [ ] 仅在空行结束事件时将事件交给 route-specific decoder。
-- [ ] 将 `[DONE]` 判断移动到 `OpenAiChatCompletions` 流事件 decoder；通用 SSE decoder 不理解业务 payload。
-- [ ] 让 `http/stream.rs` 和 `IngressStream` 复用同一个 decoder，删除重复状态机。
-- [ ] 统一使用 `SSE_BUFFER_MAX_BYTES`，限制“尚未消费的数据”，事件过大时返回明确错误。
-- [ ] 明确 EOF 行为：完整但没有最终空行的事件是否派发应由兼容策略决定；半个 UTF-8 字符或半个字段必须返回截断错误，不能静默丢弃。
+- [x] 提取唯一的、与 reqwest 解耦的 `SSEDecoder`，输入 `Bytes`，输出完整 `SSEEvent`。
+- [x] 内部使用字节缓冲而不是对每个 HTTP chunk 转为 `&str`；只在完整字段行或完整事件形成后校验 UTF-8。
+- [x] 同时识别 `\n\n`、`\r\n\r\n`，并正确处理分隔符本身跨 chunk 的情况。
+- [x] 支持 `data`、`event`、`id`、`retry` 和 comment；按规范将多个 `data:` 行以换行连接。
+- [x] 仅在空行结束事件时将事件交给 route-specific decoder。
+- [x] 将 `[DONE]` 判断移动到 `OpenAiChatCompletions` 流事件 decoder；通用 SSE decoder 不理解业务 payload。
+- [x] 让 `http/stream.rs` 和 `IngressStream` 复用同一个 decoder，删除重复状态机。
+- [x] 统一使用 `SSE_BUFFER_MAX_BYTES`，限制”尚未消费的数据”，事件过大时返回明确错误。
+- [x] 明确 EOF 行为：完整但没有最终空行的事件是否派发应由兼容策略决定；半个 UTF-8 字符或半个字段必须返回截断错误，不能静默丢弃。
 
 ### 必需的回归测试
 
-- [ ] JSON 在每一个可能的字节位置切成两个或多个 HTTP chunk，解析结果保持一致。
-- [ ] 中文、emoji 等 UTF-8 字符在每个字节位置切分。
-- [ ] `data:`、字段名、冒号、`\r\n` 和事件终止空行分别跨 chunk。
-- [ ] 一个 chunk 包含多个事件。
-- [ ] 一个事件包含多条 `data:` 行。
-- [ ] comment/heartbeat 不产生业务事件。
-- [ ] OpenAI `[DONE]` 只终止 `OpenAiChatCompletions` decoder。
-- [ ] Anthropic `event:` 与 JSON `type` 能正确传递给 Anthropic decoder。
-- [ ] 超过大小上限、非法 UTF-8、流错误、EOF 残帧返回确定性错误。
-- [ ] cancellation 后不再轮询底层 stream，也不派发残留事件。
+- [x] JSON 在每一个可能的字节位置切成两个或多个 HTTP chunk，解析结果保持一致。
+- [x] 中文、emoji 等 UTF-8 字符在每个字节位置切分。
+- [x] `data:`、字段名、冒号、`\r\n` 和事件终止空行分别跨 chunk。
+- [x] 一个 chunk 包含多个事件。
+- [x] 一个事件包含多条 `data:` 行。
+- [x] comment/heartbeat 不产生业务事件。
+- [x] OpenAI `[DONE]` 只终止 `OpenAiChatCompletions` decoder。
+- [x] Anthropic `event:` 与 JSON `type` 能正确传递给 Anthropic decoder。
+- [x] 超过大小上限、非法 UTF-8、流错误、EOF 残帧返回确定性错误。
+- [x] cancellation 后不再轮询底层 stream，也不派发残留事件。
 
 完成标准：任意 HTTP chunk 分割不会改变事件序列；传输 decoder 完全不知道 OpenAI 或 Anthropic 类型。
 
