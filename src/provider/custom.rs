@@ -243,7 +243,8 @@ mod tests {
 
         register_custom_provider(config).expect("registration should succeed");
 
-        let provider = detect_custom_provider("", "secure-model-1").expect("should detect provider");
+        let provider =
+            detect_custom_provider("", "secure-model-1").expect("should detect provider");
         let (header_name, header_value) = provider
             .auth_header("my-secret-key")
             .expect("should return auth header");

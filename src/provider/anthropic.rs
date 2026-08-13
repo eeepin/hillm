@@ -90,11 +90,10 @@ impl Provider for AnthropicProvider {
     }
 
     fn matches_model(&self, model: &str) -> bool {
-        registry_get()
-            .is_some_and(|reg| {
-                reg.get("anthropic")
-                    .is_some_and(|p| p.models.contains_key(model))
-            })
+        registry_get().is_some_and(|reg| {
+            reg.get("anthropic")
+                .is_some_and(|p| p.models.contains_key(model))
+        })
     }
 
     /// Anthropic uses `/messages` instead of `/chat/completions`.

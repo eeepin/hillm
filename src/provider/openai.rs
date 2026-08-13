@@ -25,11 +25,10 @@ impl Provider for OpenAiProvider {
     }
 
     fn matches_model(&self, model: &str) -> bool {
-        registry_get()
-            .is_some_and(|reg| {
-                reg.get("openai")
-                    .is_some_and(|p| p.models.contains_key(model))
-            })
+        registry_get().is_some_and(|reg| {
+            reg.get("openai")
+                .is_some_and(|p| p.models.contains_key(model))
+        })
     }
 
     fn transform_response(&self, body: &mut serde_json::Value) -> HiLlmResult<()> {

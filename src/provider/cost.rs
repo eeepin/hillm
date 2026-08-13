@@ -117,8 +117,7 @@ mod tests {
         assert!(result.is_ok());
         let cost = result.unwrap().expect("should return Some");
         // uncached=0, cache_read=500, cache_write=500 (clamped to 1000-500)
-        let expected =
-            (500.0 * 1e-6 + 500.0 * 2e-6 + 100.0 * 2e-5) / TOKENS_PER_MILLION;
+        let expected = (500.0 * 1e-6 + 500.0 * 2e-6 + 100.0 * 2e-5) / TOKENS_PER_MILLION;
         assert!((cost - expected).abs() < 1e-15);
     }
 
