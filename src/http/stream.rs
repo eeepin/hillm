@@ -3,17 +3,15 @@ use std::task::{Context, Poll};
 
 use bytes::Bytes;
 use futures_core::Stream;
-use memchr::memchr;
 use pin_project_lite::pin_project;
 #[cfg(feature = "default-http")]
 pub use tokio_util::sync::CancellationToken;
 
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::HiLlmResult;
+use crate::sse::SSEStream;
 use crate::types::ChatCompletionChunk;
 
 use super::request::with_retry;
-
-const MAX_BUFFER_BYTES: usize = 1024 * 1024; // 1 MiB
 
 #[cfg_attr(
     feature = "tracing",
@@ -134,20 +132,13 @@ type CancelField = Option<CancellationToken>;
 type CancelField = Option<std::convert::Infallible>;
 
 pin_project! {
+    /// Thin wrapper around SSEStream that adds cancel-token support and
+    /// maps SSEEvent to ChatCompletionChunk via the parse_event closure.
     struct SseParser<S, P> {
         #[pin]
-        inner: S,
-        buffer: String,
-        cursor: usize,
-        done: bool,
+        stream: SSEStream<S>,
         parse_event: P,
         cancel: CancelField,
-    }
-
-    impl<S, P> PinnedDrop for SseParser<S, P> {
-        fn drop(this: Pin<&mut Self>) {
-            let _ = this;
-        }
     }
 }
 
@@ -157,10 +148,7 @@ where
 {
     fn new(inner: S, parse_event: P, cancel: CancelField) -> Self {
         Self {
-            inner,
-            buffer: String::with_capacity(4096),
-            cursor: 0,
-            done: false,
+            stream: SSEStream::new(inner),
             parse_event,
             cancel,
         }
@@ -169,7 +157,7 @@ where
 
 impl<S, P> Stream for SseParser<S, P>
 where
-    S: Stream<Item = std::result::Result<Bytes, reqwest::Error>>,
+    S: Stream<Item = Result<Bytes, reqwest::Error>>,
     P: Fn(&str) -> HiLlmResult<Option<ChatCompletionChunk>>,
 {
     type Item = HiLlmResult<ChatCompletionChunk>;
@@ -177,111 +165,31 @@ where
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
 
+        // Cancel check
         #[cfg(feature = "default-http")]
         if this.cancel.as_ref().is_some_and(|t| t.is_cancelled()) {
             #[cfg(feature = "tracing")]
             tracing::debug!("SSE stream cancelled by downstream disconnect");
-            *this.done = true;
             return Poll::Ready(None);
         }
 
         loop {
-            if let Some(offset) = memchr(b'\n', &this.buffer.as_bytes()[*this.cursor..]) {
-                let newline_pos = *this.cursor + offset;
-                let line = this.buffer[*this.cursor..newline_pos]
-                    .trim_end_matches('\r')
-                    .trim();
-
-                if line.is_empty() || line.starts_with(':') {
-                    *this.cursor = newline_pos + 1;
-                    compact_if_needed(this.buffer, this.cursor);
-                    continue;
-                }
-
-                if let Some(raw) = line.strip_prefix("data:") {
-                    let data = raw.strip_prefix(' ').unwrap_or(raw).trim();
-                    if data == "[DONE]" {
-                        *this.cursor = newline_pos + 1;
-                        compact_if_needed(this.buffer, this.cursor);
+            match this.stream.as_mut().poll_next(cx) {
+                Poll::Pending => return Poll::Pending,
+                Poll::Ready(None) => return Poll::Ready(None),
+                Poll::Ready(Some(Err(e))) => return Poll::Ready(Some(Err(e))),
+                Poll::Ready(Some(Ok(event))) => {
+                    // [DONE] handling — OpenAI-specific sentinel
+                    if event.data == "[DONE]" {
                         return Poll::Ready(None);
                     }
-
-                    let result = (this.parse_event)(data);
-                    *this.cursor = newline_pos + 1;
-                    compact_if_needed(this.buffer, this.cursor);
-                    match result {
+                    match (this.parse_event)(&event.data) {
                         Ok(None) => continue,
                         Ok(Some(chunk)) => return Poll::Ready(Some(Ok(chunk))),
                         Err(e) => return Poll::Ready(Some(Err(e))),
                     }
                 }
-
-                *this.cursor = newline_pos + 1;
-                compact_if_needed(this.buffer, this.cursor);
-                continue;
-            }
-
-            if *this.done {
-                let remaining = this.buffer.len() - *this.cursor;
-                if remaining > 0 {
-                    #[cfg(feature = "tracing")]
-                    tracing::warn!(
-                        leftover_bytes = remaining,
-                        preview = &this.buffer[*this.cursor..(*this.cursor + remaining.min(64))],
-                        "SSE stream ended with unterminated data in buffer; dropping partial line"
-                    );
-                    this.buffer.clear();
-                    *this.cursor = 0;
-                }
-                return Poll::Ready(None);
-            }
-
-            #[cfg(feature = "default-http")]
-            if this.cancel.as_ref().is_some_and(|t| t.is_cancelled()) {
-                #[cfg(feature = "tracing")]
-                tracing::debug!("SSE stream cancelled while waiting for next chunk");
-                *this.done = true;
-                return Poll::Ready(None);
-            }
-
-            match this.inner.as_mut().poll_next(cx) {
-                Poll::Ready(Some(Ok(bytes))) => {
-                    if this.buffer.len() + bytes.len() > MAX_BUFFER_BYTES {
-                        *this.done = true;
-                        return Poll::Ready(Some(Err(HiLlmError::Streaming {
-                            message: format!(
-                                "SSE buffer exceeded {MAX_BUFFER_BYTES} bytes; stream aborted"
-                            ),
-                        })));
-                    }
-                    match std::str::from_utf8(&bytes) {
-                        Ok(s) => this.buffer.push_str(s),
-                        Err(e) => {
-                            *this.done = true;
-                            return Poll::Ready(Some(Err(HiLlmError::Streaming {
-                                message: format!("invalid UTF-8 in SSE stream: {e}"),
-                            })));
-                        }
-                    }
-                }
-                Poll::Ready(Some(Err(e))) => {
-                    return Poll::Ready(Some(Err(HiLlmError::from(e))));
-                }
-                Poll::Ready(None) => {
-                    *this.done = true;
-                    continue;
-                }
-                Poll::Pending => {
-                    return Poll::Pending;
-                }
             }
         }
-    }
-}
-
-fn compact_if_needed(buffer: &mut String, cursor: &mut usize) {
-    if *cursor > buffer.len() / 2 {
-        buffer.drain(..*cursor);
-        *cursor = 0;
     }
 }

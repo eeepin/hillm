@@ -70,10 +70,8 @@ impl EventBuilder {
                 None
             } else {
                 Some(
-                    String::from_utf8(self.event.clone()).map_err(|e| {
-                        HiLlmError::Streaming {
-                            message: format!("invalid UTF-8 in event field: {e}"),
-                        }
+                    String::from_utf8(self.event.clone()).map_err(|e| HiLlmError::Streaming {
+                        message: format!("invalid UTF-8 in event field: {e}"),
                     })?,
                 )
             },
@@ -133,13 +131,7 @@ impl SSEDecoder {
         self.buf.extend_from_slice(&chunk);
         let mut events = Vec::new();
 
-        loop {
-            // Find next newline
-            let newline_pos = match memchr::memchr(b'\n', &self.buf) {
-                Some(pos) => pos,
-                None => break, // No complete line yet
-            };
-
+        while let Some(newline_pos) = memchr::memchr(b'\n', &self.buf) {
             // Extract line (excluding \n)
             let line_bytes = &self.buf[..newline_pos];
             let line_len = newline_pos + 1;
@@ -152,11 +144,10 @@ impl SSEDecoder {
             };
 
             // Process the line
-            let line = String::from_utf8(line_bytes.to_vec()).map_err(|e| {
-                HiLlmError::Streaming {
+            let line =
+                String::from_utf8(line_bytes.to_vec()).map_err(|e| HiLlmError::Streaming {
                     message: format!("invalid UTF-8 in SSE line: {e}"),
-                }
-            })?;
+                })?;
 
             // Advance buffer
             self.buf.advance(line_len);
@@ -246,11 +237,10 @@ impl SSEDecoder {
                 line_bytes
             };
 
-            let line = String::from_utf8(line_bytes.to_vec()).map_err(|_| {
-                HiLlmError::Streaming {
+            let line =
+                String::from_utf8(line_bytes.to_vec()).map_err(|_| HiLlmError::Streaming {
                     message: "SSE stream ended with incomplete UTF-8 sequence".to_string(),
-                }
-            })?;
+                })?;
 
             self.buf.clear();
 
@@ -422,7 +412,9 @@ mod tests {
     fn multiple_data_lines_joined() {
         let mut decoder = SSEDecoder::new();
         let events = decoder
-            .decode(Bytes::from_static(b"data: line1\ndata: line2\ndata: line3\n\n"))
+            .decode(Bytes::from_static(
+                b"data: line1\ndata: line2\ndata: line3\n\n",
+            ))
             .unwrap();
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].data, "line1\nline2\nline3");
@@ -492,7 +484,6 @@ mod tests {
 
     #[test]
     fn json_split_across_chunks() {
-        let mut decoder = SSEDecoder::new();
         let payload = b"data: {\"key\":\"value\"}\n\n";
 
         // Split at every position
@@ -521,7 +512,6 @@ mod tests {
 
     #[test]
     fn utf8_chinese_split_across_chunks() {
-        let mut decoder = SSEDecoder::new();
         let payload = "data: 你好世界\n\n".as_bytes();
 
         // Split at every byte position (Chinese chars are 3 bytes each)
@@ -546,7 +536,6 @@ mod tests {
 
     #[test]
     fn utf8_emoji_split_across_chunks() {
-        let mut decoder = SSEDecoder::new();
         let payload = "data: 🎉🎊\n\n".as_bytes();
 
         // Split at every byte position (emoji are 4 bytes each)
@@ -587,7 +576,9 @@ mod tests {
         let mut decoder = SSEDecoder::new();
 
         // Split \r\n across chunks
-        let events1 = decoder.decode(Bytes::from_static(b"data: hello\r")).unwrap();
+        let events1 = decoder
+            .decode(Bytes::from_static(b"data: hello\r"))
+            .unwrap();
         assert_eq!(events1.len(), 0);
 
         let events2 = decoder.decode(Bytes::from_static(b"\n\n")).unwrap();
@@ -600,7 +591,9 @@ mod tests {
         let mut decoder = SSEDecoder::new();
 
         // Split the terminating blank line
-        let events1 = decoder.decode(Bytes::from_static(b"data: hello\n")).unwrap();
+        let events1 = decoder
+            .decode(Bytes::from_static(b"data: hello\n"))
+            .unwrap();
         assert_eq!(events1.len(), 0);
 
         let events2 = decoder.decode(Bytes::from_static(b"\n")).unwrap();
@@ -612,7 +605,9 @@ mod tests {
     fn multiple_events_in_single_chunk() {
         let mut decoder = SSEDecoder::new();
         let events = decoder
-            .decode(Bytes::from_static(b"data: event1\n\ndata: event2\n\ndata: event3\n\n"))
+            .decode(Bytes::from_static(
+                b"data: event1\n\ndata: event2\n\ndata: event3\n\n",
+            ))
             .unwrap();
         assert_eq!(events.len(), 3);
         assert_eq!(events[0].data, "event1");

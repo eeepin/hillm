@@ -9,6 +9,7 @@ use pin_project_lite::pin_project;
 
 use crate::error::{HiLlmError, HiLlmResult};
 use crate::provider::StreamFormat;
+use crate::sse::SSEStream;
 use crate::types::ChatCompletionChunk;
 
 #[cfg(feature = "default-http")]
@@ -56,10 +57,7 @@ impl<M: ChunkMiddleware + ?Sized> ChunkMiddleware for Arc<M> {
 pin_project! {
     pub struct IngressStream<S, P> {
         #[pin]
-        inner: S,
-        buffer: String,
-        cursor: usize,
-        done: bool,
+        stream: SSEStream<S>,
         parse_event: P,
         cancel: CancelField,
     }
@@ -71,10 +69,7 @@ where
 {
     pub fn new_sse(inner: S, parse_event: P, cancel: CancelField) -> Self {
         Self {
-            inner,
-            buffer: String::with_capacity(4096),
-            cursor: 0,
-            done: false,
+            stream: SSEStream::new(inner),
             parse_event,
             cancel,
         }
@@ -94,89 +89,25 @@ where
 
         #[cfg(feature = "default-http")]
         if this.cancel.as_ref().is_some_and(|t| t.is_cancelled()) {
-            *this.done = true;
             return Poll::Ready(None);
         }
 
         loop {
-            if let Some(offset) = memchr_newline(&this.buffer.as_bytes()[*this.cursor..]) {
-                let newline_pos = *this.cursor + offset;
-                let line = this.buffer[*this.cursor..newline_pos]
-                    .trim_end_matches('\r')
-                    .trim();
-
-                if line.is_empty() || line.starts_with(':') {
-                    *this.cursor = newline_pos + 1;
-                    compact_buffer(this.buffer, this.cursor);
-                    continue;
-                }
-
-                if let Some(raw) = line.strip_prefix("data:") {
-                    let data = raw.strip_prefix(' ').unwrap_or(raw).trim();
-                    if data == "[DONE]" {
-                        *this.cursor = newline_pos + 1;
-                        compact_buffer(this.buffer, this.cursor);
+            match this.stream.as_mut().poll_next(cx) {
+                Poll::Pending => return Poll::Pending,
+                Poll::Ready(None) => return Poll::Ready(None),
+                Poll::Ready(Some(Err(e))) => return Poll::Ready(Some(Err(e))),
+                Poll::Ready(Some(Ok(event))) => {
+                    // [DONE] handling — OpenAI-specific sentinel
+                    if event.data == "[DONE]" {
                         return Poll::Ready(None);
                     }
-                    let result = (this.parse_event)(data);
-                    *this.cursor = newline_pos + 1;
-                    compact_buffer(this.buffer, this.cursor);
-                    match result {
+                    match (this.parse_event)(&event.data) {
                         Ok(None) => continue,
                         Ok(Some(chunk)) => return Poll::Ready(Some(Ok(chunk))),
                         Err(e) => return Poll::Ready(Some(Err(e))),
                     }
                 }
-
-                *this.cursor = newline_pos + 1;
-                compact_buffer(this.buffer, this.cursor);
-                continue;
-            }
-
-            if *this.done {
-                let remaining = this.buffer.len() - *this.cursor;
-                if remaining > 0 {
-                    this.buffer.clear();
-                    *this.cursor = 0;
-                }
-                return Poll::Ready(None);
-            }
-
-            #[cfg(feature = "default-http")]
-            if this.cancel.as_ref().is_some_and(|t| t.is_cancelled()) {
-                *this.done = true;
-                return Poll::Ready(None);
-            }
-
-            match this.inner.as_mut().poll_next(cx) {
-                Poll::Ready(Some(Ok(bytes))) => {
-                    const MAX_BUFFER_BYTES: usize = 1024 * 1024; // 1 MiB
-                    if this.buffer.len() + bytes.len() > MAX_BUFFER_BYTES {
-                        *this.done = true;
-                        return Poll::Ready(Some(Err(HiLlmError::Streaming {
-                            message: format!(
-                                "SSE buffer exceeded {MAX_BUFFER_BYTES} bytes; stream aborted"
-                            ),
-                        })));
-                    }
-                    match std::str::from_utf8(&bytes) {
-                        Ok(s) => this.buffer.push_str(s),
-                        Err(e) => {
-                            *this.done = true;
-                            return Poll::Ready(Some(Err(HiLlmError::Streaming {
-                                message: format!("invalid UTF-8 in SSE stream: {e}"),
-                            })));
-                        }
-                    }
-                }
-                Poll::Ready(Some(Err(e))) => {
-                    return Poll::Ready(Some(Err(e.into())));
-                }
-                Poll::Ready(None) => {
-                    *this.done = true;
-                    continue;
-                }
-                Poll::Pending => return Poll::Pending,
             }
         }
     }
@@ -377,16 +308,4 @@ fn encode_sse_chunk(chunk: &ChatCompletionChunk) -> HiLlmResult<Bytes> {
     buf.clear();
     pool_release(buf);
     Ok(frozen)
-}
-
-#[inline]
-fn memchr_newline(haystack: &[u8]) -> Option<usize> {
-    haystack.iter().position(|&b| b == b'\n')
-}
-
-fn compact_buffer(buffer: &mut String, cursor: &mut usize) {
-    if *cursor > buffer.len() / 2 {
-        buffer.drain(..*cursor);
-        *cursor = 0;
-    }
 }
