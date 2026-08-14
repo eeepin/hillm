@@ -18,7 +18,7 @@ impl Provider for OpenAIProvider {
         "https://api.openai.com/v1"
     }
 
-    fn env_var(&self) -> Option<&'static str> {
+    fn env_var(&self) -> Option<&str> {
         Some("OPENAI_API_KEY")
     }
 
