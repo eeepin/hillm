@@ -12,10 +12,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use crate::error::{HiLlmError, HiLlmResult};
-
-/// Maximum buffer size for SSE decoding (1 MiB).
-/// Prevents memory exhaustion from malformed or malicious streams.
-pub const SSE_BUFFER_MAX_BYTES: usize = 1024 * 1024;
+use crate::util::bound::SSE_BUFFER_MAX_BYTES;
 
 /// A complete SSE event, assembled per the SSE specification.
 ///
@@ -224,66 +221,36 @@ impl SSEDecoder {
     ///
     /// # Errors
     /// Returns `HiLlmError::Streaming` if the buffer ends mid-UTF-8-sequence
-    /// or mid-field (incomplete field name with no newline).
+    /// or contains an incomplete field (data without a terminating newline).
     pub fn finish(&mut self) -> HiLlmResult<Option<SSEEvent>> {
-        // Process any remaining bytes in the buffer as a final line
+        // If there are remaining bytes without a terminating newline,
+        // that is an incomplete field — return a truncation error.
         if !self.buf.is_empty() {
-            let line_bytes = &self.buf[..];
+            let residue = &self.buf[..];
 
             // Strip trailing \r if present
-            let line_bytes = if line_bytes.last() == Some(&b'\r') {
-                &line_bytes[..line_bytes.len() - 1]
+            let residue = if residue.last() == Some(&b'\r') {
+                &residue[..residue.len() - 1]
             } else {
-                line_bytes
+                residue
             };
 
-            let line =
-                String::from_utf8(line_bytes.to_vec()).map_err(|_| HiLlmError::Streaming {
-                    message: "SSE stream ended with incomplete UTF-8 sequence".to_string(),
-                })?;
+            if !residue.is_empty() {
+                // Validate UTF-8 first for a clear error message
+                let text =
+                    String::from_utf8(residue.to_vec()).map_err(|_| HiLlmError::Streaming {
+                        message: "SSE stream ended with incomplete UTF-8 sequence".to_string(),
+                    })?;
+
+                return Err(HiLlmError::Streaming {
+                    message: format!(
+                        "SSE stream ended with incomplete field (no terminating newline): {:?}",
+                        text
+                    ),
+                });
+            }
 
             self.buf.clear();
-
-            let line = line.trim();
-
-            if !line.is_empty() && !line.starts_with(':') {
-                // Parse as a field line
-                let (field_name, value) = if let Some(colon_pos) = line.find(':') {
-                    let name = &line[..colon_pos];
-                    let mut val = &line[colon_pos + 1..];
-                    if val.starts_with(' ') {
-                        val = &val[1..];
-                    }
-                    (name, val)
-                } else {
-                    (line, "")
-                };
-
-                match field_name {
-                    "data" => {
-                        if self.current.data_line_count > 0 {
-                            self.current.data.push(b'\n');
-                        }
-                        self.current.data.extend_from_slice(value.as_bytes());
-                        self.current.data_line_count += 1;
-                        self.has_data = true;
-                    }
-                    "event" => {
-                        self.current.event.clear();
-                        self.current.event.extend_from_slice(value.as_bytes());
-                    }
-                    "id" => {
-                        self.current.id.clear();
-                        self.current.id.extend_from_slice(value.as_bytes());
-                    }
-                    "retry" => {
-                        if let Ok(ms) = value.parse::<u64>() {
-                            self.current.retry = Some(ms);
-                        }
-                    }
-                    _ => {}
-                }
-            }
         }
 
         // If we have data but no final blank line, dispatch the event
@@ -743,10 +710,26 @@ mod tests {
     #[test]
     fn finish_with_pending_event() {
         let mut decoder = SSEDecoder::new();
-        decoder.decode(Bytes::from_static(b"data: hello")).unwrap();
+        // Field line is complete (has newline), but event has no terminating blank line.
+        // Compatibility policy: dispatch the event anyway.
+        decoder
+            .decode(Bytes::from_static(b"data: hello\n"))
+            .unwrap();
         let event = decoder.finish().unwrap();
         assert!(event.is_some());
         assert_eq!(event.unwrap().data, "hello");
+    }
+
+    #[test]
+    fn finish_with_incomplete_field() {
+        let mut decoder = SSEDecoder::new();
+        // No terminating newline — incomplete field, should error.
+        decoder.decode(Bytes::from_static(b"data: hel")).unwrap();
+        let result = decoder.finish();
+        assert!(result.is_err());
+        if let Err(HiLlmError::Streaming { message }) = result {
+            assert!(message.contains("incomplete field"));
+        }
     }
 
     #[test]
@@ -868,5 +851,67 @@ mod tests {
         assert_eq!(events[0].event, Some("message_start".to_string()));
         assert_eq!(events[1].event, Some("content_block_delta".to_string()));
         assert_eq!(events[2].event, Some("message_stop".to_string()));
+    }
+
+    // ========== Cancellation Tests ==========
+
+    #[cfg(feature = "tower")]
+    #[tokio::test]
+    async fn stream_drop_stops_polling() {
+        use futures_util::StreamExt;
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let poll_count = Arc::new(AtomicUsize::new(0));
+        let poll_count_clone = poll_count.clone();
+
+        // Create a stream that tracks how many times it's polled
+        let stream = futures_util::stream::unfold((), move |()| {
+            let count = poll_count_clone.clone();
+            async move {
+                count.fetch_add(1, Ordering::SeqCst);
+                Some((
+                    Ok::<Bytes, HiLlmError>(Bytes::from_static(b"data: test\n\n")),
+                    (),
+                ))
+            }
+        });
+
+        let mut sse_stream = SSEStream::new(stream);
+
+        // Poll once to get an event
+        let event = sse_stream.next().await.unwrap().unwrap();
+        assert_eq!(event.data, "test");
+
+        // Drop the stream
+        drop(sse_stream);
+
+        // Record the poll count after drop
+        let final_count = poll_count.load(Ordering::SeqCst);
+
+        // Wait a bit to ensure no more polls happen
+        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+
+        // Poll count should not have increased after drop
+        assert_eq!(
+            poll_count.load(Ordering::SeqCst),
+            final_count,
+            "Stream was polled after being dropped"
+        );
+    }
+
+    // ========== [DONE] Isolation Tests ==========
+
+    #[test]
+    fn done_sentinel_is_transparent_to_decoder() {
+        // The SSE decoder should treat [DONE] as regular data.
+        // Protocol-specific handling (e.g., OpenAI stopping on [DONE])
+        // belongs in the provider codec, not the transport decoder.
+        let mut decoder = SSEDecoder::new();
+        let events = decoder
+            .decode(Bytes::from_static(b"data: [DONE]\n\n"))
+            .unwrap();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].data, "[DONE]");
     }
 }
