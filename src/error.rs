@@ -84,6 +84,18 @@ pub enum HiLlmError {
         "idempotency key '{key}' is currently in-flight; retry after the first request completes"
     )]
     IdempotencyInFlight { key: String },
+
+    #[error("provider '{provider}' does not support API type '{api_type}'")]
+    APITypeUnsupported { api_type: String, provider: String },
+
+    #[error("ambiguous provider for model '{model}': multiple providers match: {candidates:?}")]
+    AmbiguousProvider {
+        model: String,
+        candidates: Vec<String>,
+    },
+
+    #[error("provider not found: '{name}'")]
+    ProviderNotFound { name: String },
 }
 
 impl HiLlmError {
@@ -110,6 +122,9 @@ impl HiLlmError {
             Self::OutboundForbidden { .. } => 0,
             Self::IdempotencyConflict { .. } => 409,
             Self::IdempotencyInFlight { .. } => 409,
+            Self::APITypeUnsupported { .. } => 400,
+            Self::AmbiguousProvider { .. } => 400,
+            Self::ProviderNotFound { .. } => 404,
         }
     }
 
@@ -148,6 +163,9 @@ impl HiLlmError {
             Self::OutboundForbidden { .. } => "OutboundForbidden",
             Self::IdempotencyConflict { .. } => "IdempotencyConflict",
             Self::IdempotencyInFlight { .. } => "IdempotencyInFlight",
+            Self::APITypeUnsupported { .. } => "APITypeUnsupported",
+            Self::AmbiguousProvider { .. } => "AmbiguousProvider",
+            Self::ProviderNotFound { .. } => "ProviderNotFound",
         }
     }
 
@@ -221,6 +239,15 @@ impl HiLlmError {
             },
             Self::IdempotencyConflict { key } => Self::IdempotencyConflict { key: key.clone() },
             Self::IdempotencyInFlight { key } => Self::IdempotencyInFlight { key: key.clone() },
+            Self::APITypeUnsupported { api_type, provider } => Self::APITypeUnsupported {
+                api_type: api_type.clone(),
+                provider: provider.clone(),
+            },
+            Self::AmbiguousProvider { model, candidates } => Self::AmbiguousProvider {
+                model: model.clone(),
+                candidates: candidates.clone(),
+            },
+            Self::ProviderNotFound { name } => Self::ProviderNotFound { name: name.clone() },
         }
     }
 
