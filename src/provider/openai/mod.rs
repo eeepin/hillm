@@ -1,11 +1,13 @@
 use super::{Provider, registry_get};
-use crate::provider::codec::APITypeCodec;
 use crate::provider::APIType;
+use crate::provider::codec::APITypeCodec;
 use std::borrow::Cow;
 
 pub mod chat_completions_codec;
+pub mod responses_codec;
 
 pub use chat_completions_codec::OpenAIChatCompletionsCodec;
+pub use responses_codec::OpenAIResponsesCodec;
 
 pub(crate) struct OpenAIProvider;
 
@@ -37,12 +39,13 @@ impl Provider for OpenAIProvider {
     }
 
     fn available_api_types(&self) -> Vec<APIType> {
-        vec![APIType::OpenAIChatCompletions]
+        vec![APIType::OpenAIChatCompletions, APIType::OpenAIResponses]
     }
 
     fn codec_for(&self, api_type: APIType) -> Option<Box<dyn APITypeCodec>> {
         match api_type {
             APIType::OpenAIChatCompletions => Some(Box::new(OpenAIChatCompletionsCodec)),
+            APIType::OpenAIResponses => Some(Box::new(OpenAIResponsesCodec)),
             _ => None,
         }
     }
