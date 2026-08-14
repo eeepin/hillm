@@ -8,18 +8,21 @@ use serde::{Deserialize, Serialize};
 /// Providers declare which API types they support, and clients select the appropriate
 /// API type when making requests.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
 pub enum APIType {
     /// OpenAI Chat Completions API (`/chat/completions`)
+    #[serde(rename = "openai_chat_completions")]
     OpenAIChatCompletions,
 
     /// OpenAI Responses API (`/responses`)
+    #[serde(rename = "openai_responses")]
     OpenAIResponses,
 
     /// Anthropic Messages API (`/messages`)
+    #[serde(rename = "anthropic_messages")]
     AnthropicMessages,
 
     /// AWS Bedrock Converse API
+    #[serde(rename = "bedrock_converse")]
     BedrockConverse,
 }
 

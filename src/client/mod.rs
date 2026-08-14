@@ -41,7 +41,7 @@ use crate::auth::Credential;
 use crate::http;
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 use crate::provider::{
-    self, Provider, openai::OpenAiProvider, openai_compatible::OpenAiCompatibleProvider,
+    self, Provider, openai::OpenAIProvider, openai_compatible::OpenAiCompatibleProvider,
 };
 
 pub use builder::{ClientBuilder, NoApiKey, NoProvider, WithApiKey, WithProvider};
@@ -538,7 +538,7 @@ fn build_provider(config: &ClientConfig, provider_name: Option<String>) -> Arc<d
         return Arc::from(p);
     }
 
-    Arc::new(OpenAiProvider)
+    Arc::new(OpenAIProvider)
 }
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]

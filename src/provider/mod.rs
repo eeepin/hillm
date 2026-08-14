@@ -1,6 +1,5 @@
 pub(crate) mod anthropic;
 pub mod api_type;
-pub mod base;
 pub(crate) mod bedrock;
 pub mod codec;
 pub mod cost;
@@ -11,7 +10,6 @@ pub(crate) mod openai_compatible;
 pub mod outbound_policy;
 
 pub use api_type::APIType;
-pub use base::BaseProvider;
 pub use codec::APITypeCodec;
 pub use outbound_policy::{
     OutboundPolicy, current_policy, set_outbound_policy, validate_outbound_url,
@@ -21,7 +19,7 @@ pub use outbound_policy::{
 use anthropic::AnthropicProvider;
 use bedrock::BedrockProvider;
 use datadriven::ConfigDrivenProvider;
-use openai::OpenAiProvider;
+use openai::OpenAIProvider;
 
 use crate::error::{HiLlmError, HiLlmResult};
 use crate::types::Modality;
@@ -314,107 +312,17 @@ pub(crate) trait Provider: Send + Sync {
         vec![]
     }
 
-    fn chat_completions_path(&self) -> &str {
-        "/chat/completions"
-    }
+    fn available_api_types(&self) -> Vec<APIType>;
 
-    fn embeddings_path(&self) -> &str {
-        "/embeddings"
-    }
+    fn codec_for(&self, api_type: APIType) -> Option<Box<dyn codec::APITypeCodec>>;
 
-    fn models_path(&self) -> &str {
-        "/models"
-    }
-
-    fn image_generations_path(&self) -> &str {
-        "/images/generations"
-    }
-
-    fn audio_speech_path(&self) -> &str {
-        "/audio/speech"
-    }
-
-    fn audio_transcriptions_path(&self) -> &str {
-        "/audio/transcriptions"
-    }
-
-    fn moderations_path(&self) -> &str {
-        "/moderations"
-    }
-
-    fn rerank_path(&self) -> &str {
-        "/rerank"
-    }
-
-    fn files_path(&self) -> &str {
-        "/files"
-    }
-
-    fn batches_path(&self) -> &str {
-        "/batches"
-    }
-
-    fn responses_path(&self) -> &str {
-        "/responses"
-    }
-
-    fn search_path(&self) -> &str {
-        "/search"
-    }
-
-    fn ocr_path(&self) -> &str {
-        "/ocr"
-    }
-
-    #[allow(dead_code)]
-    fn supports_streaming(&self) -> bool {
-        true
-    }
-
-    fn transform_request(&self, body: &mut serde_json::Value) -> HiLlmResult<()> {
-        let _ = body;
-        Ok(())
-    }
-
-    fn transform_response(&self, _body: &mut serde_json::Value) -> HiLlmResult<()> {
-        Ok(())
-    }
-
-    fn build_url(&self, endpoint_path: &str, _model: &str) -> String {
-        format!("{}{}", self.base_url(), endpoint_path)
-    }
-
-    fn parse_stream_event(
-        &self,
-        event_data: &str,
-    ) -> HiLlmResult<Option<crate::types::ChatCompletionChunk>> {
-        serde_json::from_str::<crate::types::ChatCompletionChunk>(event_data)
-            .map(Some)
-            .map_err(|e| HiLlmError::Streaming {
-                message: format!("failed to parse SSE data: {e}"),
-            })
-    }
-
-    fn stream_format(&self) -> StreamFormat {
-        StreamFormat::SSE
-    }
-
-    fn build_stream_url(&self, endpoint_path: &str, model: &str) -> String {
-        self.build_url(endpoint_path, model)
-    }
-
-    fn signing_headers(&self, method: &str, url: &str, body: &[u8]) -> Vec<(String, String)> {
-        let _ = (method, url, body);
-        vec![]
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    fn env_var(&self) -> Option<&'static str> {
+        None
     }
 
     fn validate(&self) -> HiLlmResult<()> {
         Ok(())
-    }
-
-    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
-    fn env_var(&self) -> Option<&str> {
-        None
     }
 }
 
@@ -425,7 +333,7 @@ pub(crate) fn get_provider(name: &str) -> Option<Box<dyn Provider>> {
 
     match name {
         "openai" => {
-            return Some(Box::new(OpenAiProvider));
+            return Some(Box::new(OpenAIProvider));
         }
         "anthropic" => {
             return Some(Box::new(AnthropicProvider));
