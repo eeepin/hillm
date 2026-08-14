@@ -22,7 +22,7 @@ use datadriven::ConfigDrivenProvider;
 use openai::OpenAIProvider;
 
 use crate::error::{HiLlmError, HiLlmResult};
-use crate::types::Modality;
+use crate::types::{ChatCompletionChunk, Modality};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -80,6 +80,8 @@ impl ProviderEntry {
             endpoints: None,
             models,
             param_mappings: None,
+            available_api_types: vec![], // Will use default [OpenAIChatCompletions]
+            default_api_type: None,
         }
     }
 }
@@ -271,6 +273,48 @@ pub struct ProviderConfig {
     pub endpoints: Option<Vec<String>>,
     pub models: Vec<String>,
     pub param_mappings: Option<HashMap<String, String>>,
+    /// API types this provider supports. Empty defaults to `[OpenAIChatCompletions]`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub available_api_types: Vec<APIType>,
+    /// The default API type to use when creating a provider instance.
+    /// Must be one of `available_api_types` if both are set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_api_type: Option<APIType>,
+}
+
+impl ProviderConfig {
+    /// Returns the effective available API types, falling back to `[OpenAIChatCompletions]` if empty.
+    pub fn effective_api_types(&self) -> Vec<APIType> {
+        if self.available_api_types.is_empty() {
+            vec![APIType::OpenAIChatCompletions]
+        } else {
+            self.available_api_types.clone()
+        }
+    }
+
+    /// Returns the effective default API type, falling back to the first available type.
+    pub fn effective_default_api_type(&self) -> APIType {
+        self.default_api_type
+            .unwrap_or_else(|| self.effective_api_types()[0])
+    }
+
+    /// Validates the API type configuration.
+    /// Returns an error if `default_api_type` is set but not in `available_api_types`.
+    pub fn validate_api_types(&self) -> HiLlmResult<()> {
+        if let Some(default) = self.default_api_type {
+            let available = self.effective_api_types();
+            if !available.contains(&default) {
+                return Err(HiLlmError::BadRequest {
+                    message: format!(
+                        "default_api_type '{default}' is not in available_api_types {:?}",
+                        available
+                    ),
+                    status: 400,
+                });
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -312,17 +356,121 @@ pub(crate) trait Provider: Send + Sync {
         vec![]
     }
 
-    fn available_api_types(&self) -> Vec<APIType>;
+    #[allow(dead_code)]
+    fn available_api_types(&self) -> Vec<APIType> {
+        vec![APIType::OpenAIChatCompletions]
+    }
 
-    fn codec_for(&self, api_type: APIType) -> Option<Box<dyn codec::APITypeCodec>>;
+    #[allow(dead_code)]
+    fn codec_for(&self, api_type: APIType) -> Option<Box<dyn codec::APITypeCodec>> {
+        let _ = api_type;
+        None
+    }
 
     #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
-    fn env_var(&self) -> Option<&'static str> {
+    fn env_var(&self) -> Option<&str> {
         None
     }
 
     fn validate(&self) -> HiLlmResult<()> {
         Ok(())
+    }
+
+    // --- Legacy endpoint path methods (used by DefaultClient for non-codec paths) ---
+
+    fn chat_completions_path(&self) -> &str {
+        "/chat/completions"
+    }
+
+    fn embeddings_path(&self) -> &str {
+        "/embeddings"
+    }
+
+    fn image_generations_path(&self) -> &str {
+        "/images/generations"
+    }
+
+    fn audio_speech_path(&self) -> &str {
+        "/audio/speech"
+    }
+
+    fn audio_transcriptions_path(&self) -> &str {
+        "/audio/transcriptions"
+    }
+
+    fn moderations_path(&self) -> &str {
+        "/moderations"
+    }
+
+    fn rerank_path(&self) -> &str {
+        "/rerank"
+    }
+
+    fn search_path(&self) -> &str {
+        "/search"
+    }
+
+    fn ocr_path(&self) -> &str {
+        "/ocr"
+    }
+
+    fn models_path(&self) -> &str {
+        "/models"
+    }
+
+    fn files_path(&self) -> &str {
+        "/files"
+    }
+
+    fn batches_path(&self) -> &str {
+        "/batches"
+    }
+
+    fn responses_path(&self) -> &str {
+        "/responses"
+    }
+
+    // --- Legacy URL building ---
+
+    fn build_url(&self, endpoint_path: &str, _model: &str) -> String {
+        format!("{}{}", self.base_url(), endpoint_path)
+    }
+
+    fn build_stream_url(&self, endpoint_path: &str, model: &str) -> String {
+        self.build_url(endpoint_path, model)
+    }
+
+    // --- Legacy request/response transforms ---
+
+    fn transform_request(&self, _body: &mut serde_json::Value) -> HiLlmResult<()> {
+        Ok(())
+    }
+
+    fn transform_response(&self, _body: &mut serde_json::Value) -> HiLlmResult<()> {
+        Ok(())
+    }
+
+    // --- Legacy streaming ---
+
+    fn stream_format(&self) -> StreamFormat {
+        StreamFormat::SSE
+    }
+
+    fn parse_stream_event(&self, data: &str) -> HiLlmResult<Option<ChatCompletionChunk>> {
+        if data == "[DONE]" {
+            return Ok(None);
+        }
+        serde_json::from_str(data)
+            .map(Some)
+            .map_err(|e| HiLlmError::Streaming {
+                message: format!("Failed to parse stream event: {e}"),
+            })
+    }
+
+    // --- Legacy signing ---
+
+    fn signing_headers(&self, _method: &str, _url: &str, _body: &[u8]) -> Vec<(String, String)> {
+        vec![]
     }
 }
 
@@ -483,5 +631,58 @@ mod tests {
             !registry.values().collect::<Vec<_>>()[0].models.is_empty(),
             "registry should have models"
         );
+    }
+
+    #[test]
+    fn provider_config_defaults_to_chat_completions() {
+        let config = ProviderConfig {
+            name: "test".to_string(),
+            display_name: None,
+            base_url: Some("https://example.com".to_string()),
+            auth: None,
+            endpoints: None,
+            models: vec!["model-a".to_string()],
+            param_mappings: None,
+            available_api_types: vec![],
+            default_api_type: None,
+        };
+        assert_eq!(config.effective_api_types(), vec![APIType::OpenAIChatCompletions]);
+        assert_eq!(config.effective_default_api_type(), APIType::OpenAIChatCompletions);
+    }
+
+    #[test]
+    fn provider_config_validates_default_in_available() {
+        let config = ProviderConfig {
+            name: "test".to_string(),
+            display_name: None,
+            base_url: Some("https://example.com".to_string()),
+            auth: None,
+            endpoints: None,
+            models: vec!["model-a".to_string()],
+            param_mappings: None,
+            available_api_types: vec![APIType::OpenAIChatCompletions],
+            default_api_type: Some(APIType::AnthropicMessages),
+        };
+        let result = config.validate_api_types();
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("default_api_type"));
+    }
+
+    #[test]
+    fn provider_config_accepts_valid_default() {
+        let config = ProviderConfig {
+            name: "test".to_string(),
+            display_name: None,
+            base_url: Some("https://example.com".to_string()),
+            auth: None,
+            endpoints: None,
+            models: vec!["model-a".to_string()],
+            param_mappings: None,
+            available_api_types: vec![APIType::OpenAIChatCompletions, APIType::OpenAIResponses],
+            default_api_type: Some(APIType::OpenAIResponses),
+        };
+        assert!(config.validate_api_types().is_ok());
+        assert_eq!(config.effective_default_api_type(), APIType::OpenAIResponses);
     }
 }

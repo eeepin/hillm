@@ -4,7 +4,6 @@ use bytes::Bytes;
 
 use crate::error::HiLlmResult;
 use crate::provider::APIType;
-use crate::types::{APIRequest, APIResponse};
 
 /// Codec trait for protocol-specific request/response encoding and decoding.
 ///
@@ -16,15 +15,6 @@ use crate::types::{APIRequest, APIResponse};
 /// - URL building (including stream URLs)
 /// - Signing headers (for providers like AWS Bedrock)
 pub trait APITypeCodec: Send + Sync {
-    /// The request type this codec handles.
-    type Request: APIRequest;
-
-    /// The response type this codec produces.
-    type Response: APIResponse;
-
-    /// The stream event type for streaming responses.
-    type StreamEvent;
-
     /// Returns the API type this codec implements.
     fn api_type(&self) -> APIType;
 
@@ -46,16 +36,16 @@ pub trait APITypeCodec: Send + Sync {
         self.build_url(base_url, model)
     }
 
-    /// Encodes a request into bytes for transmission.
-    fn encode_request(&self, request: &Self::Request) -> HiLlmResult<Bytes>;
+    /// Encodes a request value into bytes for transmission.
+    fn encode_request(&self, request: &serde_json::Value) -> HiLlmResult<Bytes>;
 
-    /// Decodes a response from bytes.
-    fn decode_response(&self, bytes: &[u8]) -> HiLlmResult<Self::Response>;
+    /// Decodes a response from bytes into a value.
+    fn decode_response(&self, bytes: &[u8]) -> HiLlmResult<serde_json::Value>;
 
     /// Parses a stream event from SSE data.
     ///
     /// Returns `Ok(None)` if the event should be skipped (e.g., OpenAI's `[DONE]` marker).
-    fn parse_stream_event(&self, data: &str) -> HiLlmResult<Option<Self::StreamEvent>>;
+    fn parse_stream_event(&self, data: &str) -> HiLlmResult<Option<serde_json::Value>>;
 
     /// Returns signing headers for the request, if any.
     ///

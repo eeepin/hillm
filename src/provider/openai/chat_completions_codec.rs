@@ -1,21 +1,16 @@
 //! OpenAI Chat Completions API codec implementation.
 
 use bytes::Bytes;
-use serde_json;
 
 use crate::error::{HiLlmError, HiLlmResult};
 use crate::provider::APIType;
 use crate::provider::codec::APITypeCodec;
-use crate::types::chat::{ChatCompletionChunk, ChatCompletionRequest, ChatCompletionResponse};
 
 /// Codec for OpenAI Chat Completions API.
+#[allow(dead_code)]
 pub struct OpenAIChatCompletionsCodec;
 
 impl APITypeCodec for OpenAIChatCompletionsCodec {
-    type Request = ChatCompletionRequest;
-    type Response = ChatCompletionResponse;
-    type StreamEvent = ChatCompletionChunk;
-
     fn api_type(&self) -> APIType {
         APIType::OpenAIChatCompletions
     }
@@ -24,21 +19,15 @@ impl APITypeCodec for OpenAIChatCompletionsCodec {
         "/chat/completions"
     }
 
-    fn encode_request(&self, request: &Self::Request) -> HiLlmResult<Bytes> {
-        serde_json::to_vec(request)
-            .map(Bytes::from)
-            .map_err(|e| HiLlmError::Serialization {
-                message: format!("Failed to serialize ChatCompletionRequest: {}", e),
-            })
+    fn encode_request(&self, request: &serde_json::Value) -> HiLlmResult<Bytes> {
+        Ok(Bytes::from(serde_json::to_vec(request)?))
     }
 
-    fn decode_response(&self, bytes: &[u8]) -> HiLlmResult<Self::Response> {
-        serde_json::from_slice(bytes).map_err(|e| HiLlmError::Serialization {
-            message: format!("Failed to deserialize ChatCompletionResponse: {}", e),
-        })
+    fn decode_response(&self, bytes: &[u8]) -> HiLlmResult<serde_json::Value> {
+        Ok(serde_json::from_slice(bytes)?)
     }
 
-    fn parse_stream_event(&self, data: &str) -> HiLlmResult<Option<Self::StreamEvent>> {
+    fn parse_stream_event(&self, data: &str) -> HiLlmResult<Option<serde_json::Value>> {
         // OpenAI sends "[DONE]" to signal end of stream
         if data == "[DONE]" {
             return Ok(None);
@@ -46,8 +35,8 @@ impl APITypeCodec for OpenAIChatCompletionsCodec {
 
         serde_json::from_str(data)
             .map(Some)
-            .map_err(|e| HiLlmError::Serialization {
-                message: format!("Failed to parse ChatCompletionChunk: {}", e),
+            .map_err(|e| HiLlmError::Streaming {
+                message: format!("Failed to parse ChatCompletionChunk: {e}"),
             })
     }
 }
@@ -55,8 +44,6 @@ impl APITypeCodec for OpenAIChatCompletionsCodec {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::chat::{ChatCompletionChunk, ChatCompletionRequest, ChatCompletionResponse};
-    use crate::types::message::{Message, MessageContent, UserMessage};
 
     #[test]
     fn test_openai_chat_completions_codec_api_type() {
@@ -73,15 +60,10 @@ mod tests {
     #[test]
     fn test_openai_chat_completions_codec_encode_request() {
         let codec = OpenAIChatCompletionsCodec;
-        let request = ChatCompletionRequest {
-            model: "gpt-4".to_string(),
-            messages: vec![Message::User(UserMessage {
-                content: MessageContent::Text("Hello".to_string()),
-                name: None,
-            })],
-            stream: Some(false),
-            ..Default::default()
-        };
+        let request = serde_json::json!({
+            "model": "gpt-4",
+            "messages": [{"role": "user", "content": "Hello"}]
+        });
 
         let result = codec.encode_request(&request);
         assert!(result.is_ok());
@@ -117,7 +99,7 @@ mod tests {
         let result = codec.parse_stream_event(chunk_json).unwrap();
         assert!(result.is_some());
         let chunk = result.unwrap();
-        assert_eq!(chunk.id, "chatcmpl-123");
-        assert_eq!(chunk.choices.len(), 1);
+        assert_eq!(chunk["id"], "chatcmpl-123");
+        assert_eq!(chunk["choices"].as_array().unwrap().len(), 1);
     }
 }
