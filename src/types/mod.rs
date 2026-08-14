@@ -1,6 +1,8 @@
+pub mod anthropic;
 pub mod api;
 pub mod audio;
 pub mod batch;
+pub mod bedrock;
 pub mod chat;
 pub mod embedding;
 pub mod file;
@@ -13,9 +15,11 @@ pub mod rerank;
 pub mod response;
 pub mod search;
 
+pub use anthropic::*;
 pub use api::*;
 pub use audio::*;
 pub use batch::*;
+pub use bedrock::*;
 pub use chat::*;
 pub use embedding::*;
 pub use file::*;

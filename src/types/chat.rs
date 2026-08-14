@@ -205,6 +205,23 @@ pub struct StreamFunctionCall {
     pub arguments: Option<String>,
 }
 
+// APIRequest/APIResponse trait implementations
+
+impl APIRequest for ChatCompletionRequest {
+    type Response = ChatCompletionResponse;
+    type StreamEvent = ChatCompletionChunk;
+
+    fn model(&self) -> &str {
+        &self.model
+    }
+
+    fn stream(&self) -> bool {
+        self.stream.unwrap_or(false)
+    }
+}
+
+impl APIResponse for ChatCompletionResponse {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -347,20 +364,3 @@ mod tests {
         assert!(reser.contains("\"cached_tokens\":30"));
     }
 }
-
-// APIRequest/APIResponse trait implementations
-
-impl APIRequest for ChatCompletionRequest {
-    type Response = ChatCompletionResponse;
-    type StreamEvent = ChatCompletionChunk;
-
-    fn model(&self) -> &str {
-        &self.model
-    }
-
-    fn stream(&self) -> bool {
-        self.stream.unwrap_or(false)
-    }
-}
-
-impl APIResponse for ChatCompletionResponse {}
