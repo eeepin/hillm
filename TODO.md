@@ -213,6 +213,43 @@ enum ModelMatch {
 
 完成标准：三条路由分别能执行非流请求；三类类型不会被强制归一成 OpenAI Chat 后再发送。
 
+#### 技术债务：APITypeCodec trait 的类型安全重构
+
+**当前问题**：`APITypeCodec` trait 当前使用 `serde_json::Value` 作为请求/响应类型，而非关联类型 `Self::Request` / `Self::Response`。这是因为使用关联类型会导致 `Box<dyn APITypeCodec>` 无法满足对象安全（object safety）要求，编译器无法推断关联类型。
+
+**临时方案**：使用 `serde_json::Value` 作为通用类型，牺牲编译时类型安全以支持动态分发。
+
+**推荐重构方案**（后续实施）：使用 Enum 包装保持类型安全和动态分发：
+
+```rust
+pub enum AnyRequest {
+    ChatCompletion(ChatCompletionRequest),
+    AnthropicMessages(AnthropicMessagesRequest),
+    BedrockConverse(BedrockConverseRequest),
+}
+
+pub enum AnyResponse {
+    ChatCompletion(ChatCompletionResponse),
+    AnthropicMessages(AnthropicMessagesResponse),
+    BedrockConverse(BedrockConverseResponse),
+}
+
+pub trait APITypeCodec: Send + Sync {
+    fn api_type(&self) -> APIType;
+    fn encode_request(&self, request: &AnyRequest) -> HiLlmResult<Bytes>;
+    fn decode_response(&self, bytes: &[u8]) -> HiLlmResult<AnyResponse>;
+    fn parse_stream_event(&self, data: &str) -> HiLlmResult<Option<AnyStreamEvent>>;
+}
+```
+
+**优势**：
+- 保持编译时类型检查
+- 支持动态分发（`Box<dyn APITypeCodec>`）
+- 明确的类型边界，符合 Rust 哲学
+- 与 TODO.md 中"三种路由分别拥有原生类型"的目标一致
+
+**实施时机**：在 P0 Step 2（provider 工厂路由选择）完成后，P0 Step 3（endpoint 和 codec 绑定）开始时进行重构。
+
 ### 4. 路由集成测试
 
 - [ ] 用本地 mock HTTP service 断言三种 route 的 URL、header 和 JSON body。
