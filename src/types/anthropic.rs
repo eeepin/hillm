@@ -1,7 +1,7 @@
 //! Anthropic Messages API native types.
 
-use serde::{Deserialize, Serialize};
 use crate::types::{APIRequest, APIResponse};
+use serde::{Deserialize, Serialize};
 
 // ============ Request Types ============
 
@@ -100,23 +100,15 @@ pub enum AnthropicContentBlock {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum AnthropicImageSource {
-    Base64 {
-        media_type: String,
-        data: String,
-    },
-    Url {
-        url: String,
-    },
+    Base64 { media_type: String, data: String },
+    Url { url: String },
 }
 
 /// Document source.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum AnthropicDocumentSource {
-    Base64 {
-        media_type: String,
-        data: String,
-    },
+    Base64 { media_type: String, data: String },
 }
 
 /// Cache control configuration.
@@ -262,9 +254,17 @@ pub struct AnthropicMessageStart {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum AnthropicContentBlockStart {
-    Text { text: String },
-    ToolUse { id: String, name: String },
-    Thinking { thinking: String, signature: Option<String> },
+    Text {
+        text: String,
+    },
+    ToolUse {
+        id: String,
+        name: String,
+    },
+    Thinking {
+        thinking: String,
+        signature: Option<String>,
+    },
 }
 
 /// Delta variants.

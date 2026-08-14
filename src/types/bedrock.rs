@@ -1,7 +1,7 @@
 //! AWS Bedrock Converse API native types.
 
-use serde::{Deserialize, Serialize};
 use crate::types::{APIRequest, APIResponse};
+use serde::{Deserialize, Serialize};
 
 // ============ Request Types ============
 
@@ -42,10 +42,23 @@ pub enum BedrockRole {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum BedrockContentBlock {
-    Text { text: String },
-    Image { format: String, source: BedrockImageSource },
-    Document { name: String, format: String, source: BedrockDocumentSource },
-    ToolUse { tool_use_id: String, name: String, input: serde_json::Value },
+    Text {
+        text: String,
+    },
+    Image {
+        format: String,
+        source: BedrockImageSource,
+    },
+    Document {
+        name: String,
+        format: String,
+        source: BedrockDocumentSource,
+    },
+    ToolUse {
+        tool_use_id: String,
+        name: String,
+        input: serde_json::Value,
+    },
     ToolResult {
         tool_use_id: String,
         content: Vec<BedrockContentBlock>,
@@ -163,7 +176,9 @@ pub struct BedrockUsage {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "event_type", rename_all = "camelCase")]
 pub enum BedrockStreamEvent {
-    MessageStart { role: BedrockRole },
+    MessageStart {
+        role: BedrockRole,
+    },
     ContentBlockStart {
         content_block_index: u32,
         start: BedrockContentBlockStart,
@@ -172,9 +187,15 @@ pub enum BedrockStreamEvent {
         content_block_index: u32,
         delta: BedrockStreamDelta,
     },
-    ContentBlockStop { content_block_index: u32 },
-    MessageStop { stop_reason: BedrockStopReason },
-    Metadata { usage: BedrockUsage },
+    ContentBlockStop {
+        content_block_index: u32,
+    },
+    MessageStop {
+        stop_reason: BedrockStopReason,
+    },
+    Metadata {
+        usage: BedrockUsage,
+    },
 }
 
 /// Content block start.
