@@ -3,8 +3,11 @@ use std::borrow::Cow;
 #[cfg(feature = "bedrock")]
 use crate::error::HiLlmError;
 use crate::error::HiLlmResult;
-use crate::provider::{Provider, StreamFormat, registry_get};
+use crate::provider::bedrock::codec::BedrockConverseCodec;
+use crate::provider::{APIType, Provider, StreamFormat, codec::APITypeCodec, registry_get};
 use crate::types::ChatCompletionChunk;
+
+pub mod codec;
 
 /// Default AWS region for Bedrock when none is specified.
 const DEFAULT_REGION: &str = "us-east-1";
@@ -133,6 +136,17 @@ impl Provider for BedrockProvider {
             }
         }
         Ok(())
+    }
+
+    fn available_api_types(&self) -> Vec<APIType> {
+        vec![APIType::BedrockConverse]
+    }
+
+    fn codec_for(&self, api_type: APIType) -> Option<Box<dyn APITypeCodec>> {
+        match api_type {
+            APIType::BedrockConverse => Some(Box::new(BedrockConverseCodec)),
+            _ => None,
+        }
     }
 
     fn stream_format(&self) -> StreamFormat {
