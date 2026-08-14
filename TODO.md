@@ -133,7 +133,8 @@ enum ModelMatch {
 - [x] 用 `saturating_sub` 或显式校验修复 cache read/write token 总和超过 input token 时的无符号下溢。
 - [x] 修复 provider 环境变量扫描只检查第一个元素的问题。
 - [x] 处理 `cargo clippy --locked --all-targets -- -D warnings` 的全部错误。
-- [x] 为上述两个逻辑问题添加不依赖网络的回归测试。
+- [x] 为 token 下溢问题添加不依赖网络的回归测试。
+- [ ] 为 provider 环境变量扫描问题添加不依赖网络的回归测试（`ProviderEntry::to_config()` 当前零测试覆盖）。
 
 完成标准：fmt、默认测试和严格 Clippy 均通过。
 
