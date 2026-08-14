@@ -297,8 +297,14 @@ default_api_type = "anthropic_messages"
 "#;
         let config = FileConfig::from_toml_str(toml).expect("TOML should parse");
         assert_eq!(config.providers().len(), 1);
-        assert_eq!(config.providers()[0].available_api_types, vec![APIType::AnthropicMessages]);
-        assert_eq!(config.providers()[0].default_api_type, Some(APIType::AnthropicMessages));
+        assert_eq!(
+            config.providers()[0].available_api_types,
+            vec![APIType::AnthropicMessages]
+        );
+        assert_eq!(
+            config.providers()[0].default_api_type,
+            Some(APIType::AnthropicMessages)
+        );
     }
 
     #[test]
