@@ -5,6 +5,7 @@ use std::time::Duration;
 use serde::Deserialize;
 
 use crate::error::{HiLlmError, HiLlmResult};
+use crate::provider::APIType;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -55,6 +56,35 @@ pub struct FileProviderConfig {
     pub name: String,
     pub base_url: String,
     pub auth_header: Option<String>,
+    /// API types this provider supports. If empty, defaults to OpenAI Chat Completions.
+    #[serde(default)]
+    pub available_api_types: Vec<APIType>,
+    /// The default API type to use. Must be one of `available_api_types` if set.
+    #[serde(default)]
+    pub default_api_type: Option<APIType>,
+}
+
+impl FileProviderConfig {
+    /// Validates the API type configuration.
+    pub fn validate_api_types(&self) -> HiLlmResult<()> {
+        if let Some(default) = self.default_api_type {
+            let available = if self.available_api_types.is_empty() {
+                vec![APIType::OpenAIChatCompletions]
+            } else {
+                self.available_api_types.clone()
+            };
+            if !available.contains(&default) {
+                return Err(HiLlmError::BadRequest {
+                    message: format!(
+                        "provider '{}': default_api_type '{default}' is not in available_api_types {:?}",
+                        self.name, available
+                    ),
+                    status: 400,
+                });
+            }
+        }
+        Ok(())
+    }
 }
 
 impl FileConfig {
@@ -179,6 +209,16 @@ impl FileConfig {
     pub fn providers(&self) -> &[FileProviderConfig] {
         self.providers.as_deref().unwrap_or(&[])
     }
+
+    /// Validates all provider configurations.
+    pub fn validate_providers(&self) -> HiLlmResult<()> {
+        if let Some(providers) = &self.providers {
+            for provider in providers {
+                provider.validate_api_types()?;
+            }
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -242,5 +282,70 @@ max_retries = 2
     fn empty_config_is_valid() {
         let config = FileConfig::from_toml_str("").expect("TOML should parse");
         assert!(config.api_key.is_none());
+    }
+
+    #[test]
+    fn parse_provider_with_api_types() {
+        let toml = r#"
+api_key = "sk-test"
+
+[[providers]]
+name = "anthropic"
+base_url = "https://api.anthropic.com/v1"
+available_api_types = ["anthropic_messages"]
+default_api_type = "anthropic_messages"
+"#;
+        let config = FileConfig::from_toml_str(toml).expect("TOML should parse");
+        assert_eq!(config.providers().len(), 1);
+        assert_eq!(config.providers()[0].available_api_types, vec![APIType::AnthropicMessages]);
+        assert_eq!(config.providers()[0].default_api_type, Some(APIType::AnthropicMessages));
+    }
+
+    #[test]
+    fn validate_providers_rejects_invalid_default() {
+        let toml = r#"
+api_key = "sk-test"
+
+[[providers]]
+name = "test"
+base_url = "https://example.com"
+available_api_types = ["openai_chat_completions"]
+default_api_type = "anthropic_messages"
+"#;
+        let config = FileConfig::from_toml_str(toml).expect("TOML should parse");
+        let result = config.validate_providers();
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("default_api_type"));
+    }
+
+    #[test]
+    fn validate_providers_accepts_valid_config() {
+        let toml = r#"
+api_key = "sk-test"
+
+[[providers]]
+name = "openai"
+base_url = "https://api.openai.com/v1"
+available_api_types = ["openai_chat_completions", "openai_responses"]
+default_api_type = "openai_chat_completions"
+"#;
+        let config = FileConfig::from_toml_str(toml).expect("TOML should parse");
+        assert!(config.validate_providers().is_ok());
+    }
+
+    #[test]
+    fn validate_providers_defaults_to_chat_completions() {
+        let toml = r#"
+api_key = "sk-test"
+
+[[providers]]
+name = "test"
+base_url = "https://example.com"
+"#;
+        let config = FileConfig::from_toml_str(toml).expect("TOML should parse");
+        assert!(config.validate_providers().is_ok());
+        // Empty available_api_types defaults to [OpenAIChatCompletions]
+        assert!(config.providers()[0].available_api_types.is_empty());
     }
 }
