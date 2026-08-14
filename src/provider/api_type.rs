@@ -104,14 +104,26 @@ mod tests {
             APIType::OpenAIChatCompletions.default_endpoint_path(),
             "/chat/completions"
         );
-        assert_eq!(APIType::OpenAIResponses.default_endpoint_path(), "/responses");
-        assert_eq!(APIType::AnthropicMessages.default_endpoint_path(), "/messages");
-        assert_eq!(APIType::BedrockConverse.default_endpoint_path(), "/converse");
+        assert_eq!(
+            APIType::OpenAIResponses.default_endpoint_path(),
+            "/responses"
+        );
+        assert_eq!(
+            APIType::AnthropicMessages.default_endpoint_path(),
+            "/messages"
+        );
+        assert_eq!(
+            APIType::BedrockConverse.default_endpoint_path(),
+            "/converse"
+        );
     }
 
     #[test]
     fn api_type_display() {
-        assert_eq!(APIType::OpenAIChatCompletions.to_string(), "OpenAI Chat Completions");
+        assert_eq!(
+            APIType::OpenAIChatCompletions.to_string(),
+            "OpenAI Chat Completions"
+        );
         assert_eq!(APIType::OpenAIResponses.to_string(), "OpenAI Responses");
         assert_eq!(APIType::AnthropicMessages.to_string(), "Anthropic Messages");
         assert_eq!(APIType::BedrockConverse.to_string(), "AWS Bedrock Converse");

@@ -503,6 +503,29 @@ pub(crate) fn get_provider(name: &str) -> Option<Box<dyn Provider>> {
     None
 }
 
+/// Create a provider instance validated against a specific API type.
+///
+/// Unlike [`get_provider`], this function checks that the provider supports
+/// the requested `api_type` and returns a structured error if not.
+#[allow(dead_code)] // Part of APIType routing infrastructure, not yet consumed by client
+pub(crate) fn create_provider(
+    name: &str,
+    api_type: APIType,
+) -> Result<Box<dyn Provider>, HiLlmError> {
+    let provider = get_provider(name).ok_or_else(|| HiLlmError::ProviderNotFound {
+        name: name.to_string(),
+    })?;
+
+    if !provider.available_api_types().contains(&api_type) {
+        return Err(HiLlmError::APITypeUnsupported {
+            api_type: api_type.to_string(),
+            provider: provider.name().to_string(),
+        });
+    }
+
+    Ok(provider)
+}
+
 pub async fn all_providers() -> HiLlmResult<Vec<ProviderConfig>> {
     let registry = registry().await.map_err(|e| HiLlmError::InternalError {
         message: e.to_string(),
@@ -646,8 +669,14 @@ mod tests {
             available_api_types: vec![],
             default_api_type: None,
         };
-        assert_eq!(config.effective_api_types(), vec![APIType::OpenAIChatCompletions]);
-        assert_eq!(config.effective_default_api_type(), APIType::OpenAIChatCompletions);
+        assert_eq!(
+            config.effective_api_types(),
+            vec![APIType::OpenAIChatCompletions]
+        );
+        assert_eq!(
+            config.effective_default_api_type(),
+            APIType::OpenAIChatCompletions
+        );
     }
 
     #[test]
@@ -683,6 +712,58 @@ mod tests {
             default_api_type: Some(APIType::OpenAIResponses),
         };
         assert!(config.validate_api_types().is_ok());
-        assert_eq!(config.effective_default_api_type(), APIType::OpenAIResponses);
+        assert_eq!(
+            config.effective_default_api_type(),
+            APIType::OpenAIResponses
+        );
+    }
+
+    #[test]
+    fn provider_entry_to_config_scans_all_env_vars() {
+        let entry = ProviderEntry {
+            id: "test".into(),
+            env: vec!["NON_KEY_VAR".into(), "MY_API_KEY".into()],
+            api: Default::default(),
+            name: Default::default(),
+            models: Default::default(),
+        };
+        let config = entry.to_config();
+        assert_eq!(
+            config.auth.as_ref().unwrap().env_var.as_deref(),
+            Some("MY_API_KEY")
+        );
+    }
+
+    #[test]
+    fn create_provider_returns_provider_for_supported_api_type() {
+        let result = create_provider("openai", APIType::OpenAIChatCompletions);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().name(), "openai");
+    }
+
+    #[test]
+    fn create_provider_returns_provider_for_responses_api_type() {
+        let result = create_provider("openai", APIType::OpenAIResponses);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn create_provider_rejects_unsupported_api_type() {
+        let result = create_provider("openai", APIType::AnthropicMessages);
+        assert!(result.is_err());
+        if let Err(err) = result {
+            assert!(matches!(err, HiLlmError::APITypeUnsupported { .. }));
+            let msg = err.to_string();
+            assert!(msg.contains("openai"));
+        }
+    }
+
+    #[test]
+    fn create_provider_returns_not_found_for_unknown() {
+        let result = create_provider("nonexistent_provider", APIType::OpenAIChatCompletions);
+        assert!(result.is_err());
+        if let Err(err) = result {
+            assert!(matches!(err, HiLlmError::ProviderNotFound { .. }));
+        }
     }
 }
