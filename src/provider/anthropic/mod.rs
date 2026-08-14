@@ -1,5 +1,5 @@
-use crate::provider::{APIType, Provider, codec::APITypeCodec, registry_get};
 use crate::provider::anthropic::codec::AnthropicMessagesCodec;
+use crate::provider::{APIType, Provider, codec::APITypeCodec, registry_get};
 use std::borrow::Cow;
 
 static ANTHROPIC_EXTRA_HEADERS: &[(&str, &str)] = &[("anthropic-version", "2023-06-01")];
