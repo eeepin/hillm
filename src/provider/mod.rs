@@ -29,6 +29,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
 use tokio::sync::OnceCell;
 
 // Fetch Providers and models info from models.dev
@@ -42,11 +43,15 @@ pub enum ProviderError {
     ParseError(String),
 }
 
+type ProviderRegistry = HashMap<String, ProviderEntry>;
+
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
 static PROVIDER_REGISTRY: OnceCell<Arc<ProviderRegistry>> = OnceCell::const_new();
+
+#[cfg(not(any(feature = "default-http", feature = "wasm-http")))]
+static PROVIDER_REGISTRY: std::sync::OnceLock<Arc<ProviderRegistry>> = std::sync::OnceLock::new();
 const PROVIDER_API_URL: &str = "https://models.dev/api.json";
 pub(crate) const TOKENS_PER_MILLION: f64 = 1_000_000.0;
-
-type ProviderRegistry = HashMap<String, ProviderEntry>;
 
 #[derive(Debug, Deserialize)]
 pub struct ProviderEntry {
@@ -210,6 +215,7 @@ pub struct ContextTier {
     pub(crate) size: u64,
 }
 
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
 async fn fetch_provider() -> Result<ProviderRegistry, ProviderError> {
     let client = reqwest::Client::new();
     let response = client
@@ -232,6 +238,7 @@ fn parse_provider(json: &str) -> Result<ProviderRegistry, ProviderError> {
     Ok(providers)
 }
 
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
 pub async fn registry() -> Result<Arc<ProviderRegistry>, ProviderError> {
     PROVIDER_REGISTRY
         .get_or_try_init(|| async {
@@ -240,6 +247,18 @@ pub async fn registry() -> Result<Arc<ProviderRegistry>, ProviderError> {
         })
         .await
         .map(Arc::clone)
+}
+
+#[cfg(not(any(feature = "default-http", feature = "wasm-http")))]
+pub fn registry() -> Result<Arc<ProviderRegistry>, ProviderError> {
+    PROVIDER_REGISTRY
+        .get_or_init(|| {
+            // Without HTTP features, we can't fetch from remote
+            // Return empty registry
+            Arc::new(HashMap::new())
+        })
+        .clone()
+        .ok_or_else(|| ProviderError::FetchError("No HTTP backend available".to_string()))
 }
 
 /// Synchronously check if the registry has been initialized.

@@ -1,4 +1,5 @@
 use crate::error::HiLlmError;
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
 use reqwest::dns::{Addrs, Name, Resolve, Resolving};
 use std::net::IpAddr;
 use std::sync::{Arc, OnceLock, RwLock};
@@ -31,6 +32,7 @@ pub fn current_policy() -> OutboundPolicy {
         .clone()
 }
 
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
 pub async fn validate_outbound_url(raw_url: &str) -> Result<(), HiLlmError> {
     let policy = current_policy();
     if matches!(policy, OutboundPolicy::Off) {
@@ -103,6 +105,7 @@ pub fn validate_outbound_url_sync(raw_url: &str) -> Result<(), HiLlmError> {
     Ok(())
 }
 
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
 async fn check_deny_private(url: &Url, raw: &str) -> Result<(), HiLlmError> {
     let host = url
         .host_str()
@@ -187,8 +190,10 @@ fn is_link_local_v6(ip: std::net::Ipv6Addr) -> bool {
 
 // GuardedResolver
 
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
 pub struct GuardedResolver;
 
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
 impl Resolve for GuardedResolver {
     fn resolve(&self, name: Name) -> Resolving {
         Box::pin(async move {
@@ -223,6 +228,7 @@ impl Resolve for GuardedResolver {
     }
 }
 
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
 pub fn guarded_resolver() -> Arc<GuardedResolver> {
     Arc::new(GuardedResolver)
 }
