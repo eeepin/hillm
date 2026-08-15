@@ -134,7 +134,7 @@ enum ModelMatch {
 - [x] 修复 provider 环境变量扫描只检查第一个元素的问题。
 - [x] 处理 `cargo clippy --locked --all-targets -- -D warnings` 的全部错误。
 - [x] 为 token 下溢问题添加不依赖网络的回归测试。
-- [ ] 为 provider 环境变量扫描问题添加不依赖网络的回归测试（`ProviderEntry::to_config()` 当前零测试覆盖）。
+- [x] 为 provider 环境变量扫描问题添加不依赖网络的回归测试（`ProviderEntry::to_config()` 当前零测试覆盖）。
 
 完成标准：fmt、默认测试和严格 Clippy 均通过。
 
@@ -185,32 +185,32 @@ enum ModelMatch {
 
 ### 1. 先增加纯配置模型，不改变网络行为
 
-- [ ] 新增 `APIType`，包含且仅包含 `OpenAIChatCompletions`、`OpenAIResponses`、`AnthropicMessages`。
-- [ ] 为静态、远端数据驱动和 custom provider 配置增加 `available_api_types` 与 `default_api_type`。
-- [ ] 为文件配置增加相同字段，并对未知值、空列表和非法 default 做严格校验。
-- [ ] 给内置 provider 设置明确能力：OpenAI 至少支持 Chat 和 Responses；Anthropic 支持 Messages；其他 provider 依据真实端点配置，不进行乐观推断。
-- [ ] 保留旧配置的兼容默认值：只在旧配置未填写 api types 时推导原行为，并输出迁移说明；新配置必须显式声明。
+- [x] 新增 `APIType`，包含且仅包含 `OpenAIChatCompletions`、`OpenAIResponses`、`AnthropicMessages`。
+- [x] 为静态、远端数据驱动和 custom provider 配置增加 `available_api_types` 与 `default_api_type`。
+- [x] 为文件配置增加相同字段，并对未知值、空列表和非法 default 做严格校验。
+- [x] 给内置 provider 设置明确能力：OpenAI 至少支持 Chat 和 Responses；Anthropic 支持 Messages；其他 provider 依据真实端点配置，不进行乐观推断。
+- [x] 保留旧配置的兼容默认值：只在旧配置未填写 api types 时推导原行为，并输出迁移说明；新配置必须显式声明。
 
 完成标准：配置可以 round-trip，所有非法组合在 provider 创建前失败。
 
 ### 2. provider 工厂在创建实例时选择路由
 
-- [ ] 将 `get_provider(name)` 演进为显式选择 api type 的工厂接口，例如 `create_provider(name, api_type)`。
+- [x] 将 `get_provider(name)` 演进为显式选择 api type 的工厂接口，例如 `create_provider(name, api_type)`。
 - [ ] custom provider 检测同时校验 provider/model match 和 api type 支持。
 - [ ] `base_url` 不再无条件创建 `OpenAICompatibleProvider`；使用自定义 base URL 时必须给出 api type，或使用明确的兼容默认值并标为待弃用。
 - [ ] provider 实例暴露只读 `api_type()`，实例创建后不得改变。
-- [ ] 增加 `APITypeUnsupported`、`AmbiguousProvider` 等结构化错误，避免统一返回 `BadRequest(String)`。
+- [x] 增加 `APITypeUnsupported`、`AmbiguousProvider` 等结构化错误，避免统一返回 `BadRequest(String)`。
 
 完成标准：每个 provider 实例的 api type 唯一、可观察且已验证；不再静默回退到 OpenAI。
 
 ### 3. 将 endpoint 和 codec 绑定到 api type
 
-- [ ] 为每种 `APIType` 提供 api-type-specific codec：请求编码、非流响应解码、SSE 事件解码和结束条件。
-- [ ] `OpenAIChatCompletions` 使用 `/chat/completions` 与 Chat Completion 原生类型。
+- [x] 为每种 `APIType` 提供 api-type-specific codec：请求编码、非流响应解码、SSE 事件解码和结束条件。
+- [x] `OpenAIChatCompletions` 使用 `/chat/completions` 与 Chat Completion 原生类型。
 - [ ] `OpenAIResponses` 使用 `/responses` 与 Responses 原生类型；补齐其流式 API，而不是先转换成 chat chunk。
-- [ ] `AnthropicMessages` 使用 `/messages` 与 Anthropic 原生类型；新增原生 request、response、usage、content block 和 stream event 类型。
+- [x] `AnthropicMessages` 使用 `/messages` 与 Anthropic 原生类型；新增原生 request、response、usage、content block 和 stream event 类型。
 - [ ] 将现有 Anthropic → OpenAI chat 的转换保留为显式 compatibility adapter。
-- [ ] 逐步淘汰通用 `transform_request(&mut Value)` / `transform_response(&mut Value)` 在核心协议路由中的使用；无法静态表达的 provider 参数映射可以保留为最后一层扩展。
+- [x] 逐步淘汰通用 `transform_request(&mut Value)` / `transform_response(&mut Value)` 在核心协议路由中的使用；无法静态表达的 provider 参数映射可以保留为最后一层扩展。
 
 完成标准：三条路由分别能执行非流请求；三类类型不会被强制归一成 OpenAI Chat 后再发送。
 
