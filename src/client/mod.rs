@@ -548,36 +548,82 @@ impl LlmClient for DefaultClient {
         req: ChatCompletionRequest,
     ) -> BoxFuture<'_, HiLlmResult<ChatCompletionResponse>> {
         Box::pin(async move {
-            let prepared =
-                self.prepare_request(&req, |p| p.chat_completions_path(), &req.model, Some(false))?;
+            // Try codec path first
+            if let Some(codec) = self.provider.codec_for(provider::APIType::OpenAIChatCompletions) {
+                let endpoint_path = codec.endpoint_path();
+                let url = self.provider.build_url(endpoint_path, &req.model);
 
-            let auth_header = self
-                .resolve_auth_header_for_provider(prepared.provider.as_ref())
+                let mut body = serde_json::to_value(&req)?;
+                if let Some(obj) = body.as_object_mut() {
+                    obj.insert("model".into(), serde_json::Value::String(req.model.clone()));
+                    obj.insert("stream".into(), serde_json::Value::Bool(false));
+                }
+
+                let body_bytes = codec.encode_request(&body)?;
+
+                let auth_header = self
+                    .resolve_auth_header_for_provider(self.provider.as_ref())
+                    .await?;
+                let all_headers = self.all_headers_for_provider(
+                    self.provider.as_ref(),
+                    "POST",
+                    &url,
+                    &body,
+                    &body_bytes,
+                );
+                let extra: Vec<(&str, &str)> = all_headers
+                    .iter()
+                    .map(|(n, v)| (n.as_str(), v.as_str()))
+                    .collect();
+
+                let auth = auth_header.as_ref().map(str_pair);
+                let raw_bytes = http::request::post_json_raw(
+                    &self.http_client,
+                    &url,
+                    auth,
+                    &extra,
+                    body_bytes,
+                    self.config.max_retries,
+                )
                 .await?;
-            let all_headers = self.all_headers_for_provider(
-                prepared.provider.as_ref(),
-                "POST",
-                &prepared.url,
-                &prepared.body_json,
-                &prepared.body_bytes,
-            );
-            let extra: Vec<(&str, &str)> = all_headers
-                .iter()
-                .map(|(n, v)| (n.as_str(), v.as_str()))
-                .collect();
 
-            let auth = auth_header.as_ref().map(str_pair);
-            let mut raw = http::request::post_json_raw(
-                &self.http_client,
-                &prepared.url,
-                auth,
-                &extra,
-                prepared.body_bytes,
-                self.config.max_retries,
-            )
-            .await?;
-            prepared.provider.transform_response(&mut raw)?;
-            serde_json::from_value::<ChatCompletionResponse>(raw).map_err(HiLlmError::from)
+                let raw_bytes_vec = serde_json::to_vec(&raw_bytes)?;
+                let response_value = codec.decode_response(&raw_bytes_vec)?;
+                serde_json::from_value::<ChatCompletionResponse>(response_value)
+                    .map_err(HiLlmError::from)
+            } else {
+                // Fall back to legacy path
+                let prepared =
+                    self.prepare_request(&req, |p| p.chat_completions_path(), &req.model, Some(false))?;
+
+                let auth_header = self
+                    .resolve_auth_header_for_provider(prepared.provider.as_ref())
+                    .await?;
+                let all_headers = self.all_headers_for_provider(
+                    prepared.provider.as_ref(),
+                    "POST",
+                    &prepared.url,
+                    &prepared.body_json,
+                    &prepared.body_bytes,
+                );
+                let extra: Vec<(&str, &str)> = all_headers
+                    .iter()
+                    .map(|(n, v)| (n.as_str(), v.as_str()))
+                    .collect();
+
+                let auth = auth_header.as_ref().map(str_pair);
+                let mut raw = http::request::post_json_raw(
+                    &self.http_client,
+                    &prepared.url,
+                    auth,
+                    &extra,
+                    prepared.body_bytes,
+                    self.config.max_retries,
+                )
+                .await?;
+                prepared.provider.transform_response(&mut raw)?;
+                serde_json::from_value::<ChatCompletionResponse>(raw).map_err(HiLlmError::from)
+            }
         })
     }
 
@@ -586,57 +632,106 @@ impl LlmClient for DefaultClient {
         req: ChatCompletionRequest,
     ) -> BoxFuture<'_, HiLlmResult<BoxStream<'static, HiLlmResult<ChatCompletionChunk>>>> {
         Box::pin(async move {
-            let prepared =
-                self.prepare_request(&req, |p| p.chat_completions_path(), &req.model, Some(true))?;
+            // Try codec path first
+            if let Some(codec) = self.provider.codec_for(provider::APIType::OpenAIChatCompletions) {
+                let endpoint_path = codec.endpoint_path();
+                let url = self.provider.build_stream_url(endpoint_path, &req.model);
 
-            let url = prepared
-                .provider
-                .build_stream_url(prepared.provider.chat_completions_path(), &req.model);
-
-            let auth_header = self
-                .resolve_auth_header_for_provider(prepared.provider.as_ref())
-                .await?;
-            let all_headers = self.all_headers_for_provider(
-                prepared.provider.as_ref(),
-                "POST",
-                &url,
-                &prepared.body_json,
-                &prepared.body_bytes,
-            );
-            let extra: Vec<(&str, &str)> = all_headers
-                .iter()
-                .map(|(n, v)| (n.as_str(), v.as_str()))
-                .collect();
-            let auth = auth_header.as_ref().map(str_pair);
-
-            match prepared.provider.stream_format() {
-                provider::StreamFormat::SSE => {
-                    let provider = Arc::clone(&prepared.provider);
-                    let parse_event = move |data: &str| provider.parse_stream_event(data);
-                    let stream = http::stream::post_stream(
-                        &self.http_client,
-                        &url,
-                        auth,
-                        &extra,
-                        prepared.body_bytes,
-                        self.config.max_retries,
-                        parse_event,
-                    )
-                    .await?;
-                    Ok(stream)
+                let mut body = serde_json::to_value(&req)?;
+                if let Some(obj) = body.as_object_mut() {
+                    obj.insert("model".into(), serde_json::Value::String(req.model.clone()));
+                    obj.insert("stream".into(), serde_json::Value::Bool(true));
                 }
-                provider::StreamFormat::AwsEventStream => {
-                    let stream = http::eventstream::post_eventstream(
-                        &self.http_client,
-                        &url,
-                        auth,
-                        &extra,
-                        prepared.body_bytes,
-                        self.config.max_retries,
-                        provider::bedrock::parse_bedrock_stream_event,
-                    )
+                let body_bytes = codec.encode_request(&body)?;
+
+                let auth_header = self
+                    .resolve_auth_header_for_provider(self.provider.as_ref())
                     .await?;
-                    Ok(stream)
+                let all_headers = self.all_headers_for_provider(
+                    self.provider.as_ref(),
+                    "POST",
+                    &url,
+                    &body,
+                    &body_bytes,
+                );
+                let extra: Vec<(&str, &str)> = all_headers
+                    .iter()
+                    .map(|(n, v)| (n.as_str(), v.as_str()))
+                    .collect();
+                let auth = auth_header.as_ref().map(str_pair);
+
+                let parse_event = move |data: &str| {
+                    codec
+                        .parse_stream_event(data)?
+                        .map(serde_json::from_value::<ChatCompletionChunk>)
+                        .transpose()
+                        .map_err(HiLlmError::from)
+                };
+                let stream = http::stream::post_stream(
+                    &self.http_client,
+                    &url,
+                    auth,
+                    &extra,
+                    body_bytes,
+                    self.config.max_retries,
+                    parse_event,
+                )
+                .await?;
+                Ok(stream)
+            } else {
+                // Fall back to legacy path
+                let prepared =
+                    self.prepare_request(&req, |p| p.chat_completions_path(), &req.model, Some(true))?;
+
+                let url = prepared
+                    .provider
+                    .build_stream_url(prepared.provider.chat_completions_path(), &req.model);
+
+                let auth_header = self
+                    .resolve_auth_header_for_provider(prepared.provider.as_ref())
+                    .await?;
+                let all_headers = self.all_headers_for_provider(
+                    prepared.provider.as_ref(),
+                    "POST",
+                    &url,
+                    &prepared.body_json,
+                    &prepared.body_bytes,
+                );
+                let extra: Vec<(&str, &str)> = all_headers
+                    .iter()
+                    .map(|(n, v)| (n.as_str(), v.as_str()))
+                    .collect();
+                let auth = auth_header.as_ref().map(str_pair);
+
+                match prepared.provider.stream_format() {
+                    provider::StreamFormat::SSE => {
+                        let provider = Arc::clone(&prepared.provider);
+                        let parse_event = move |data: &str| provider.parse_stream_event(data);
+                        let stream = http::stream::post_stream(
+                            &self.http_client,
+                            &url,
+                            auth,
+                            &extra,
+                            prepared.body_bytes,
+                            self.config.max_retries,
+                            parse_event,
+                        )
+                        .await?;
+                        Ok(stream)
+                    }
+                    provider::StreamFormat::AwsEventStream => {
+                        let stream = http::eventstream::post_eventstream(
+                            &self.http_client,
+                            &url,
+                            auth,
+                            &extra,
+                            prepared.body_bytes,
+                            self.config.max_retries,
+                            provider::bedrock::parse_bedrock_stream_event,
+                        )
+                        .await?;
+                        Ok(stream)
+                    }
                 }
             }
         })
