@@ -47,6 +47,7 @@ pub enum HiLlmError {
     #[error("request timeout")]
     Timeout,
 
+    #[cfg(any(feature = "default-http", feature = "wasm-http"))]
     #[error(transparent)]
     Network(#[from] reqwest::Error),
 
