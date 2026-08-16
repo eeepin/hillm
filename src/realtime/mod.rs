@@ -155,3 +155,117 @@ pub trait RealtimeTranslator: Send + Sync + 'static {
 
     fn provider(&self) -> &'static str;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn content_part_constructors() {
+        assert!(matches!(
+            ContentPart::text("hello"),
+            ContentPart::Text { text } if text == "hello"
+        ));
+        assert!(matches!(
+            ContentPart::audio("YWJj"),
+            ContentPart::Audio { base64 } if base64 == "YWJj"
+        ));
+        assert!(matches!(
+            ContentPart::image_ref("https://img"),
+            ContentPart::ImageRef { url } if url == "https://img"
+        ));
+    }
+
+    #[test]
+    fn content_part_serde_round_trip_text() {
+        let part = ContentPart::text("hi");
+        let json = serde_json::to_value(&part).unwrap();
+        assert_eq!(json["type"], "text");
+        assert_eq!(json["text"], "hi");
+        let back: ContentPart = serde_json::from_value(json).unwrap();
+        assert_eq!(back, part);
+    }
+
+    #[test]
+    fn content_part_serde_round_trip_audio() {
+        let part = ContentPart::audio("YWJj");
+        let json = serde_json::to_value(&part).unwrap();
+        assert_eq!(json["type"], "audio");
+        let back: ContentPart = serde_json::from_value(json).unwrap();
+        assert_eq!(back, part);
+    }
+
+    #[test]
+    fn content_part_serde_round_trip_image_ref() {
+        let part = ContentPart::image_ref("https://img");
+        let json = serde_json::to_value(&part).unwrap();
+        assert_eq!(json["type"], "image_ref");
+        let back: ContentPart = serde_json::from_value(json).unwrap();
+        assert_eq!(back, part);
+    }
+
+    #[test]
+    fn response_status_serde_variants() {
+        for (status, expected_str) in [
+            (ResponseStatus::Completed, "completed"),
+            (ResponseStatus::Cancelled, "cancelled"),
+            (ResponseStatus::Failed, "failed"),
+            (ResponseStatus::Incomplete, "incomplete"),
+        ] {
+            let json = serde_json::to_value(status).unwrap();
+            assert_eq!(json, expected_str);
+            let back: ResponseStatus = serde_json::from_value(json).unwrap();
+            assert_eq!(back, status);
+        }
+    }
+
+    #[test]
+    fn envelope_new_has_no_id() {
+        let env = RealtimeEnvelope::new(RealtimeEvent::InputAudioBufferCommit);
+        assert!(env.event_id.is_none());
+        assert!(matches!(env.event, RealtimeEvent::InputAudioBufferCommit));
+    }
+
+    #[test]
+    fn envelope_with_id_has_id() {
+        let env = RealtimeEnvelope::with_id("evt_1", RealtimeEvent::InputAudioBufferClear);
+        assert_eq!(env.event_id.as_deref(), Some("evt_1"));
+    }
+
+    #[test]
+    fn realtime_event_serde_round_trip_session_created() {
+        let event = RealtimeEvent::SessionCreated {
+            session_id: "s1".into(),
+            model: "gpt-4o-realtime".into(),
+        };
+        let json = serde_json::to_value(&event).unwrap();
+        assert_eq!(json["type"], "session_created");
+        let back: RealtimeEvent = serde_json::from_value(json).unwrap();
+        assert_eq!(back, event);
+    }
+
+    #[test]
+    fn realtime_event_serde_round_trip_error() {
+        let event = RealtimeEvent::Error {
+            code: "rate_limit".into(),
+            message: "too many".into(),
+            event_id: Some("evt_2".into()),
+        };
+        let json = serde_json::to_value(&event).unwrap();
+        assert_eq!(json["type"], "error");
+        let back: RealtimeEvent = serde_json::from_value(json).unwrap();
+        assert_eq!(back, event);
+    }
+
+    #[test]
+    fn realtime_event_serde_round_trip_raw() {
+        let payload = serde_json::json!({"foo": "bar"});
+        let event = RealtimeEvent::Raw {
+            event_type: "custom.event".into(),
+            payload: payload.clone(),
+        };
+        let json = serde_json::to_value(&event).unwrap();
+        let back: RealtimeEvent = serde_json::from_value(json).unwrap();
+        assert_eq!(back, event);
+    }
+}

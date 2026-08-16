@@ -680,4 +680,399 @@ mod tests {
         let state2 = state1.clone();
         assert_eq!(state1.metrics.len(), state2.metrics.len());
     }
+
+    // -----------------------------------------------------------------------
+    // Test infrastructure: mock service and request builder
+    // -----------------------------------------------------------------------
+
+    use crate::tower::types::{LlmRequest, LlmResponse};
+    use crate::types::{
+        AssistantMessage, ChatCompletionRequest, ChatCompletionResponse, Choice, Message,
+        MessageContent, Usage,
+    };
+    use std::sync::atomic::{AtomicU32, Ordering as StdOrdering};
+    use tower::ServiceExt;
+
+    fn create_chat_request(content: &str) -> LlmRequest {
+        LlmRequest {
+            kind: crate::tower::types::LlmRequestKind::Chat(ChatCompletionRequest {
+                model: "test-model".to_string(),
+                messages: vec![Message::User(crate::types::UserMessage {
+                    content: MessageContent::Text(content.to_string()),
+                    name: None,
+                })],
+                ..Default::default()
+            }),
+            tenant_id: None,
+            idempotency_key: None,
+        }
+    }
+
+    fn create_chat_response() -> LlmResponse {
+        LlmResponse::Chat(ChatCompletionResponse {
+            id: "test-id".to_string(),
+            object: "chat.completion".to_string(),
+            created: 1234567890,
+            model: "test-model".to_string(),
+            choices: vec![Choice {
+                index: 0,
+                message: AssistantMessage {
+                    content: Some(MessageContent::Text("ok".to_string())),
+                    ..Default::default()
+                },
+                finish_reason: None,
+            }],
+            usage: Some(Usage {
+                prompt_tokens: 10,
+                completion_tokens: 20,
+                total_tokens: 30,
+                ..Default::default()
+            }),
+            ..Default::default()
+        })
+    }
+
+    #[derive(Clone)]
+    struct MockService {
+        behavior: MockBehavior,
+        call_count: Arc<AtomicU32>,
+    }
+
+    #[derive(Clone)]
+    enum MockBehavior {
+        Success,
+        TransientFail,
+        TerminalFail,
+    }
+
+    impl MockService {
+        fn success() -> Self {
+            Self {
+                behavior: MockBehavior::Success,
+                call_count: Arc::new(AtomicU32::new(0)),
+            }
+        }
+
+        fn transient_fail() -> Self {
+            Self {
+                behavior: MockBehavior::TransientFail,
+                call_count: Arc::new(AtomicU32::new(0)),
+            }
+        }
+
+        fn terminal_fail() -> Self {
+            Self {
+                behavior: MockBehavior::TerminalFail,
+                call_count: Arc::new(AtomicU32::new(0)),
+            }
+        }
+    }
+
+    impl Service<LlmRequest> for MockService {
+        type Response = LlmResponse;
+        type Error = HiLlmError;
+        type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+
+        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn call(&mut self, _req: LlmRequest) -> Self::Future {
+            self.call_count.fetch_add(1, StdOrdering::SeqCst);
+            let behavior = self.behavior.clone();
+            Box::pin(async move {
+                match behavior {
+                    MockBehavior::Success => Ok(create_chat_response()),
+                    MockBehavior::TransientFail => Err(HiLlmError::ServiceUnavailable {
+                        message: "transient".to_string(),
+                        status: 503,
+                    }),
+                    MockBehavior::TerminalFail => Err(HiLlmError::BadRequest {
+                        message: "terminal".to_string(),
+                        status: 400,
+                    }),
+                }
+            })
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Router construction validation
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn router_rejects_empty_deployments() {
+        let result = Router::<MockService>::new(vec![], RoutingStrategy::RoundRobin, "test");
+        assert!(result.is_err(), "empty deployments should error");
+    }
+
+    #[test]
+    fn router_weighted_random_rejects_weight_length_mismatch() {
+        let s1 = MockService::success();
+        let s2 = MockService::success();
+        let result = Router::new(
+            vec![s1, s2],
+            RoutingStrategy::WeightedRandom {
+                weights: vec![Weight::ONE],
+            },
+            "test",
+        );
+        assert!(result.is_err(), "weight length must match deployments");
+    }
+
+    #[test]
+    fn router_weighted_random_rejects_all_zero_weights() {
+        let s1 = MockService::success();
+        let result = Router::new(
+            vec![s1],
+            RoutingStrategy::WeightedRandom {
+                weights: vec![Weight::ZERO],
+            },
+            "test",
+        );
+        assert!(result.is_err(), "all-zero weights should error");
+    }
+
+    #[test]
+    fn router_accepts_valid_weighted_random() {
+        let s1 = MockService::success();
+        let result = Router::new(
+            vec![s1],
+            RoutingStrategy::WeightedRandom {
+                weights: vec![Weight::ONE],
+            },
+            "test",
+        );
+        assert!(result.is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // RoundRobin strategy
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn round_robin_distributes_in_order() {
+        let s1 = MockService::success();
+        let s2 = MockService::success();
+        let c1 = Arc::clone(&s1.call_count);
+        let c2 = Arc::clone(&s2.call_count);
+        let mut router = Router::new(vec![s1, s2], RoutingStrategy::RoundRobin, "test").unwrap();
+
+        for _ in 0..4 {
+            let req = create_chat_request("hello");
+            router.ready().await.unwrap().call(req).await.unwrap();
+        }
+        assert_eq!(
+            c1.load(StdOrdering::SeqCst),
+            2,
+            "s1 should be called twice (requests 0, 2)"
+        );
+        assert_eq!(
+            c2.load(StdOrdering::SeqCst),
+            2,
+            "s2 should be called twice (requests 1, 3)"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Fallback strategy
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn fallback_first_succeeds() {
+        let s1 = MockService::success();
+        let s2 = MockService::success();
+        let c1 = Arc::clone(&s1.call_count);
+        let c2 = Arc::clone(&s2.call_count);
+        let mut router = Router::new(vec![s1, s2], RoutingStrategy::Fallback, "test").unwrap();
+
+        let req = create_chat_request("hello");
+        router.ready().await.unwrap().call(req).await.unwrap();
+
+        assert_eq!(c1.load(StdOrdering::SeqCst), 1, "s1 should be called");
+        assert_eq!(
+            c2.load(StdOrdering::SeqCst),
+            0,
+            "s2 should not be called when s1 succeeds"
+        );
+    }
+
+    #[tokio::test]
+    async fn fallback_falls_through_transient() {
+        let s1 = MockService::transient_fail();
+        let s2 = MockService::success();
+        let c1 = Arc::clone(&s1.call_count);
+        let c2 = Arc::clone(&s2.call_count);
+        let mut router = Router::new(vec![s1, s2], RoutingStrategy::Fallback, "test").unwrap();
+
+        let req = create_chat_request("hello");
+        router.ready().await.unwrap().call(req).await.unwrap();
+
+        assert_eq!(c1.load(StdOrdering::SeqCst), 1, "s1 should be tried");
+        assert_eq!(
+            c2.load(StdOrdering::SeqCst),
+            1,
+            "s2 should be tried after s1 transient fail"
+        );
+    }
+
+    #[tokio::test]
+    async fn fallback_terminal_error_aborts() {
+        let s1 = MockService::terminal_fail();
+        let s2 = MockService::success();
+        let c2 = Arc::clone(&s2.call_count);
+        let mut router = Router::new(vec![s1, s2], RoutingStrategy::Fallback, "test").unwrap();
+
+        let req = create_chat_request("hello");
+        let result = router.ready().await.unwrap().call(req).await;
+        assert!(result.is_err());
+        assert_eq!(
+            c2.load(StdOrdering::SeqCst),
+            0,
+            "s2 should not be called after terminal error"
+        );
+    }
+
+    #[tokio::test]
+    async fn fallback_all_transient_returns_last_error() {
+        let s1 = MockService::transient_fail();
+        let s2 = MockService::transient_fail();
+        let mut router = Router::new(vec![s1, s2], RoutingStrategy::Fallback, "test").unwrap();
+
+        let req = create_chat_request("hello");
+        let result = router.ready().await.unwrap().call(req).await;
+        assert!(
+            result.is_err(),
+            "all transient failures should propagate error"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // LatencyBased strategy
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn latency_based_picks_lowest_ema_on_first_request() {
+        // On first request, all EMAs are 0.0 (default for unseen).
+        // Ties are broken by lowest index (strict <).
+        let s1 = MockService::success();
+        let s2 = MockService::success();
+        let c1 = Arc::clone(&s1.call_count);
+        let c2 = Arc::clone(&s2.call_count);
+        let mut router = Router::new(vec![s1, s2], RoutingStrategy::LatencyBased, "test").unwrap();
+
+        let req = create_chat_request("hello");
+        router.ready().await.unwrap().call(req).await.unwrap();
+
+        assert_eq!(
+            c1.load(StdOrdering::SeqCst),
+            1,
+            "s1 (index 0) should be picked on tie"
+        );
+        assert_eq!(
+            c2.load(StdOrdering::SeqCst),
+            0,
+            "s2 should not be picked on tie"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // CostBased strategy (behaves like Fallback; logs cost)
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn cost_based_falls_through_transient_like_fallback() {
+        // CostBased is currently implemented as Fallback + cost logging.
+        let s1 = MockService::transient_fail();
+        let s2 = MockService::success();
+        let c1 = Arc::clone(&s1.call_count);
+        let c2 = Arc::clone(&s2.call_count);
+        let mut router = Router::new(vec![s1, s2], RoutingStrategy::CostBased, "test").unwrap();
+
+        let req = create_chat_request("hello");
+        router.ready().await.unwrap().call(req).await.unwrap();
+
+        assert_eq!(c1.load(StdOrdering::SeqCst), 1);
+        assert_eq!(
+            c2.load(StdOrdering::SeqCst),
+            1,
+            "CostBased falls through transient like Fallback"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // WeightedRandom strategy
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn weighted_random_degenerate_weights_picks_only_nonzero() {
+        // weights [0, 1, 0] → must always pick index 1
+        let s0 = MockService::success();
+        let s1 = MockService::success();
+        let s2 = MockService::success();
+        let c0 = Arc::clone(&s0.call_count);
+        let c1 = Arc::clone(&s1.call_count);
+        let c2 = Arc::clone(&s2.call_count);
+
+        let mut router = Router::new(
+            vec![s0, s1, s2],
+            RoutingStrategy::WeightedRandom {
+                weights: vec![Weight::ZERO, Weight::ONE, Weight::ZERO],
+            },
+            "test",
+        )
+        .unwrap();
+
+        for _ in 0..10 {
+            let req = create_chat_request("hello");
+            router.ready().await.unwrap().call(req).await.unwrap();
+        }
+        assert_eq!(
+            c0.load(StdOrdering::SeqCst),
+            0,
+            "weight 0 should never be picked"
+        );
+        assert_eq!(
+            c1.load(StdOrdering::SeqCst),
+            10,
+            "only s1 has non-zero weight"
+        );
+        assert_eq!(
+            c2.load(StdOrdering::SeqCst),
+            0,
+            "weight 0 should never be picked"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // weighted_random_select
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn weighted_random_select_total_zero_returns_zero() {
+        // Not reachable via Router::new (which rejects all-zero),
+        // but the free function should handle it gracefully.
+        assert_eq!(weighted_random_select(&[Weight::ZERO, Weight::ZERO]), 0);
+    }
+
+    #[test]
+    fn weighted_random_select_single_weight_returns_zero() {
+        assert_eq!(weighted_random_select(&[Weight::from_f64(5.0)]), 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // RouterError
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn router_error_no_ready_upstream_has_code() {
+        let err = RouterError::NoReadyUpstream { code: 2002 };
+        assert_eq!(err.code(), 2002);
+    }
+
+    #[test]
+    fn router_error_converts_to_server_error_503() {
+        let err: HiLlmError = RouterError::NoReadyUpstream { code: 2002 }.into();
+        assert_eq!(err.status_code(), 503);
+    }
 }

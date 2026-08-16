@@ -178,21 +178,6 @@ mod tests {
         }
     }
 
-    impl Clone for GuardrailDecision {
-        fn clone(&self) -> Self {
-            match self {
-                Self::Allow => Self::Allow,
-                Self::Block { reason, code } => Self::Block {
-                    reason: reason.clone(),
-                    code: *code,
-                },
-                Self::Mutate { new_payload } => Self::Mutate {
-                    new_payload: new_payload.clone(),
-                },
-            }
-        }
-    }
-
     fn create_test_context() -> GuardrailContext<'static> {
         static REQUEST: std::sync::OnceLock<serde_json::Value> = std::sync::OnceLock::new();
         static METADATA: std::sync::OnceLock<HashMap<String, String>> = std::sync::OnceLock::new();

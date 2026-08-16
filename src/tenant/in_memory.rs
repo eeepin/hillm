@@ -171,4 +171,139 @@ mod tests {
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), KeyResolverError::Inactive));
     }
+
+    // -----------------------------------------------------------------------
+    // Concurrency tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn concurrent_insert_and_resolve() {
+        let resolver = Arc::new(InMemoryKeyResolver::new());
+        let n = 100;
+
+        // Spawn N tasks that each insert a unique key.
+        let mut insert_handles = Vec::new();
+        for i in 0..n {
+            let r = Arc::clone(&resolver);
+            insert_handles.push(tokio::spawn(async move {
+                let key = format!("key-{i}");
+                let resolved = create_test_resolved_key(&format!("tenant-{i}"), true);
+                r.insert(key.clone(), resolved);
+                key
+            }));
+        }
+
+        // Wait for all inserts.
+        let keys: Vec<String> = futures_util::future::join_all(insert_handles)
+            .await
+            .into_iter()
+            .map(|h| h.unwrap())
+            .collect();
+
+        // Resolve all keys; each must succeed with the right tenant.
+        for key in keys {
+            let r = Arc::clone(&resolver);
+            let k = key.clone();
+            let result = tokio::spawn(async move { r.resolve(k).await })
+                .await
+                .unwrap();
+            let resolved = result.expect("resolve should succeed");
+            let expected_tenant = key.strip_prefix("key-").unwrap();
+            assert_eq!(
+                resolved.tenant_id,
+                TenantId::from(format!("tenant-{expected_tenant}"))
+            );
+        }
+
+        assert_eq!(resolver.keys.len(), n as usize);
+    }
+
+    #[tokio::test]
+    async fn concurrent_insert_and_remove_same_key() {
+        let resolver = Arc::new(InMemoryKeyResolver::new());
+        let key = "shared-key".to_string();
+
+        // Concurrently insert, then remove the same key.
+        // Should not panic; result should be either Ok or NotFound.
+        let r1 = Arc::clone(&resolver);
+        let r2 = Arc::clone(&resolver);
+        let k1 = key.clone();
+        let k2 = key.clone();
+
+        let (ins, rem) = tokio::join!(
+            tokio::spawn(async move {
+                let resolved = create_test_resolved_key("t1", true);
+                r1.insert(k1, resolved);
+            }),
+            tokio::spawn(async move { r2.remove(&k2) }),
+        );
+
+        ins.unwrap();
+        let remove_result = rem.unwrap();
+        // remove may or may not find the key depending on timing — both are valid.
+        let _ = remove_result;
+    }
+
+    #[tokio::test]
+    async fn insert_replaces_existing_key() {
+        let resolver = InMemoryKeyResolver::new();
+        resolver.insert("key1", create_test_resolved_key("tenant-A", true));
+        resolver.insert("key1", create_test_resolved_key("tenant-B", true));
+
+        let result = resolver.resolve("key1".to_string()).await.unwrap();
+        assert_eq!(
+            result.tenant_id,
+            TenantId::from("tenant-B"),
+            "insert should replace existing key"
+        );
+        assert_eq!(
+            resolver.keys.len(),
+            1,
+            "replaced key should not increase count"
+        );
+    }
+
+    #[tokio::test]
+    async fn remove_returns_the_removed_value() {
+        let resolver = InMemoryKeyResolver::new();
+        let resolved = create_test_resolved_key("tenant-42", true);
+        resolver.insert("key1", resolved.clone());
+
+        let removed = resolver.remove("key1").expect("should remove existing key");
+        assert_eq!(removed.tenant_id, resolved.tenant_id);
+    }
+
+    #[tokio::test]
+    async fn resolve_works_after_resolver_clone() {
+        // The resolver's internal Arc<DashMap> should keep the data alive
+        // even if the original resolver is dropped.
+        let resolver = InMemoryKeyResolver::new();
+        resolver.insert("key1", create_test_resolved_key("t1", true));
+        let future = resolver.resolve("key1".to_string());
+        drop(resolver);
+        let result = future.await;
+        assert!(
+            result.is_ok(),
+            "future should work after original resolver dropped"
+        );
+    }
+
+    #[tokio::test]
+    async fn with_entries_duplicate_keys_last_wins() {
+        // If with_entries is given duplicate keys, DashMap semantics apply:
+        // later inserts overwrite earlier ones.
+        let entries = vec![
+            (
+                "key".to_string(),
+                create_test_resolved_key("tenant-A", true),
+            ),
+            (
+                "key".to_string(),
+                create_test_resolved_key("tenant-B", true),
+            ),
+        ];
+        let resolver = InMemoryKeyResolver::with_entries(entries);
+        // DashMap iter may have only one entry per key; count should be 1.
+        assert_eq!(resolver.keys.len(), 1);
+    }
 }

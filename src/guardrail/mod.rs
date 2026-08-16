@@ -35,7 +35,7 @@ pub struct GuardrailContext<'a> {
     pub metadata: &'a HashMap<String, String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum GuardrailDecision {
     Allow,
     Block { reason: String, code: u32 },

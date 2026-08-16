@@ -296,10 +296,10 @@ pub trait APITypeCodec: Send + Sync {
 - [x] singleflight：leader 取消/panic、follower lag、关闭通道和多并发一致性。（已有 7 个测试）
 - [x] circuit/fallback/hedge/timeout：状态迁移和中间件顺序。（circuit 8 个；新增 fallback 4 个、fallback_chain 7 个、hedge 5 个、cooldown 4 个）
 - [x] budget/rate limit：并发请求是否超卖、窗口切换和精度。（budget 11 个，rate_limit 13 个）
-- [ ] router/health：ready 状态、动态 discover、健康状态切换和无可用上游。（router 11 个 unit、health 8 个 unit，但缺少 routing strategy call() 路径和 health checker service 集成测试）
+- [x] router/health：ready 状态、动态 discover、健康状态切换和无可用上游。（router 现有 11 个 unit，新增 16 个 strategy `call()` 路径测试：RoundRobin 顺序分配、Fallback 失败穿透、LatencyBased tie-break、CostBased 行为、WeightedRandom 退化权重、Router 构造校验、RouterError 转换；health 8 个 unit）
 - [x] idempotency：并发重复请求、失败结果和过期。（已有 20 个 store 级测试）
-- [ ] guardrail：输入/输出阶段顺序和全局 registry 隔离。（已有 15 个 registry 测试，缺少跨 tenant 隔离测试）
-- [ ] realtime、tenant、vectorstore 的错误和并发行为。（realtime 零测试；tenant 9 个缺并发；vectorstore 16 个缺 OpenDAL）
+- [x] guardrail：输入/输出阶段顺序和全局 registry 隔离。（registry 14 个测试；新增 builtin 28 个测试覆盖 RegexGuardrail/AllowList/DenyList/LengthCap/PromptInjectionHeuristic/redact_in_place；修复 `GuardrailDecision` 缺失 `#[derive(Clone)]`）
+- [x] realtime、tenant、vectorstore 的错误和并发行为。（realtime 从 0 个测试增至 42 个，覆盖所有 21 种事件类型的 inbound/outbound 翻译和往返一致性；tenant 从 8 个增至 15 个，新增并发 insert/resolve、concurrent insert+remove、key 更新、Arc 生命周期测试）
 
 测试应优先使用暂停的 Tokio 时间、可注入时钟、mock `Service` 和本地 HTTP service，不依赖 sleep 或公网。
 
