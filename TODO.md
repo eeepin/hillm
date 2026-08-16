@@ -280,7 +280,7 @@ pub trait APITypeCodec: Send + Sync {
 
 ## P1：feature、网络和安全边界
 
-- [ ] 修复 `--no-default-features`，为所有 `reqwest`、`tokio`、`rustls`、`DefaultClient` 和 cancellation 类型补齐条件编译边界。
+- [x] 修复 `--no-default-features`，为所有 `reqwest`、`tokio`、`rustls`、`DefaultClient` 和 cancellation 类型补齐条件编译边界。
 - [ ] 建立 CI feature 矩阵：default、no-default、tower、wasm、bedrock、all-features。
 - [ ] 在 CI 提供 `protoc`，或采用可复现的 vendored protoc 方案验证 etcd feature。
 - [ ] 将 JSON、binary、错误 body、SSE 和 EventStream 全部接入统一的有界读取策略；当前 `RESPONSE_BODY_MAX_BYTES` 等常量不能只定义不使用。

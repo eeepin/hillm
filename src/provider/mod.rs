@@ -11,9 +11,10 @@ pub mod outbound_policy;
 
 pub use api_type::APIType;
 pub use codec::APITypeCodec;
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
+pub use outbound_policy::validate_outbound_url;
 pub use outbound_policy::{
-    OutboundPolicy, current_policy, set_outbound_policy, validate_outbound_url,
-    validate_outbound_url_sync,
+    OutboundPolicy, current_policy, set_outbound_policy, validate_outbound_url_sync,
 };
 
 use anthropic::AnthropicProvider;
@@ -251,14 +252,11 @@ pub async fn registry() -> Result<Arc<ProviderRegistry>, ProviderError> {
 
 #[cfg(not(any(feature = "default-http", feature = "wasm-http")))]
 pub fn registry() -> Result<Arc<ProviderRegistry>, ProviderError> {
-    PROVIDER_REGISTRY
-        .get_or_init(|| {
-            // Without HTTP features, we can't fetch from remote
-            // Return empty registry
-            Arc::new(HashMap::new())
-        })
-        .clone()
-        .ok_or_else(|| ProviderError::FetchError("No HTTP backend available".to_string()))
+    // Without HTTP features, we can't fetch from remote; return an empty
+    // registry so capability lookups degrade to defaults.
+    Ok(PROVIDER_REGISTRY
+        .get_or_init(|| Arc::new(HashMap::new()))
+        .clone())
 }
 
 /// Synchronously check if the registry has been initialized.
@@ -545,8 +543,20 @@ pub(crate) fn create_provider(
     Ok(provider)
 }
 
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
 pub async fn all_providers() -> HiLlmResult<Vec<ProviderConfig>> {
     let registry = registry().await.map_err(|e| HiLlmError::InternalError {
+        message: e.to_string(),
+    })?;
+    Ok(registry
+        .values()
+        .map(|provider_entry| provider_entry.to_config())
+        .collect())
+}
+
+#[cfg(not(any(feature = "default-http", feature = "wasm-http")))]
+pub fn all_providers() -> HiLlmResult<Vec<ProviderConfig>> {
+    let registry = registry().map_err(|e| HiLlmError::InternalError {
         message: e.to_string(),
     })?;
     Ok(registry
@@ -659,6 +669,7 @@ mod tests {
         assert_eq!(price.cache_read, None);
     }
 
+    #[cfg(any(feature = "default-http", feature = "wasm-http"))]
     #[tokio::test]
     #[ignore = "requires network access to models.dev"]
     async fn fetch_provider_returns_valid_registry() {

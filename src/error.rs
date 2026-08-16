@@ -112,6 +112,7 @@ impl HiLlmError {
             Self::ServerError { status, .. } => *status,
             Self::ServiceUnavailable { status, .. } => *status,
             Self::Timeout => 408,
+            #[cfg(any(feature = "default-http", feature = "wasm-http"))]
             Self::Network(_) => 0,
             Self::Streaming { .. } => 0,
             Self::EndpointNotSupported { .. } => 400,
@@ -131,14 +132,27 @@ impl HiLlmError {
 
     #[must_use]
     pub fn is_transient(&self) -> bool {
-        matches!(
-            self,
-            Self::RateLimited { .. }
-                | Self::ServiceUnavailable { .. }
-                | Self::Timeout
-                | Self::ServerError { .. }
-                | Self::Network(_)
-        )
+        #[cfg(any(feature = "default-http", feature = "wasm-http"))]
+        {
+            matches!(
+                self,
+                Self::RateLimited { .. }
+                    | Self::ServiceUnavailable { .. }
+                    | Self::Timeout
+                    | Self::ServerError { .. }
+                    | Self::Network(_)
+            )
+        }
+        #[cfg(not(any(feature = "default-http", feature = "wasm-http")))]
+        {
+            matches!(
+                self,
+                Self::RateLimited { .. }
+                    | Self::ServiceUnavailable { .. }
+                    | Self::Timeout
+                    | Self::ServerError { .. }
+            )
+        }
     }
 
     #[must_use]
@@ -153,6 +167,7 @@ impl HiLlmError {
             Self::ServerError { .. } => "ServerError",
             Self::ServiceUnavailable { .. } => "ServiceUnavailable",
             Self::Timeout => "Timeout",
+            #[cfg(any(feature = "default-http", feature = "wasm-http"))]
             Self::Network(_) => "Network",
             Self::Streaming { .. } => "Streaming",
             Self::EndpointNotSupported { .. } => "EndpointNotSupported",
@@ -207,6 +222,7 @@ impl HiLlmError {
                 status: *status,
             },
             Self::Timeout => Self::Timeout,
+            #[cfg(any(feature = "default-http", feature = "wasm-http"))]
             Self::Network(e) => Self::InternalError {
                 message: e.to_string(),
             },

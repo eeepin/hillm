@@ -44,6 +44,7 @@ impl TransportConfig {
         self
     }
 
+    #[cfg(any(feature = "default-http", feature = "wasm-http"))]
     pub fn apply_to_builder(&self, builder: reqwest::ClientBuilder) -> reqwest::ClientBuilder {
         let builder = builder
             .pool_max_idle_per_host(self.pool_max_idle_per_host)
@@ -103,6 +104,7 @@ mod tests {
         assert_eq!(cfg.dns_cache_ttl, None);
     }
 
+    #[cfg(any(feature = "default-http", feature = "wasm-http"))]
     #[test]
     fn test_apply_to_builder_builds_client_with_non_default_config() {
         let cfg = TransportConfig::new()
@@ -120,6 +122,7 @@ mod tests {
         );
     }
 
+    #[cfg(any(feature = "default-http", feature = "wasm-http"))]
     #[test]
     fn test_apply_to_builder_with_pooling_disabled() {
         let cfg = TransportConfig::new()

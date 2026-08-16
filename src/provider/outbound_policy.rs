@@ -386,6 +386,7 @@ mod tests {
         });
     }
 
+    #[cfg(any(feature = "default-http", feature = "wasm-http"))]
     #[tokio::test]
     #[serial(outbound_policy)]
     async fn validate_async_off_passes_everything() {
@@ -398,6 +399,7 @@ mod tests {
         );
     }
 
+    #[cfg(any(feature = "default-http", feature = "wasm-http"))]
     #[tokio::test]
     #[serial(outbound_policy)]
     async fn validate_async_deny_private_rejects_loopback() {
@@ -410,6 +412,7 @@ mod tests {
         );
     }
 
+    #[cfg(any(feature = "default-http", feature = "wasm-http"))]
     #[tokio::test]
     #[serial(outbound_policy)]
     async fn validate_async_deny_private_rejects_metadata_ip() {
@@ -419,6 +422,7 @@ mod tests {
         assert!(result.is_err(), "AWS metadata IP should be rejected");
     }
 
+    #[cfg(any(feature = "default-http", feature = "wasm-http"))]
     #[tokio::test]
     #[serial(outbound_policy)]
     async fn validate_async_deny_private_rejects_ula() {
@@ -428,6 +432,7 @@ mod tests {
         assert!(result.is_err(), "ULA address should be rejected");
     }
 
+    #[cfg(any(feature = "default-http", feature = "wasm-http"))]
     #[tokio::test]
     #[serial(outbound_policy)]
     async fn validate_async_deny_private_rejects_link_local_v6() {
@@ -437,6 +442,7 @@ mod tests {
         assert!(result.is_err(), "IPv6 link-local should be rejected");
     }
 
+    #[cfg(any(feature = "default-http", feature = "wasm-http"))]
     #[tokio::test]
     #[serial(outbound_policy)]
     async fn validate_async_deny_private_rejects_unknown_scheme() {
@@ -446,6 +452,7 @@ mod tests {
         assert!(result.is_err(), "ftp:// scheme should be rejected");
     }
 
+    #[cfg(any(feature = "default-http", feature = "wasm-http"))]
     #[tokio::test]
     #[serial(outbound_policy)]
     async fn validate_async_allowlist_accepts_exact_origin() {
@@ -460,6 +467,7 @@ mod tests {
         );
     }
 
+    #[cfg(any(feature = "default-http", feature = "wasm-http"))]
     #[tokio::test]
     #[serial(outbound_policy)]
     async fn validate_async_allowlist_rejects_other_host() {

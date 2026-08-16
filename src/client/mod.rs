@@ -549,7 +549,10 @@ impl LlmClient for DefaultClient {
     ) -> BoxFuture<'_, HiLlmResult<ChatCompletionResponse>> {
         Box::pin(async move {
             // Try codec path first
-            if let Some(codec) = self.provider.codec_for(provider::APIType::OpenAIChatCompletions) {
+            if let Some(codec) = self
+                .provider
+                .codec_for(provider::APIType::OpenAIChatCompletions)
+            {
                 let endpoint_path = codec.endpoint_path();
                 let url = self.provider.build_url(endpoint_path, &req.model);
 
@@ -593,8 +596,12 @@ impl LlmClient for DefaultClient {
                     .map_err(HiLlmError::from)
             } else {
                 // Fall back to legacy path
-                let prepared =
-                    self.prepare_request(&req, |p| p.chat_completions_path(), &req.model, Some(false))?;
+                let prepared = self.prepare_request(
+                    &req,
+                    |p| p.chat_completions_path(),
+                    &req.model,
+                    Some(false),
+                )?;
 
                 let auth_header = self
                     .resolve_auth_header_for_provider(prepared.provider.as_ref())
@@ -633,7 +640,10 @@ impl LlmClient for DefaultClient {
     ) -> BoxFuture<'_, HiLlmResult<BoxStream<'static, HiLlmResult<ChatCompletionChunk>>>> {
         Box::pin(async move {
             // Try codec path first
-            if let Some(codec) = self.provider.codec_for(provider::APIType::OpenAIChatCompletions) {
+            if let Some(codec) = self
+                .provider
+                .codec_for(provider::APIType::OpenAIChatCompletions)
+            {
                 let endpoint_path = codec.endpoint_path();
                 let url = self.provider.build_stream_url(endpoint_path, &req.model);
 
@@ -680,8 +690,12 @@ impl LlmClient for DefaultClient {
                 Ok(stream)
             } else {
                 // Fall back to legacy path
-                let prepared =
-                    self.prepare_request(&req, |p| p.chat_completions_path(), &req.model, Some(true))?;
+                let prepared = self.prepare_request(
+                    &req,
+                    |p| p.chat_completions_path(),
+                    &req.model,
+                    Some(true),
+                )?;
 
                 let url = prepared
                     .provider
