@@ -8,12 +8,11 @@ use pin_project_lite::pin_project;
 use crate::client::BoxStream;
 use crate::error::{HiLlmError, HiLlmResult};
 use crate::types::ChatCompletionChunk;
+use crate::util::bound::EVENT_STREAM_BUFFER_MAX_BYTES;
 
 use super::request::with_retry;
 
 const MIN_FRAME_SIZE: usize = 16;
-
-const MAX_FRAME_SIZE: usize = 16 * 1024 * 1024;
 
 const HEADER_TYPE_STRING: u8 = 7;
 
@@ -230,10 +229,10 @@ where
                     this.buffer[3],
                 ]) as usize;
 
-                if !(MIN_FRAME_SIZE..=MAX_FRAME_SIZE).contains(&total_length) {
+                if !(MIN_FRAME_SIZE..=EVENT_STREAM_BUFFER_MAX_BYTES).contains(&total_length) {
                     return Poll::Ready(Some(Err(HiLlmError::Streaming {
                         message: format!(
-                            "EventStream frame size {total_length} is out of range [{MIN_FRAME_SIZE}, {MAX_FRAME_SIZE}]"
+                            "EventStream frame size {total_length} is out of range [{MIN_FRAME_SIZE}, {EVENT_STREAM_BUFFER_MAX_BYTES}]"
                         ),
                     })));
                 }
@@ -343,10 +342,10 @@ where
 
             match this.inner.as_mut().poll_next(cx) {
                 Poll::Ready(Some(Ok(bytes))) => {
-                    if this.buffer.len() + bytes.len() > MAX_FRAME_SIZE {
+                    if this.buffer.len() + bytes.len() > EVENT_STREAM_BUFFER_MAX_BYTES {
                         *this.done = true;
                         return Poll::Ready(Some(Err(HiLlmError::Streaming {
-                            message: format!("EventStream buffer exceeded {MAX_FRAME_SIZE} bytes"),
+                            message: format!("EventStream buffer exceeded {EVENT_STREAM_BUFFER_MAX_BYTES} bytes"),
                         })));
                     }
                     this.buffer.extend_from_slice(&bytes);
