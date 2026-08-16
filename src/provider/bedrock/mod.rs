@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 
 #[cfg(feature = "bedrock")]
-use crate::error::HiLlmError;
-use crate::error::HiLlmResult;
+use crate::error::HiLLMError;
+use crate::error::HiLLMResult;
 use crate::provider::bedrock::codec::BedrockConverseCodec;
 use crate::provider::{APIType, Provider, StreamFormat, codec::APITypeCodec, registry_get};
 use crate::types::ChatCompletionChunk;
@@ -122,11 +122,11 @@ impl Provider for BedrockProvider {
         })
     }
 
-    fn validate(&self) -> HiLlmResult<()> {
+    fn validate(&self) -> HiLLMResult<()> {
         #[cfg(feature = "bedrock")]
         {
             if std::env::var("AWS_ACCESS_KEY_ID").is_err() {
-                return Err(HiLlmError::BadRequest {
+                return Err(HiLLMError::BadRequest {
                     message: "AWS Bedrock requires AWS credentials. \
                               Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY (and optionally \
                               AWS_SESSION_TOKEN) in the environment."
@@ -182,7 +182,7 @@ impl Provider for BedrockProvider {
         }
     }
 
-    fn transform_request(&self, body: &mut serde_json::Value) -> HiLlmResult<()> {
+    fn transform_request(&self, body: &mut serde_json::Value) -> HiLLMResult<()> {
         use serde_json::json;
 
         let messages = body
@@ -437,7 +437,7 @@ impl Provider for BedrockProvider {
         Ok(())
     }
 
-    fn transform_response(&self, body: &mut serde_json::Value) -> HiLlmResult<()> {
+    fn transform_response(&self, body: &mut serde_json::Value) -> HiLLMResult<()> {
         use serde_json::json;
 
         let stop_reason = body
@@ -550,17 +550,17 @@ impl Provider for BedrockProvider {
 pub(crate) fn parse_bedrock_stream_event(
     event_type: &str,
     payload: &str,
-) -> HiLlmResult<Option<ChatCompletionChunk>> {
-    use crate::error::HiLlmError;
+) -> HiLLMResult<Option<ChatCompletionChunk>> {
+    use crate::error::HiLLMError;
     use serde_json::json;
 
     let v: serde_json::Value =
-        serde_json::from_str(payload).map_err(|e| HiLlmError::Streaming {
+        serde_json::from_str(payload).map_err(|e| HiLLMError::Streaming {
             message: format!("Bedrock stream event parse error: {e}"),
         })?;
 
-    let chunk_from_json = |chunk_json: serde_json::Value| -> HiLlmResult<ChatCompletionChunk> {
-        serde_json::from_value(chunk_json).map_err(|e| HiLlmError::Streaming {
+    let chunk_from_json = |chunk_json: serde_json::Value| -> HiLLMResult<ChatCompletionChunk> {
+        serde_json::from_value(chunk_json).map_err(|e| HiLLMError::Streaming {
             message: format!("Bedrock chunk deserialization error: {e}"),
         })
     };
@@ -742,17 +742,17 @@ fn sigv4_sign(
     url: &str,
     body: &[u8],
     region: &str,
-) -> HiLlmResult<Vec<(String, String)>> {
+) -> HiLLMResult<Vec<(String, String)>> {
     use aws_credential_types::Credentials;
     use aws_sigv4::http_request::{SignableBody, SignableRequest, SigningSettings, sign};
     use aws_sigv4::sign::v4::SigningParams;
 
-    let access_key = std::env::var("AWS_ACCESS_KEY_ID").map_err(|_| HiLlmError::BadRequest {
+    let access_key = std::env::var("AWS_ACCESS_KEY_ID").map_err(|_| HiLLMError::BadRequest {
         message: "AWS_ACCESS_KEY_ID environment variable is required for Bedrock requests".into(),
         status: 400,
     })?;
     let secret_key =
-        std::env::var("AWS_SECRET_ACCESS_KEY").map_err(|_| HiLlmError::BadRequest {
+        std::env::var("AWS_SECRET_ACCESS_KEY").map_err(|_| HiLLMError::BadRequest {
             message: "AWS_SECRET_ACCESS_KEY environment variable is required for Bedrock requests"
                 .into(),
             status: 400,
@@ -773,7 +773,7 @@ fn sigv4_sign(
         .time(now)
         .settings(signing_settings)
         .build()
-        .map_err(|e| HiLlmError::BadRequest {
+        .map_err(|e| HiLLMError::BadRequest {
             message: format!("failed to build SigV4 signing params: {e}"),
             status: 400,
         })?;
@@ -784,12 +784,12 @@ fn sigv4_sign(
         std::iter::empty::<(&str, &str)>(),
         SignableBody::Bytes(body),
     )
-    .map_err(|e| HiLlmError::BadRequest {
+    .map_err(|e| HiLLMError::BadRequest {
         message: format!("failed to create signable request: {e}"),
         status: 400,
     })?;
 
-    let signing_output = sign(signable, &params.into()).map_err(|e| HiLlmError::BadRequest {
+    let signing_output = sign(signable, &params.into()).map_err(|e| HiLLMError::BadRequest {
         message: format!("SigV4 signing failed: {e}"),
         status: 400,
     })?;

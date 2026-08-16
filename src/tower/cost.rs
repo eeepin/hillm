@@ -5,7 +5,7 @@ use tower::Service;
 
 use super::types::{LlmRequest, LlmResponse};
 use crate::client::BoxFuture;
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 use crate::provider::cost;
 
 pub struct CostTrackingLayer {
@@ -51,14 +51,14 @@ where
 
 impl<S> Service<LlmRequest> for CostTrackingService<S>
 where
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Send + 'static,
+    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Send + 'static,
     S::Future: Send + 'static,
 {
     type Response = LlmResponse;
-    type Error = HiLlmError;
-    type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+    type Error = HiLLMError;
+    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         self.inner.poll_ready(cx)
     }
 

@@ -6,7 +6,7 @@ use tower::{Layer, Service};
 
 use super::types::{LlmRequest, LlmResponse};
 use crate::client::BoxFuture;
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 
 pub trait HedgePolicy: Send + Sync + 'static {
     fn delay_for_attempt(&self, attempt: u32, latency_so_far: Duration) -> Option<Duration>;
@@ -81,14 +81,14 @@ impl<P: HedgePolicy, S: Clone> Clone for HedgeService<P, S> {
 impl<P, S> Service<LlmRequest> for HedgeService<P, S>
 where
     P: HedgePolicy + 'static,
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Send + Clone + 'static,
+    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Send + Clone + 'static,
     S::Future: Send + 'static,
 {
     type Response = LlmResponse;
-    type Error = HiLlmError;
-    type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+    type Error = HiLLMError;
+    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         self.inner.poll_ready(cx)
     }
 
@@ -114,9 +114,9 @@ async fn hedge_race<S>(
     inner_for_hedges: S,
     policy: Arc<impl HedgePolicy>,
     max_attempts: u32,
-) -> HiLlmResult<LlmResponse>
+) -> HiLLMResult<LlmResponse>
 where
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Send + Clone + 'static,
+    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Send + Clone + 'static,
     S::Future: Send + 'static,
 {
     use std::time::Instant;
@@ -130,7 +130,7 @@ where
         return primary.call(req).await;
     }
 
-    let mut join_set: tokio::task::JoinSet<(u32, HiLlmResult<LlmResponse>)> =
+    let mut join_set: tokio::task::JoinSet<(u32, HiLLMResult<LlmResponse>)> =
         tokio::task::JoinSet::new();
 
     {
@@ -171,7 +171,7 @@ where
         });
     }
 
-    let mut last_err: Option<HiLlmError> = None;
+    let mut last_err: Option<HiLLMError> = None;
 
     while let Some(join_result) = join_set.join_next().await {
         match join_result {
@@ -187,14 +187,14 @@ where
             Err(join_err) if join_err.is_cancelled() => {}
             Err(join_err) => {
                 tracing::error!(error = %join_err, "hedged task panicked");
-                last_err = Some(HiLlmError::InternalError {
+                last_err = Some(HiLLMError::InternalError {
                     message: format!("hedge task panicked: {join_err}"),
                 });
             }
         }
     }
 
-    Err(last_err.unwrap_or(HiLlmError::InternalError {
+    Err(last_err.unwrap_or(HiLLMError::InternalError {
         message: "all hedged attempts failed with no error recorded".into(),
     }))
 }
@@ -275,10 +275,10 @@ mod tests {
 
     impl Service<LlmRequest> for DelayedMockService {
         type Response = LlmResponse;
-        type Error = HiLlmError;
-        type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+        type Error = HiLLMError;
+        type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
 
-        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
             Poll::Ready(Ok(()))
         }
 
@@ -291,7 +291,7 @@ mod tests {
                     tokio::time::sleep(delay).await;
                 }
                 if should_fail {
-                    Err(HiLlmError::ServiceUnavailable {
+                    Err(HiLLMError::ServiceUnavailable {
                         message: "mock fail".to_string(),
                         status: 503,
                     })

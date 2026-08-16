@@ -1,5 +1,5 @@
-use crate::error::HiLlmError;
-use crate::error::HiLlmResult;
+use crate::error::HiLLMError;
+use crate::error::HiLLMResult;
 use crate::provider::anthropic::codec::AnthropicMessagesCodec;
 use crate::provider::{APIType, Provider, codec::APITypeCodec, registry_get};
 use std::borrow::Cow;
@@ -68,11 +68,11 @@ impl AnthropicProvider {
     }
 
     /// Creates a provider instance bound to `api_type`, failing with
-    /// [`HiLlmError::APITypeUnsupported`] unless it is
+    /// [`HiLLMError::APITypeUnsupported`] unless it is
     /// [`APIType::AnthropicMessages`].
-    pub(crate) fn with_api_type(api_type: APIType) -> HiLlmResult<Self> {
+    pub(crate) fn with_api_type(api_type: APIType) -> HiLLMResult<Self> {
         if api_type != APIType::AnthropicMessages {
-            return Err(HiLlmError::APITypeUnsupported {
+            return Err(HiLLMError::APITypeUnsupported {
                 api_type: api_type.to_string(),
                 provider: "anthropic".to_string(),
             });

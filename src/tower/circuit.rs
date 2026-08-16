@@ -7,7 +7,7 @@ use tower::{Layer, Service};
 
 use super::types::{LlmRequest, LlmResponse};
 use crate::client::BoxFuture;
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -256,14 +256,14 @@ impl<P: CircuitPolicy, S: Clone> Clone for CircuitService<P, S> {
 impl<P, S> Service<LlmRequest> for CircuitService<P, S>
 where
     P: CircuitPolicy + 'static,
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Send + Clone + 'static,
+    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Send + Clone + 'static,
     S::Future: Send + 'static,
 {
     type Response = LlmResponse;
-    type Error = HiLlmError;
-    type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+    type Error = HiLLMError;
+    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         self.inner.poll_ready(cx)
     }
 
@@ -297,7 +297,7 @@ where
 
                 super::metrics::record_circuit_trip(&system, &model);
 
-                return Err(HiLlmError::ServiceUnavailable {
+                return Err(HiLLMError::ServiceUnavailable {
                     message: format!("circuit breaker open for provider '{provider}'"),
                     status: 503,
                 });
@@ -397,10 +397,10 @@ mod tests {
 
     impl Service<LlmRequest> for MockService {
         type Response = LlmResponse;
-        type Error = HiLlmError;
-        type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+        type Error = HiLLMError;
+        type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
 
-        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
             Poll::Ready(Ok(()))
         }
 
@@ -408,7 +408,7 @@ mod tests {
             let should_fail = self.should_fail;
             Box::pin(async move {
                 if should_fail {
-                    Err(HiLlmError::ServiceUnavailable {
+                    Err(HiLLMError::ServiceUnavailable {
                         message: "mock failure".to_string(),
                         status: 503,
                     })

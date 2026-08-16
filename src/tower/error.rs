@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use thiserror::Error;
 
-use crate::error::HiLlmError;
+use crate::error::HiLLMError;
 
 #[derive(Debug, Error)]
 #[error("circuit open for provider {provider}: retry after {retry_after:?}")]
@@ -17,7 +17,7 @@ pub struct HedgeExhaustedError {
     pub attempts: u32,
 }
 
-impl From<CircuitOpenError> for HiLlmError {
+impl From<CircuitOpenError> for HiLLMError {
     fn from(e: CircuitOpenError) -> Self {
         // TODO(1.A): replace with a dedicated CircuitOpen variant.
         Self::ServiceUnavailable {
@@ -27,7 +27,7 @@ impl From<CircuitOpenError> for HiLlmError {
     }
 }
 
-impl From<HedgeExhaustedError> for HiLlmError {
+impl From<HedgeExhaustedError> for HiLLMError {
     fn from(_e: HedgeExhaustedError) -> Self {
         // TODO(1.A): replace with a dedicated HedgeExhausted variant.
         Self::Timeout

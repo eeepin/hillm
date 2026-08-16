@@ -1,5 +1,5 @@
 use super::{APIType, AuthType, Provider, ProviderConfig};
-use crate::error::HiLlmResult;
+use crate::error::HiLLMResult;
 use std::borrow::Cow;
 
 pub(crate) struct ConfigDrivenProvider {
@@ -26,7 +26,7 @@ impl Provider for ConfigDrivenProvider {
         self.config.auth.as_ref().and_then(|a| a.env_var.as_deref())
     }
 
-    fn transform_request(&self, body: &mut serde_json::Value) -> HiLlmResult<()> {
+    fn transform_request(&self, body: &mut serde_json::Value) -> HiLLMResult<()> {
         if let Some(mappings) = &self.config.param_mappings
             && let Some(obj) = body.as_object_mut()
         {

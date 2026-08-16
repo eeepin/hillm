@@ -5,7 +5,7 @@ use secrecy::SecretString;
 
 use crate::auth::CredentialProvider;
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
-use crate::error::HiLlmResult;
+use crate::error::HiLLMResult;
 use crate::http::transport::TransportConfig;
 use crate::provider::APIType;
 use crate::provider::outbound_policy::OutboundPolicyValidator;
@@ -279,7 +279,7 @@ impl<K, P> ClientBuilder<K, P> {
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 impl ClientBuilder<WithApiKey, WithProvider> {
-    pub fn build(self) -> HiLlmResult<super::Client> {
+    pub fn build(self) -> HiLLMResult<super::Client> {
         use super::config::ClientConfig;
 
         let config = ClientConfig {

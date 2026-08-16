@@ -6,7 +6,7 @@ use std::pin::Pin;
 use dashmap::DashMap;
 
 use super::{VectorMatch, VectorMetadata, VectorStore};
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 
 fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     if a.len() != b.len() || a.is_empty() {
@@ -81,9 +81,9 @@ impl VectorStore for InMemoryVectorStore {
         id: String,
         vec: Vec<f32>,
         metadata: VectorMetadata,
-    ) -> Pin<Box<dyn Future<Output = HiLlmResult<()>> + Send + 'a>> {
+    ) -> Pin<Box<dyn Future<Output = HiLLMResult<()>> + Send + 'a>> {
         if vec.len() != self.dim {
-            return Box::pin(std::future::ready(Err(HiLlmError::InternalError {
+            return Box::pin(std::future::ready(Err(HiLLMError::InternalError {
                 message: format!(
                     "vector dimension mismatch: store expects {} but received {}",
                     self.dim,
@@ -98,7 +98,7 @@ impl VectorStore for InMemoryVectorStore {
     fn delete<'a>(
         &'a self,
         id: &'a str,
-    ) -> Pin<Box<dyn Future<Output = HiLlmResult<()>> + Send + 'a>> {
+    ) -> Pin<Box<dyn Future<Output = HiLLMResult<()>> + Send + 'a>> {
         self.entries.remove(id);
         Box::pin(std::future::ready(Ok(())))
     }

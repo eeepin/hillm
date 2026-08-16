@@ -5,7 +5,7 @@ use bytes::Bytes;
 use futures_core::Stream;
 use pin_project_lite::pin_project;
 
-use crate::error::HiLlmResult;
+use crate::error::HiLLMResult;
 use crate::sse::SSEStream;
 use crate::types::ChatCompletionChunk;
 
@@ -31,9 +31,9 @@ pub async fn post_stream<P>(
     body: Bytes,
     max_retries: u32,
     parse_event: P,
-) -> HiLlmResult<crate::client::BoxStream<'static, HiLlmResult<ChatCompletionChunk>>>
+) -> HiLLMResult<crate::client::BoxStream<'static, HiLLMResult<ChatCompletionChunk>>>
 where
-    P: Fn(&str) -> HiLlmResult<Option<ChatCompletionChunk>> + Send + 'static,
+    P: Fn(&str) -> HiLLMResult<Option<ChatCompletionChunk>> + Send + 'static,
 {
     let resp =
         send_stream_request(client, url, auth_header, extra_headers, body, max_retries).await?;
@@ -69,10 +69,10 @@ pub async fn post_typed_stream<T, P>(
     body: Bytes,
     max_retries: u32,
     parse_event: P,
-) -> HiLlmResult<crate::client::BoxStream<'static, HiLlmResult<T>>>
+) -> HiLLMResult<crate::client::BoxStream<'static, HiLLMResult<T>>>
 where
     T: Send + 'static,
-    P: Fn(&str) -> HiLlmResult<Option<T>> + Send + 'static,
+    P: Fn(&str) -> HiLLMResult<Option<T>> + Send + 'static,
 {
     let resp =
         send_stream_request(client, url, auth_header, extra_headers, body, max_retries).await?;
@@ -88,7 +88,7 @@ async fn send_stream_request(
     extra_headers: &[(&str, &str)],
     body: Bytes,
     max_retries: u32,
-) -> HiLlmResult<reqwest::Response> {
+) -> HiLLMResult<reqwest::Response> {
     let mut retry_count = 0u32;
 
     let resp = with_retry(max_retries, || {
@@ -129,7 +129,7 @@ pin_project! {
 
 impl<S, P> SSEParser<S, P>
 where
-    P: Fn(&str) -> HiLlmResult<Option<ChatCompletionChunk>>,
+    P: Fn(&str) -> HiLLMResult<Option<ChatCompletionChunk>>,
 {
     fn new(inner: S, parse_event: P) -> Self {
         Self {
@@ -142,9 +142,9 @@ where
 impl<S, P> Stream for SSEParser<S, P>
 where
     S: Stream<Item = Result<Bytes, reqwest::Error>>,
-    P: Fn(&str) -> HiLlmResult<Option<ChatCompletionChunk>>,
+    P: Fn(&str) -> HiLLMResult<Option<ChatCompletionChunk>>,
 {
-    type Item = HiLlmResult<ChatCompletionChunk>;
+    type Item = HiLLMResult<ChatCompletionChunk>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
@@ -177,7 +177,7 @@ pin_project! {
 
 impl<S, P, T> TypedSSEParser<S, P, T>
 where
-    P: Fn(&str) -> HiLlmResult<Option<T>>,
+    P: Fn(&str) -> HiLLMResult<Option<T>>,
 {
     fn new(inner: S, parse_event: P) -> Self {
         Self {
@@ -191,9 +191,9 @@ where
 impl<S, P, T> Stream for TypedSSEParser<S, P, T>
 where
     S: Stream<Item = Result<Bytes, reqwest::Error>>,
-    P: Fn(&str) -> HiLlmResult<Option<T>>,
+    P: Fn(&str) -> HiLLMResult<Option<T>>,
 {
-    type Item = HiLlmResult<T>;
+    type Item = HiLLMResult<T>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();

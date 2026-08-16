@@ -3,7 +3,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde_json::Value;
 
 use super::{ContentPart, RealtimeEvent, RealtimeTranslator, ResponseStatus};
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 
 #[derive(Debug, Clone, Default)]
 pub struct OpenAiRealtimeTranslator;
@@ -16,10 +16,10 @@ impl OpenAiRealtimeTranslator {
 
 // Helper
 
-fn get_str<'a>(obj: &'a Value, key: &str) -> HiLlmResult<&'a str> {
+fn get_str<'a>(obj: &'a Value, key: &str) -> HiLLMResult<&'a str> {
     obj.get(key)
         .and_then(|v| v.as_str())
-        .ok_or_else(|| HiLlmError::BadRequest {
+        .ok_or_else(|| HiLLMError::BadRequest {
             message: format!("Realtime event missing required field '{key}'"),
             status: 400,
         })
@@ -79,7 +79,7 @@ impl RealtimeTranslator for OpenAiRealtimeTranslator {
         "openai"
     }
 
-    fn translate_inbound(&self, raw: Value) -> HiLlmResult<RealtimeEvent> {
+    fn translate_inbound(&self, raw: Value) -> HiLLMResult<RealtimeEvent> {
         let event_type = get_str(&raw, "type")?;
         let event = match event_type {
             "session.created" => {
@@ -317,7 +317,7 @@ impl RealtimeTranslator for OpenAiRealtimeTranslator {
         Ok(event)
     }
 
-    fn translate_outbound(&self, event: &RealtimeEvent) -> HiLlmResult<serde_json::Value> {
+    fn translate_outbound(&self, event: &RealtimeEvent) -> HiLLMResult<serde_json::Value> {
         use serde_json::json;
 
         let value = match event {

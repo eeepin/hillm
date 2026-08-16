@@ -7,7 +7,7 @@ use tower::{Layer, Service};
 
 use super::types::{LlmRequest, LlmResponse};
 use crate::client::BoxFuture;
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 
 struct CooldownState {
     cooldown_start: Option<Instant>,
@@ -56,14 +56,14 @@ impl<S: Clone> Clone for CooldownService<S> {
 
 impl<S> Service<LlmRequest> for CooldownService<S>
 where
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Send + Clone + 'static,
+    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Send + Clone + 'static,
     S::Future: Send + 'static,
 {
     type Response = LlmResponse;
-    type Error = HiLlmError;
-    type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+    type Error = HiLLMError;
+    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         self.inner.poll_ready(cx)
     }
 
@@ -77,7 +77,7 @@ where
                 let read = state.read().await;
                 if let Some(start) = read.cooldown_start {
                     if start.elapsed() < duration {
-                        return Err(HiLlmError::ServiceUnavailable {
+                        return Err(HiLLMError::ServiceUnavailable {
                             message: format!(
                                 "service is cooling down for {:.0}s after a transient error",
                                 duration.as_secs_f64()
@@ -182,10 +182,10 @@ mod tests {
 
     impl Service<LlmRequest> for MockService {
         type Response = LlmResponse;
-        type Error = HiLlmError;
-        type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+        type Error = HiLLMError;
+        type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
 
-        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
             Poll::Ready(Ok(()))
         }
 
@@ -194,7 +194,7 @@ mod tests {
             let should_fail = self.should_fail_transient;
             Box::pin(async move {
                 if should_fail {
-                    Err(HiLlmError::ServiceUnavailable {
+                    Err(HiLLMError::ServiceUnavailable {
                         message: "transient".to_string(),
                         status: 503,
                     })
@@ -277,16 +277,16 @@ mod tests {
 
         impl Service<LlmRequest> for TerminalFailService {
             type Response = LlmResponse;
-            type Error = HiLlmError;
-            type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+            type Error = HiLLMError;
+            type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
 
-            fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+            fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
                 Poll::Ready(Ok(()))
             }
 
             fn call(&mut self, _req: LlmRequest) -> Self::Future {
                 Box::pin(async move {
-                    Err(HiLlmError::BadRequest {
+                    Err(HiLLMError::BadRequest {
                         message: "terminal".to_string(),
                         status: 400,
                     })

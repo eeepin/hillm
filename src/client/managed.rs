@@ -8,7 +8,7 @@ use super::{
     FileClient, ImageClient, ModerationClient, ModelClient, OcrClient, RerankClient,
     ResponseClient, SearchClient,
 };
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 #[cfg(feature = "opendal")]
 use crate::tower::OpenDalCacheStore;
 use crate::tower::types::{LlmRequest, LlmResponse};
@@ -34,11 +34,11 @@ use crate::types::{
 };
 
 struct SyncService {
-    inner: Mutex<tower::util::BoxCloneService<LlmRequest, LlmResponse, HiLlmError>>,
+    inner: Mutex<tower::util::BoxCloneService<LlmRequest, LlmResponse, HiLLMError>>,
 }
 
 impl SyncService {
-    fn clone_service(&self) -> tower::util::BoxCloneService<LlmRequest, LlmResponse, HiLlmError> {
+    fn clone_service(&self) -> tower::util::BoxCloneService<LlmRequest, LlmResponse, HiLLMError> {
         match self.inner.lock() {
             Ok(guard) => guard.clone(),
             Err(poisoned) => poisoned.into_inner().clone(),
@@ -53,7 +53,7 @@ pub struct ManagedClient {
 }
 
 impl ManagedClient {
-    pub fn new(config: ClientConfig, provider: Option<String>) -> HiLlmResult<Self> {
+    pub fn new(config: ClientConfig, provider: Option<String>) -> HiLLMResult<Self> {
         let client = Client::new(config.clone(), provider.clone())?;
         let inner = Arc::new(client);
 
@@ -82,12 +82,12 @@ impl ManagedClient {
         self.service.is_some()
     }
 
-    fn call_service(&self, req: LlmRequest) -> BoxFuture<'static, HiLlmResult<LlmResponse>> {
+    fn call_service(&self, req: LlmRequest) -> BoxFuture<'static, HiLLMResult<LlmResponse>> {
         let mut svc = match self.service.as_ref() {
             Some(s) => s.clone_service(),
             None => {
                 return Box::pin(async {
-                    Err(HiLlmError::InternalError {
+                    Err(HiLLMError::InternalError {
                         message: "call_service called without middleware stack".into(),
                     })
                 });
@@ -128,7 +128,7 @@ fn build_service_stack(
 
     let mut budget_state: Option<Arc<BudgetState>> = None;
 
-    type Bcs = tower::util::BoxCloneService<LlmRequest, LlmResponse, HiLlmError>;
+    type Bcs = tower::util::BoxCloneService<LlmRequest, LlmResponse, HiLLMError>;
 
     let svc: Bcs = tower::util::BoxCloneService::new(base);
 
@@ -226,7 +226,7 @@ impl ChatCompletionClient for ManagedClient {
     fn chat(
         &self,
         req: ChatCompletionRequest,
-    ) -> BoxFuture<'_, HiLlmResult<ChatCompletionResponse>> {
+    ) -> BoxFuture<'_, HiLLMResult<ChatCompletionResponse>> {
         if self.service.is_none() {
             return self.inner.chat(req);
         }
@@ -234,7 +234,7 @@ impl ChatCompletionClient for ManagedClient {
         Box::pin(async move {
             match fut.await? {
                 LlmResponse::Chat(r) => Ok(r),
-                other => Err(HiLlmError::InternalError {
+                other => Err(HiLLMError::InternalError {
                     message: format!("expected Chat response, got {other:?}"),
                 }),
             }
@@ -244,7 +244,7 @@ impl ChatCompletionClient for ManagedClient {
     fn chat_stream(
         &self,
         req: ChatCompletionRequest,
-    ) -> BoxFuture<'_, HiLlmResult<BoxStream<'static, HiLlmResult<ChatCompletionChunk>>>> {
+    ) -> BoxFuture<'_, HiLLMResult<BoxStream<'static, HiLLMResult<ChatCompletionChunk>>>> {
         if self.service.is_none() {
             return self.inner.chat_stream(req);
         }
@@ -252,7 +252,7 @@ impl ChatCompletionClient for ManagedClient {
         Box::pin(async move {
             match fut.await? {
                 LlmResponse::ChatStream(s) => Ok(s),
-                other => Err(HiLlmError::InternalError {
+                other => Err(HiLLMError::InternalError {
                     message: format!("expected ChatStream response, got {other:?}"),
                 }),
             }
@@ -262,7 +262,7 @@ impl ChatCompletionClient for ManagedClient {
     fn chat_raw(
         &self,
         req: ChatCompletionRequest,
-    ) -> BoxFuture<'_, HiLlmResult<RawExchange<ChatCompletionResponse>>> {
+    ) -> BoxFuture<'_, HiLLMResult<RawExchange<ChatCompletionResponse>>> {
         // Raw exchanges bypass middleware — the service stack operates on parsed
         // LlmRequest/LlmResponse and cannot capture the underlying HTTP bytes.
         self.inner.chat_raw(req)
@@ -273,14 +273,14 @@ impl ChatCompletionClient for ManagedClient {
         req: ChatCompletionRequest,
     ) -> BoxFuture<
         '_,
-        HiLlmResult<RawStreamExchange<BoxStream<'static, HiLlmResult<ChatCompletionChunk>>>>,
+        HiLLMResult<RawStreamExchange<BoxStream<'static, HiLLMResult<ChatCompletionChunk>>>>,
     > {
         self.inner.chat_stream_raw(req)
     }
 }
 
 impl EmbeddingClient for ManagedClient {
-    fn embed(&self, req: EmbeddingRequest) -> BoxFuture<'_, HiLlmResult<EmbeddingResponse>> {
+    fn embed(&self, req: EmbeddingRequest) -> BoxFuture<'_, HiLLMResult<EmbeddingResponse>> {
         if self.service.is_none() {
             return self.inner.embed(req);
         }
@@ -288,7 +288,7 @@ impl EmbeddingClient for ManagedClient {
         Box::pin(async move {
             match fut.await? {
                 LlmResponse::Embed(r) => Ok(r),
-                other => Err(HiLlmError::InternalError {
+                other => Err(HiLLMError::InternalError {
                     message: format!("expected Embed response, got {other:?}"),
                 }),
             }
@@ -298,7 +298,7 @@ impl EmbeddingClient for ManagedClient {
     fn embed_raw(
         &self,
         req: EmbeddingRequest,
-    ) -> BoxFuture<'_, HiLlmResult<RawExchange<EmbeddingResponse>>> {
+    ) -> BoxFuture<'_, HiLLMResult<RawExchange<EmbeddingResponse>>> {
         self.inner.embed_raw(req)
     }
 }
@@ -307,7 +307,7 @@ impl ImageClient for ManagedClient {
     fn image_generate(
         &self,
         req: CreateImageRequest,
-    ) -> BoxFuture<'_, HiLlmResult<ImagesResponse>> {
+    ) -> BoxFuture<'_, HiLLMResult<ImagesResponse>> {
         if self.service.is_none() {
             return self.inner.image_generate(req);
         }
@@ -315,7 +315,7 @@ impl ImageClient for ManagedClient {
         Box::pin(async move {
             match fut.await? {
                 LlmResponse::ImageGenerate(r) => Ok(r),
-                other => Err(HiLlmError::InternalError {
+                other => Err(HiLLMError::InternalError {
                     message: format!("expected ImageGenerate response, got {other:?}"),
                 }),
             }
@@ -325,13 +325,13 @@ impl ImageClient for ManagedClient {
     fn image_generate_raw(
         &self,
         req: CreateImageRequest,
-    ) -> BoxFuture<'_, HiLlmResult<RawExchange<ImagesResponse>>> {
+    ) -> BoxFuture<'_, HiLLMResult<RawExchange<ImagesResponse>>> {
         self.inner.image_generate_raw(req)
     }
 }
 
 impl AudioClient for ManagedClient {
-    fn speech(&self, req: CreateSpeechRequest) -> BoxFuture<'_, HiLlmResult<bytes::Bytes>> {
+    fn speech(&self, req: CreateSpeechRequest) -> BoxFuture<'_, HiLLMResult<bytes::Bytes>> {
         if self.service.is_none() {
             return self.inner.speech(req);
         }
@@ -339,7 +339,7 @@ impl AudioClient for ManagedClient {
         Box::pin(async move {
             match fut.await? {
                 LlmResponse::Speech(r) => Ok(r),
-                other => Err(HiLlmError::InternalError {
+                other => Err(HiLLMError::InternalError {
                     message: format!("expected Speech response, got {other:?}"),
                 }),
             }
@@ -349,7 +349,7 @@ impl AudioClient for ManagedClient {
     fn transcribe(
         &self,
         req: CreateTranscriptionRequest,
-    ) -> BoxFuture<'_, HiLlmResult<TranscriptionResponse>> {
+    ) -> BoxFuture<'_, HiLLMResult<TranscriptionResponse>> {
         if self.service.is_none() {
             return self.inner.transcribe(req);
         }
@@ -357,7 +357,7 @@ impl AudioClient for ManagedClient {
         Box::pin(async move {
             match fut.await? {
                 LlmResponse::Transcribe(r) => Ok(r),
-                other => Err(HiLlmError::InternalError {
+                other => Err(HiLLMError::InternalError {
                     message: format!("expected Transcribe response, got {other:?}"),
                 }),
             }
@@ -367,13 +367,13 @@ impl AudioClient for ManagedClient {
     fn transcribe_raw(
         &self,
         req: CreateTranscriptionRequest,
-    ) -> BoxFuture<'_, HiLlmResult<RawExchange<TranscriptionResponse>>> {
+    ) -> BoxFuture<'_, HiLLMResult<RawExchange<TranscriptionResponse>>> {
         self.inner.transcribe_raw(req)
     }
 }
 
 impl ModerationClient for ManagedClient {
-    fn moderate(&self, req: ModerationRequest) -> BoxFuture<'_, HiLlmResult<ModerationResponse>> {
+    fn moderate(&self, req: ModerationRequest) -> BoxFuture<'_, HiLLMResult<ModerationResponse>> {
         if self.service.is_none() {
             return self.inner.moderate(req);
         }
@@ -381,7 +381,7 @@ impl ModerationClient for ManagedClient {
         Box::pin(async move {
             match fut.await? {
                 LlmResponse::Moderate(r) => Ok(r),
-                other => Err(HiLlmError::InternalError {
+                other => Err(HiLLMError::InternalError {
                     message: format!("expected Moderate response, got {other:?}"),
                 }),
             }
@@ -391,13 +391,13 @@ impl ModerationClient for ManagedClient {
     fn moderate_raw(
         &self,
         req: ModerationRequest,
-    ) -> BoxFuture<'_, HiLlmResult<RawExchange<ModerationResponse>>> {
+    ) -> BoxFuture<'_, HiLLMResult<RawExchange<ModerationResponse>>> {
         self.inner.moderate_raw(req)
     }
 }
 
 impl RerankClient for ManagedClient {
-    fn rerank(&self, req: RerankRequest) -> BoxFuture<'_, HiLlmResult<RerankResponse>> {
+    fn rerank(&self, req: RerankRequest) -> BoxFuture<'_, HiLLMResult<RerankResponse>> {
         if self.service.is_none() {
             return self.inner.rerank(req);
         }
@@ -405,7 +405,7 @@ impl RerankClient for ManagedClient {
         Box::pin(async move {
             match fut.await? {
                 LlmResponse::Rerank(r) => Ok(r),
-                other => Err(HiLlmError::InternalError {
+                other => Err(HiLLMError::InternalError {
                     message: format!("expected Rerank response, got {other:?}"),
                 }),
             }
@@ -415,13 +415,13 @@ impl RerankClient for ManagedClient {
     fn rerank_raw(
         &self,
         req: RerankRequest,
-    ) -> BoxFuture<'_, HiLlmResult<RawExchange<RerankResponse>>> {
+    ) -> BoxFuture<'_, HiLLMResult<RawExchange<RerankResponse>>> {
         self.inner.rerank_raw(req)
     }
 }
 
 impl SearchClient for ManagedClient {
-    fn search(&self, req: SearchRequest) -> BoxFuture<'_, HiLlmResult<SearchResponse>> {
+    fn search(&self, req: SearchRequest) -> BoxFuture<'_, HiLLMResult<SearchResponse>> {
         if self.service.is_none() {
             return self.inner.search(req);
         }
@@ -429,7 +429,7 @@ impl SearchClient for ManagedClient {
         Box::pin(async move {
             match fut.await? {
                 LlmResponse::Search(r) => Ok(r),
-                other => Err(HiLlmError::InternalError {
+                other => Err(HiLLMError::InternalError {
                     message: format!("expected Search response, got {other:?}"),
                 }),
             }
@@ -439,13 +439,13 @@ impl SearchClient for ManagedClient {
     fn search_raw(
         &self,
         req: SearchRequest,
-    ) -> BoxFuture<'_, HiLlmResult<RawExchange<SearchResponse>>> {
+    ) -> BoxFuture<'_, HiLLMResult<RawExchange<SearchResponse>>> {
         self.inner.search_raw(req)
     }
 }
 
 impl OcrClient for ManagedClient {
-    fn ocr(&self, req: OcrRequest) -> BoxFuture<'_, HiLlmResult<OcrResponse>> {
+    fn ocr(&self, req: OcrRequest) -> BoxFuture<'_, HiLLMResult<OcrResponse>> {
         if self.service.is_none() {
             return self.inner.ocr(req);
         }
@@ -453,20 +453,20 @@ impl OcrClient for ManagedClient {
         Box::pin(async move {
             match fut.await? {
                 LlmResponse::Ocr(r) => Ok(r),
-                other => Err(HiLlmError::InternalError {
+                other => Err(HiLLMError::InternalError {
                     message: format!("expected Ocr response, got {other:?}"),
                 }),
             }
         })
     }
 
-    fn ocr_raw(&self, req: OcrRequest) -> BoxFuture<'_, HiLlmResult<RawExchange<OcrResponse>>> {
+    fn ocr_raw(&self, req: OcrRequest) -> BoxFuture<'_, HiLLMResult<RawExchange<OcrResponse>>> {
         self.inner.ocr_raw(req)
     }
 }
 
 impl ModelClient for ManagedClient {
-    fn list_models(&self) -> BoxFuture<'_, HiLlmResult<ModelsListResponse>> {
+    fn list_models(&self) -> BoxFuture<'_, HiLLMResult<ModelsListResponse>> {
         if self.service.is_none() {
             return self.inner.list_models();
         }
@@ -474,7 +474,7 @@ impl ModelClient for ManagedClient {
         Box::pin(async move {
             match fut.await? {
                 LlmResponse::ListModels(r) => Ok(r),
-                other => Err(HiLlmError::InternalError {
+                other => Err(HiLLMError::InternalError {
                     message: format!("expected ListModels response, got {other:?}"),
                 }),
             }
@@ -483,47 +483,47 @@ impl ModelClient for ManagedClient {
 }
 
 impl FileClient for ManagedClient {
-    fn create_file(&self, req: CreateFileRequest) -> BoxFuture<'_, HiLlmResult<FileObject>> {
+    fn create_file(&self, req: CreateFileRequest) -> BoxFuture<'_, HiLLMResult<FileObject>> {
         self.inner.create_file(req)
     }
 
-    fn retrieve_file(&self, file_id: &str) -> BoxFuture<'_, HiLlmResult<FileObject>> {
+    fn retrieve_file(&self, file_id: &str) -> BoxFuture<'_, HiLLMResult<FileObject>> {
         self.inner.retrieve_file(file_id)
     }
 
-    fn delete_file(&self, file_id: &str) -> BoxFuture<'_, HiLlmResult<DeleteResponse>> {
+    fn delete_file(&self, file_id: &str) -> BoxFuture<'_, HiLLMResult<DeleteResponse>> {
         self.inner.delete_file(file_id)
     }
 
     fn list_files(
         &self,
         query: Option<FileListQuery>,
-    ) -> BoxFuture<'_, HiLlmResult<FileListResponse>> {
+    ) -> BoxFuture<'_, HiLLMResult<FileListResponse>> {
         self.inner.list_files(query)
     }
 
-    fn file_content(&self, file_id: &str) -> BoxFuture<'_, HiLlmResult<bytes::Bytes>> {
+    fn file_content(&self, file_id: &str) -> BoxFuture<'_, HiLLMResult<bytes::Bytes>> {
         self.inner.file_content(file_id)
     }
 }
 
 impl BatchClient for ManagedClient {
-    fn create_batch(&self, req: CreateBatchRequest) -> BoxFuture<'_, HiLlmResult<BatchObject>> {
+    fn create_batch(&self, req: CreateBatchRequest) -> BoxFuture<'_, HiLLMResult<BatchObject>> {
         self.inner.create_batch(req)
     }
 
-    fn retrieve_batch(&self, batch_id: &str) -> BoxFuture<'_, HiLlmResult<BatchObject>> {
+    fn retrieve_batch(&self, batch_id: &str) -> BoxFuture<'_, HiLLMResult<BatchObject>> {
         self.inner.retrieve_batch(batch_id)
     }
 
     fn list_batches(
         &self,
         query: Option<BatchListQuery>,
-    ) -> BoxFuture<'_, HiLlmResult<BatchListResponse>> {
+    ) -> BoxFuture<'_, HiLLMResult<BatchListResponse>> {
         self.inner.list_batches(query)
     }
 
-    fn cancel_batch(&self, batch_id: &str) -> BoxFuture<'_, HiLlmResult<BatchObject>> {
+    fn cancel_batch(&self, batch_id: &str) -> BoxFuture<'_, HiLLMResult<BatchObject>> {
         self.inner.cancel_batch(batch_id)
     }
 }
@@ -532,22 +532,22 @@ impl ResponseClient for ManagedClient {
     fn create_response(
         &self,
         req: CreateResponseRequest,
-    ) -> BoxFuture<'_, HiLlmResult<ResponseObject>> {
+    ) -> BoxFuture<'_, HiLLMResult<ResponseObject>> {
         self.inner.create_response(req)
     }
 
     fn create_response_stream(
         &self,
         req: CreateResponseRequest,
-    ) -> BoxFuture<'_, HiLlmResult<BoxStream<'static, HiLlmResult<ResponsesStreamEvent>>>> {
+    ) -> BoxFuture<'_, HiLLMResult<BoxStream<'static, HiLLMResult<ResponsesStreamEvent>>>> {
         self.inner.create_response_stream(req)
     }
 
-    fn retrieve_response(&self, response_id: &str) -> BoxFuture<'_, HiLlmResult<ResponseObject>> {
+    fn retrieve_response(&self, response_id: &str) -> BoxFuture<'_, HiLLMResult<ResponseObject>> {
         self.inner.retrieve_response(response_id)
     }
 
-    fn cancel_response(&self, response_id: &str) -> BoxFuture<'_, HiLlmResult<ResponseObject>> {
+    fn cancel_response(&self, response_id: &str) -> BoxFuture<'_, HiLLMResult<ResponseObject>> {
         self.inner.cancel_response(response_id)
     }
 }

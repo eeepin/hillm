@@ -3,7 +3,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use crate::client::EmbeddingClient;
-use crate::error::HiLlmResult;
+use crate::error::HiLLMResult;
 use crate::types::EmbeddingRequest;
 
 pub trait EmbeddingProvider: Send + Sync + 'static {
@@ -11,7 +11,7 @@ pub trait EmbeddingProvider: Send + Sync + 'static {
     fn embed<'a>(
         &'a self,
         text: &'a str,
-    ) -> Pin<Box<dyn Future<Output = HiLlmResult<Vec<f32>>> + Send + 'a>>;
+    ) -> Pin<Box<dyn Future<Output = HiLLMResult<Vec<f32>>> + Send + 'a>>;
 
     /// The output dimensionality.
     fn dim(&self) -> usize;
@@ -38,7 +38,7 @@ impl EmbeddingProvider for SelfHostedEmbeddingProvider {
     fn embed<'a>(
         &'a self,
         text: &'a str,
-    ) -> Pin<Box<dyn Future<Output = HiLlmResult<Vec<f32>>> + Send + 'a>> {
+    ) -> Pin<Box<dyn Future<Output = HiLLMResult<Vec<f32>>> + Send + 'a>> {
         let req = EmbeddingRequest {
             model: self.model.clone(),
             input: crate::types::EmbeddingInput::Single(text.to_owned()),
@@ -73,7 +73,7 @@ impl EmbeddingProvider for NoOpEmbeddingProvider {
     fn embed<'a>(
         &'a self,
         _text: &'a str,
-    ) -> Pin<Box<dyn Future<Output = HiLlmResult<Vec<f32>>> + Send + 'a>> {
+    ) -> Pin<Box<dyn Future<Output = HiLLMResult<Vec<f32>>> + Send + 'a>> {
         Box::pin(std::future::ready(Ok(vec![0.0_f32; self.dim])))
     }
 

@@ -8,7 +8,7 @@ use dashmap::DashMap;
 use tower::{Layer, Service};
 
 use crate::client::BoxFuture;
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 use crate::tower::cache::CachedResponse;
 use crate::tower::types::{LlmRequest, LlmRequestKind, LlmResponse};
 
@@ -246,15 +246,15 @@ impl<I: Clone, S: IdempotencyStore> Clone for IdempotencyService<I, S> {
 
 impl<I, S> Service<LlmRequest> for IdempotencyService<I, S>
 where
-    I: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Clone + Send + 'static,
+    I: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Clone + Send + 'static,
     I::Future: Send + 'static,
     S: IdempotencyStore,
 {
     type Response = LlmResponse;
-    type Error = HiLlmError;
-    type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+    type Error = HiLLMError;
+    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         self.inner.poll_ready(cx)
     }
 
@@ -286,14 +286,14 @@ where
 
             if let Some(entry) = store.get(&key).await.map_err(store_err)? {
                 if entry.body_hash != body_hash {
-                    return Err(HiLlmError::IdempotencyConflict {
+                    return Err(HiLLMError::IdempotencyConflict {
                         key: raw_key.clone(),
                     });
                 }
                 if let Some(cached) = entry.response {
                     return cached.into_llm_response();
                 }
-                return Err(HiLlmError::IdempotencyInFlight {
+                return Err(HiLLMError::IdempotencyInFlight {
                     key: raw_key.clone(),
                 });
             }
@@ -307,7 +307,7 @@ where
                 if let Some(entry) = store.get(&key).await.map_err(store_err)?
                     && entry.body_hash != body_hash
                 {
-                    return Err(HiLlmError::IdempotencyConflict {
+                    return Err(HiLLMError::IdempotencyConflict {
                         key: raw_key.clone(),
                     });
                 }
@@ -315,7 +315,7 @@ where
                     if let Some(cached) = entry.response {
                         return cached.into_llm_response();
                     }
-                    return Err(HiLlmError::IdempotencyInFlight {
+                    return Err(HiLLMError::IdempotencyInFlight {
                         key: raw_key.clone(),
                     });
                 }
@@ -348,8 +348,8 @@ where
 }
 
 #[inline]
-fn store_err(e: IdempotencyStoreError) -> HiLlmError {
-    HiLlmError::InternalError {
+fn store_err(e: IdempotencyStoreError) -> HiLLMError {
+    HiLLMError::InternalError {
         message: format!("idempotency store: {e}"),
     }
 }

@@ -11,7 +11,7 @@ use std::collections::VecDeque;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 use crate::util::bound::SSE_BUFFER_MAX_BYTES;
 
 /// A complete SSE event, assembled per the SSE specification.
@@ -58,16 +58,16 @@ impl EventBuilder {
         self.data_line_count = 0;
     }
 
-    fn build(&self) -> HiLlmResult<SSEEvent> {
+    fn build(&self) -> HiLLMResult<SSEEvent> {
         Ok(SSEEvent {
-            data: String::from_utf8(self.data.clone()).map_err(|e| HiLlmError::Streaming {
+            data: String::from_utf8(self.data.clone()).map_err(|e| HiLLMError::Streaming {
                 message: format!("invalid UTF-8 in data field: {e}"),
             })?,
             event: if self.event.is_empty() {
                 None
             } else {
                 Some(
-                    String::from_utf8(self.event.clone()).map_err(|e| HiLlmError::Streaming {
+                    String::from_utf8(self.event.clone()).map_err(|e| HiLLMError::Streaming {
                         message: format!("invalid UTF-8 in event field: {e}"),
                     })?,
                 )
@@ -76,7 +76,7 @@ impl EventBuilder {
                 None
             } else {
                 Some(
-                    String::from_utf8(self.id.clone()).map_err(|e| HiLlmError::Streaming {
+                    String::from_utf8(self.id.clone()).map_err(|e| HiLLMError::Streaming {
                         message: format!("invalid UTF-8 in id field: {e}"),
                     })?,
                 )
@@ -112,13 +112,13 @@ impl SSEDecoder {
     /// May return an empty Vec if no event boundary has been reached yet.
     ///
     /// # Errors
-    /// Returns `HiLlmError::Streaming` if:
+    /// Returns `HiLLMError::Streaming` if:
     /// - Internal buffer exceeds `SSE_BUFFER_MAX_BYTES`.
     /// - A complete field contains invalid UTF-8.
-    pub fn decode(&mut self, chunk: Bytes) -> HiLlmResult<Vec<SSEEvent>> {
+    pub fn decode(&mut self, chunk: Bytes) -> HiLLMResult<Vec<SSEEvent>> {
         // Check buffer overflow
         if self.buf.len() + chunk.len() > SSE_BUFFER_MAX_BYTES {
-            return Err(HiLlmError::Streaming {
+            return Err(HiLLMError::Streaming {
                 message: format!(
                     "SSE buffer exceeded {SSE_BUFFER_MAX_BYTES} bytes; stream aborted"
                 ),
@@ -142,7 +142,7 @@ impl SSEDecoder {
 
             // Process the line
             let line =
-                String::from_utf8(line_bytes.to_vec()).map_err(|e| HiLlmError::Streaming {
+                String::from_utf8(line_bytes.to_vec()).map_err(|e| HiLLMError::Streaming {
                     message: format!("invalid UTF-8 in SSE line: {e}"),
                 })?;
 
@@ -220,9 +220,9 @@ impl SSEDecoder {
     /// blank line (compatibility policy).
     ///
     /// # Errors
-    /// Returns `HiLlmError::Streaming` if the buffer ends mid-UTF-8-sequence
+    /// Returns `HiLLMError::Streaming` if the buffer ends mid-UTF-8-sequence
     /// or contains an incomplete field (data without a terminating newline).
-    pub fn finish(&mut self) -> HiLlmResult<Option<SSEEvent>> {
+    pub fn finish(&mut self) -> HiLLMResult<Option<SSEEvent>> {
         // If there are remaining bytes without a terminating newline,
         // that is an incomplete field — return a truncation error.
         if !self.buf.is_empty() {
@@ -238,11 +238,11 @@ impl SSEDecoder {
             if !residue.is_empty() {
                 // Validate UTF-8 first for a clear error message
                 let text =
-                    String::from_utf8(residue.to_vec()).map_err(|_| HiLlmError::Streaming {
+                    String::from_utf8(residue.to_vec()).map_err(|_| HiLLMError::Streaming {
                         message: "SSE stream ended with incomplete UTF-8 sequence".to_string(),
                     })?;
 
-                return Err(HiLlmError::Streaming {
+                return Err(HiLLMError::Streaming {
                     message: format!(
                         "SSE stream ended with incomplete field (no terminating newline): {:?}",
                         text
@@ -299,9 +299,9 @@ impl<S> SSEStream<S> {
 impl<S, E> Stream for SSEStream<S>
 where
     S: Stream<Item = Result<Bytes, E>>,
-    E: Into<HiLlmError>,
+    E: Into<HiLLMError>,
 {
-    type Item = HiLlmResult<SSEEvent>;
+    type Item = HiLLMResult<SSEEvent>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
@@ -689,7 +689,7 @@ mod tests {
         let large_chunk = vec![b'a'; SSE_BUFFER_MAX_BYTES + 1];
         let result = decoder.decode(Bytes::from(large_chunk));
         assert!(result.is_err());
-        if let Err(HiLlmError::Streaming { message }) = result {
+        if let Err(HiLLMError::Streaming { message }) = result {
             assert!(message.contains("exceeded"));
         }
     }
@@ -700,7 +700,7 @@ mod tests {
         // Invalid UTF-8 sequence
         let result = decoder.decode(Bytes::from_static(b"data: \xff\xfe\n\n"));
         assert!(result.is_err());
-        if let Err(HiLlmError::Streaming { message }) = result {
+        if let Err(HiLLMError::Streaming { message }) = result {
             assert!(message.contains("UTF-8"));
         }
     }
@@ -727,7 +727,7 @@ mod tests {
         decoder.decode(Bytes::from_static(b"data: hel")).unwrap();
         let result = decoder.finish();
         assert!(result.is_err());
-        if let Err(HiLlmError::Streaming { message }) = result {
+        if let Err(HiLLMError::Streaming { message }) = result {
             assert!(message.contains("incomplete field"));
         }
     }
@@ -739,7 +739,7 @@ mod tests {
         decoder.decode(Bytes::from_static(b"data: \xe4")).unwrap();
         let result = decoder.finish();
         assert!(result.is_err());
-        if let Err(HiLlmError::Streaming { message }) = result {
+        if let Err(HiLLMError::Streaming { message }) = result {
             assert!(message.contains("incomplete UTF-8"));
         }
     }
@@ -765,7 +765,7 @@ mod tests {
     #[tokio::test]
     async fn stream_wrapper_basic() {
         let chunks = vec![
-            Ok::<Bytes, HiLlmError>(Bytes::from_static(b"data: event1\n\n")),
+            Ok::<Bytes, HiLLMError>(Bytes::from_static(b"data: event1\n\n")),
             Ok(Bytes::from_static(b"data: event2\n\n")),
         ];
         let stream = futures_util::stream::iter(chunks);
@@ -786,8 +786,8 @@ mod tests {
     #[tokio::test]
     async fn stream_wrapper_error_propagation() {
         let chunks = vec![
-            Ok::<Bytes, HiLlmError>(Bytes::from_static(b"data: hello\n\n")),
-            Err(HiLlmError::Streaming {
+            Ok::<Bytes, HiLLMError>(Bytes::from_static(b"data: hello\n\n")),
+            Err(HiLLMError::Streaming {
                 message: "test error".to_string(),
             }),
         ];
@@ -799,7 +799,7 @@ mod tests {
         assert_eq!(event.data, "hello");
 
         let error = sse_stream.next().await.unwrap().unwrap_err();
-        if let HiLlmError::Streaming { message } = error {
+        if let HiLLMError::Streaming { message } = error {
             assert_eq!(message, "test error");
         }
     }
@@ -807,7 +807,7 @@ mod tests {
     #[cfg(feature = "tower")]
     #[tokio::test]
     async fn stream_wrapper_multiple_events_from_single_chunk() {
-        let chunks = vec![Ok::<Bytes, HiLlmError>(Bytes::from_static(
+        let chunks = vec![Ok::<Bytes, HiLLMError>(Bytes::from_static(
             b"data: event1\n\ndata: event2\n\ndata: event3\n\n",
         ))];
         let stream = futures_util::stream::iter(chunks);
@@ -871,7 +871,7 @@ mod tests {
             async move {
                 count.fetch_add(1, Ordering::SeqCst);
                 Some((
-                    Ok::<Bytes, HiLlmError>(Bytes::from_static(b"data: test\n\n")),
+                    Ok::<Bytes, HiLLMError>(Bytes::from_static(b"data: test\n\n")),
                     (),
                 ))
             }

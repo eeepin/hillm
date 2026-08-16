@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::client::str_pair;
 use crate::client::{BoxFuture, BoxStream, ChatCompletionClient, Client};
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 use crate::http;
 use crate::provider;
 use crate::types::chat::{ChatCompletionChunk, ChatCompletionRequest, ChatCompletionResponse};
@@ -13,7 +13,7 @@ impl ChatCompletionClient for Client {
     fn chat(
         &self,
         req: ChatCompletionRequest,
-    ) -> BoxFuture<'_, HiLlmResult<ChatCompletionResponse>> {
+    ) -> BoxFuture<'_, HiLLMResult<ChatCompletionResponse>> {
         Box::pin(async move {
             // Try codec path first
             if let Some(codec) = self
@@ -60,7 +60,7 @@ impl ChatCompletionClient for Client {
                 let raw_bytes_vec = serde_json::to_vec(&raw_bytes)?;
                 let response_value = codec.decode_response(&raw_bytes_vec)?;
                 serde_json::from_value::<ChatCompletionResponse>(response_value)
-                    .map_err(HiLlmError::from)
+                    .map_err(HiLLMError::from)
             } else {
                 // Fall back to legacy path
                 let prepared = self.prepare_request(
@@ -96,7 +96,7 @@ impl ChatCompletionClient for Client {
                 )
                 .await?;
                 prepared.provider.transform_response(&mut raw)?;
-                serde_json::from_value::<ChatCompletionResponse>(raw).map_err(HiLlmError::from)
+                serde_json::from_value::<ChatCompletionResponse>(raw).map_err(HiLLMError::from)
             }
         })
     }
@@ -104,7 +104,7 @@ impl ChatCompletionClient for Client {
     fn chat_stream(
         &self,
         req: ChatCompletionRequest,
-    ) -> BoxFuture<'_, HiLlmResult<BoxStream<'static, HiLlmResult<ChatCompletionChunk>>>> {
+    ) -> BoxFuture<'_, HiLLMResult<BoxStream<'static, HiLLMResult<ChatCompletionChunk>>>> {
         Box::pin(async move {
             // Try codec path first
             if let Some(codec) = self
@@ -142,7 +142,7 @@ impl ChatCompletionClient for Client {
                         .parse_stream_event(data)?
                         .map(serde_json::from_value::<ChatCompletionChunk>)
                         .transpose()
-                        .map_err(HiLlmError::from)
+                        .map_err(HiLLMError::from)
                 };
                 let stream = http::stream::post_stream(
                     &self.http_client,
@@ -222,7 +222,7 @@ impl ChatCompletionClient for Client {
     fn chat_raw(
         &self,
         req: ChatCompletionRequest,
-    ) -> BoxFuture<'_, HiLlmResult<RawExchange<ChatCompletionResponse>>> {
+    ) -> BoxFuture<'_, HiLLMResult<RawExchange<ChatCompletionResponse>>> {
         Box::pin(async move {
             let prepared =
                 self.prepare_request(&req, |p| p.chat_completions_path(), &req.model, Some(false))?;
@@ -257,7 +257,7 @@ impl ChatCompletionClient for Client {
             let raw_response = Some(raw.clone());
             prepared.provider.transform_response(&mut raw)?;
             let data =
-                serde_json::from_value::<ChatCompletionResponse>(raw).map_err(HiLlmError::from)?;
+                serde_json::from_value::<ChatCompletionResponse>(raw).map_err(HiLLMError::from)?;
 
             Ok(RawExchange {
                 data,
@@ -272,7 +272,7 @@ impl ChatCompletionClient for Client {
         req: ChatCompletionRequest,
     ) -> BoxFuture<
         '_,
-        HiLlmResult<RawStreamExchange<BoxStream<'static, HiLlmResult<ChatCompletionChunk>>>>,
+        HiLLMResult<RawStreamExchange<BoxStream<'static, HiLLMResult<ChatCompletionChunk>>>>,
     > {
         Box::pin(async move {
             let prepared =

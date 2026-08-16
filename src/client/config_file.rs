@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use serde::Deserialize;
 
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 use crate::provider::APIType;
 
 #[derive(Debug, Clone, Deserialize)]
@@ -70,7 +70,7 @@ pub struct FileProviderConfig {
 
 impl FileProviderConfig {
     /// Validates the API type configuration.
-    pub fn validate_api_types(&self) -> HiLlmResult<()> {
+    pub fn validate_api_types(&self) -> HiLLMResult<()> {
         if let Some(default) = self.default_api_type {
             let available = if self.available_api_types.is_empty() {
                 vec![APIType::OpenAIChatCompletions]
@@ -78,7 +78,7 @@ impl FileProviderConfig {
                 self.available_api_types.clone()
             };
             if !available.contains(&default) {
-                return Err(HiLlmError::BadRequest {
+                return Err(HiLLMError::BadRequest {
                     message: format!(
                         "provider '{}': default_api_type '{default}' is not in available_api_types {:?}",
                         self.name, available
@@ -92,22 +92,22 @@ impl FileProviderConfig {
 }
 
 impl FileConfig {
-    pub fn from_toml_file(path: impl AsRef<Path>) -> HiLlmResult<Self> {
+    pub fn from_toml_file(path: impl AsRef<Path>) -> HiLLMResult<Self> {
         let path = path.as_ref();
-        let content = std::fs::read_to_string(path).map_err(|e| HiLlmError::InternalError {
+        let content = std::fs::read_to_string(path).map_err(|e| HiLLMError::InternalError {
             message: format!("failed to read config file {}: {e}", path.display()),
         })?;
         Self::from_toml_str(&content)
     }
 
-    pub fn from_toml_str(s: &str) -> HiLlmResult<Self> {
-        toml::from_str(s).map_err(|e| HiLlmError::InternalError {
+    pub fn from_toml_str(s: &str) -> HiLLMResult<Self> {
+        toml::from_str(s).map_err(|e| HiLLMError::InternalError {
             message: format!("invalid TOML config: {e}"),
         })
     }
 
-    pub fn discover() -> HiLlmResult<Option<Self>> {
-        let mut current = std::env::current_dir().map_err(|e| HiLlmError::InternalError {
+    pub fn discover() -> HiLLMResult<Option<Self>> {
+        let mut current = std::env::current_dir().map_err(|e| HiLLMError::InternalError {
             message: format!("failed to get current directory: {e}"),
         })?;
         loop {
@@ -227,7 +227,7 @@ impl FileConfig {
     }
 
     /// Validates all provider configurations.
-    pub fn validate_providers(&self) -> HiLlmResult<()> {
+    pub fn validate_providers(&self) -> HiLLMResult<()> {
         if let Some(providers) = &self.providers {
             for provider in providers {
                 provider.validate_api_types()?;

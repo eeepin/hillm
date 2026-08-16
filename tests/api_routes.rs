@@ -22,7 +22,7 @@ use hillm::types::anthropic::{
     AnthropicStopReason, AnthropicStreamEvent,
 };
 use hillm::types::response::{CreateResponseRequest, ResponsesStreamEvent};
-use hillm::{HiLlmError, Message};
+use hillm::{HiLLMError, Message};
 use serial_test::serial;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
@@ -463,7 +463,7 @@ async fn openai_chat_stream_survives_arbitrary_chunk_split() {
         .chat_stream(simple_chat_request("mock-model"))
         .await
         .expect("stream opens");
-    let chunks: Vec<hillm::HiLlmResult<hillm::types::ChatCompletionChunk>> = stream.collect().await;
+    let chunks: Vec<hillm::HiLLMResult<hillm::types::ChatCompletionChunk>> = stream.collect().await;
     let chunks: Vec<hillm::types::ChatCompletionChunk> = chunks
         .into_iter()
         .collect::<Result<Vec<_>, _>>()
@@ -544,7 +544,7 @@ async fn openai_responses_stream_emits_native_events() {
         .create_response_stream(req)
         .await
         .expect("stream opens");
-    let events: Vec<hillm::HiLlmResult<ResponsesStreamEvent>> = stream.collect().await;
+    let events: Vec<hillm::HiLLMResult<ResponsesStreamEvent>> = stream.collect().await;
     let events: Vec<ResponsesStreamEvent> = events
         .into_iter()
         .collect::<Result<Vec<_>, _>>()
@@ -627,7 +627,7 @@ async fn anthropic_messages_stream_emits_native_events() {
         .create_message_stream(simple_anthropic_request("mock-model"))
         .await
         .expect("stream opens");
-    let events: Vec<hillm::HiLlmResult<AnthropicStreamEvent>> = stream.collect().await;
+    let events: Vec<hillm::HiLLMResult<AnthropicStreamEvent>> = stream.collect().await;
     let events: Vec<AnthropicStreamEvent> = events
         .into_iter()
         .collect::<Result<Vec<_>, _>>()
@@ -679,7 +679,7 @@ async fn unsupported_api_type_fails_before_sending() {
         Ok(_) => panic!("expected APITypeUnsupported"),
     };
     assert!(
-        matches!(err, HiLlmError::APITypeUnsupported { .. }),
+        matches!(err, HiLLMError::APITypeUnsupported { .. }),
         "expected APITypeUnsupported, got: {err}"
     );
 }
@@ -704,7 +704,7 @@ async fn streaming_other_routes_fails_before_sending_on_chat_instance() {
         Ok(_) => panic!("Responses streaming must be rejected"),
     };
     assert!(
-        matches!(err, HiLlmError::EndpointNotSupported { .. }),
+        matches!(err, HiLLMError::EndpointNotSupported { .. }),
         "expected EndpointNotSupported, got: {err}"
     );
 
@@ -716,7 +716,7 @@ async fn streaming_other_routes_fails_before_sending_on_chat_instance() {
         Ok(_) => panic!("Anthropic streaming must be rejected"),
     };
     assert!(
-        matches!(err, HiLlmError::EndpointNotSupported { .. }),
+        matches!(err, HiLLMError::EndpointNotSupported { .. }),
         "expected EndpointNotSupported, got: {err}"
     );
 

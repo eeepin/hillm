@@ -1,4 +1,4 @@
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 
 // 1 MiB
 pub const SSE_BUFFER_MAX_BYTES: usize = 1024 * 1024;
@@ -17,7 +17,7 @@ pub fn check_bound(
     current_len: usize,
     incoming: usize,
     limit: usize,
-) -> HiLlmResult<()> {
+) -> HiLLMResult<()> {
     if current_len.saturating_add(incoming) > limit {
         #[cfg(feature = "tracing")]
         tracing::warn!(
@@ -27,7 +27,7 @@ pub fn check_bound(
             limit,
             "buffer limit exceeded; aborting stream"
         );
-        return Err(HiLlmError::Streaming {
+        return Err(HiLLMError::Streaming {
             message: format!("{context} buffer exceeded {limit} bytes; aborting"),
         });
     }

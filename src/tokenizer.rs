@@ -5,12 +5,12 @@ use arc_swap::ArcSwap;
 use tokenizers::Tokenizer;
 use tokio::sync::OnceCell;
 
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 use crate::types::{ChatCompletionRequest, ContentPart, Message, MessageContent};
 
 static TOKENIZER_CACHE: OnceCell<ArcSwap<HashMap<String, Arc<Tokenizer>>>> = OnceCell::const_new();
 
-async fn detect_tokenizer(model: &str) -> HiLlmResult<String> {
+async fn detect_tokenizer(model: &str) -> HiLLMResult<String> {
     // Try to find the model's tokenizer via HuggingFace Hub API
     if let Ok(api) = hf_hub::api::tokio::Api::new() {
         let repo = api.model(model.to_string());
@@ -60,7 +60,7 @@ async fn detect_tokenizer(model: &str) -> HiLlmResult<String> {
     .to_string())
 }
 
-async fn get_tokenizer(model: &str) -> HiLlmResult<Arc<Tokenizer>> {
+async fn get_tokenizer(model: &str) -> HiLLMResult<Arc<Tokenizer>> {
     let tokenizer_id = detect_tokenizer(model).await?;
 
     // Ensure cache is initialized (once)
@@ -75,7 +75,7 @@ async fn get_tokenizer(model: &str) -> HiLlmResult<Arc<Tokenizer>> {
 
     // Load from HuggingFace
     let tokenizer = Arc::new(
-        Tokenizer::from_pretrained(&tokenizer_id, None).map_err(|e| HiLlmError::BadRequest {
+        Tokenizer::from_pretrained(&tokenizer_id, None).map_err(|e| HiLLMError::BadRequest {
             message: format!("Failed to load tokenizer '{tokenizer_id}': {e} from HuggingFace"),
             status: 400,
         })?,
@@ -89,11 +89,11 @@ async fn get_tokenizer(model: &str) -> HiLlmResult<Arc<Tokenizer>> {
     Ok(tokenizer)
 }
 
-pub async fn count_tokens(model: &str, text: &str) -> HiLlmResult<usize> {
+pub async fn count_tokens(model: &str, text: &str) -> HiLLMResult<usize> {
     let tokenizer = get_tokenizer(model).await?;
     let encoding = tokenizer
         .encode(text, false)
-        .map_err(|e| HiLlmError::BadRequest {
+        .map_err(|e| HiLLMError::BadRequest {
             message: format!("Tokenization failed: {e}"),
             status: 400,
         })?;
@@ -115,7 +115,7 @@ fn content_part_text(part: &ContentPart) -> Option<&str> {
 fn count_message_content_tokens(
     tokenizer: &Tokenizer,
     content: &MessageContent,
-) -> HiLlmResult<usize> {
+) -> HiLLMResult<usize> {
     let mut total = 0usize;
     match &content {
         MessageContent::Text(t) => total += encode(tokenizer, t)?,
@@ -130,10 +130,10 @@ fn count_message_content_tokens(
     Ok(total)
 }
 
-fn encode(tokenizer: &Tokenizer, text: &str) -> HiLlmResult<usize> {
+fn encode(tokenizer: &Tokenizer, text: &str) -> HiLLMResult<usize> {
     let encoding = tokenizer
         .encode(text, false)
-        .map_err(|e| HiLlmError::BadRequest {
+        .map_err(|e| HiLLMError::BadRequest {
             message: format!("Tokenization failed: {e}"),
             status: 400,
         })?;
@@ -141,7 +141,7 @@ fn encode(tokenizer: &Tokenizer, text: &str) -> HiLlmResult<usize> {
 }
 
 /// Count tokens for a full [`ChatCompletionRequest`].
-pub async fn count_request_tokens(model: &str, req: &ChatCompletionRequest) -> HiLlmResult<usize> {
+pub async fn count_request_tokens(model: &str, req: &ChatCompletionRequest) -> HiLLMResult<usize> {
     let tokenizer = get_tokenizer(model).await?;
     let mut total = 0usize;
 

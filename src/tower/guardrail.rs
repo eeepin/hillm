@@ -7,7 +7,7 @@ use tower::Service;
 
 use super::types::{LlmRequest, LlmResponse};
 use crate::client::BoxFuture;
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 use crate::guardrail::registry::GuardrailRegistry;
 use crate::guardrail::{GuardrailContext, GuardrailDecision, GuardrailStage};
 
@@ -62,14 +62,14 @@ impl<S: Clone> Clone for GuardrailService<S> {
 
 impl<S> Service<LlmRequest> for GuardrailService<S>
 where
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Send + 'static,
+    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Send + 'static,
     S::Future: Send + 'static,
 {
     type Response = LlmResponse;
-    type Error = HiLlmError;
-    type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+    type Error = HiLLMError;
+    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         self.inner.poll_ready(cx)
     }
 
@@ -82,7 +82,7 @@ where
             let request_json = match serde_json::to_value(&req) {
                 Ok(v) => v,
                 Err(e) => {
-                    return Err(HiLlmError::InternalError {
+                    return Err(HiLLMError::InternalError {
                         message: format!("guardrail: failed to serialize request: {e}"),
                     });
                 }
@@ -98,7 +98,7 @@ where
             let input_decision = registry.run_stage(GuardrailStage::Input, &input_ctx).await;
             match input_decision {
                 GuardrailDecision::Block { reason, code } => {
-                    return Err(HiLlmError::HookRejected {
+                    return Err(HiLLMError::HookRejected {
                         message: format!("guardrail blocked [code={code}]: {reason}"),
                     });
                 }
@@ -139,7 +139,7 @@ where
                 .run_stage(GuardrailStage::Output, &output_ctx)
                 .await;
             match output_decision {
-                GuardrailDecision::Block { reason, code } => Err(HiLlmError::HookRejected {
+                GuardrailDecision::Block { reason, code } => Err(HiLLMError::HookRejected {
                     message: format!("guardrail blocked output [code={code}]: {reason}"),
                 }),
                 GuardrailDecision::Mutate { .. } => {

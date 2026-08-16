@@ -7,8 +7,8 @@ use opendal::Operator;
 use serde::{Deserialize, Serialize};
 
 use super::{VectorMatch, VectorMetadata, VectorStore};
-use crate::HiLlmResult;
-use crate::error::HiLlmError;
+use crate::HiLLMResult;
+use crate::error::HiLLMError;
 
 fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     if a.len() != b.len() || a.is_empty() {
@@ -125,9 +125,9 @@ impl VectorStore for OpenDalVectorStore {
         id: String,
         vec: Vec<f32>,
         metadata: VectorMetadata,
-    ) -> Pin<Box<dyn Future<Output = HiLlmResult<()>> + Send + 'a>> {
+    ) -> Pin<Box<dyn Future<Output = HiLLMResult<()>> + Send + 'a>> {
         if vec.len() != self.dim {
-            return Box::pin(std::future::ready(Err(HiLlmError::InternalError {
+            return Box::pin(std::future::ready(Err(HiLLMError::InternalError {
                 message: format!(
                     "vector dimension mismatch: store expects {} but received {}",
                     self.dim,
@@ -145,14 +145,14 @@ impl VectorStore for OpenDalVectorStore {
                 inserted_at_secs: Self::now_secs(),
                 extra: metadata.extra,
             };
-            let bytes = serde_json::to_vec(&stored).map_err(|e| HiLlmError::InternalError {
+            let bytes = serde_json::to_vec(&stored).map_err(|e| HiLLMError::InternalError {
                 message: format!("vector store: serialization failed: {e}"),
             })?;
             self.operator
                 .write(&path, bytes)
                 .await
                 .map(|_| ())
-                .map_err(|e| HiLlmError::InternalError {
+                .map_err(|e| HiLLMError::InternalError {
                     message: format!("vector store: write failed for '{path}': {e}"),
                 })
         })
@@ -161,13 +161,13 @@ impl VectorStore for OpenDalVectorStore {
     fn delete<'a>(
         &'a self,
         id: &'a str,
-    ) -> Pin<Box<dyn Future<Output = HiLlmResult<()>> + Send + 'a>> {
+    ) -> Pin<Box<dyn Future<Output = HiLLMResult<()>> + Send + 'a>> {
         Box::pin(async move {
             let path = self.entry_path(id);
             match self.operator.delete(&path).await {
                 Ok(()) => Ok(()),
                 Err(e) if e.kind() == opendal::ErrorKind::NotFound => Ok(()),
-                Err(e) => Err(HiLlmError::InternalError {
+                Err(e) => Err(HiLLMError::InternalError {
                     message: format!("vector store: delete failed for '{path}': {e}"),
                 }),
             }

@@ -7,7 +7,7 @@ use tower::{Layer, Service};
 
 use super::types::{LlmRequest, LlmResponse};
 use crate::client::BoxFuture;
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HealthStatus {
@@ -51,11 +51,11 @@ impl HttpProbeHealthChecker {
     pub fn new(
         timeout: Duration,
         probe_urls: impl IntoIterator<Item = (String, String)>,
-    ) -> HiLlmResult<Self> {
+    ) -> HiLLMResult<Self> {
         let client = reqwest::Client::builder()
             .timeout(timeout)
             .build()
-            .map_err(|e| HiLlmError::BadRequest {
+            .map_err(|e| HiLLMError::BadRequest {
                 message: format!("failed to build HTTP client for health checker: {e}"),
                 status: 500,
             })?;
@@ -189,7 +189,7 @@ impl<S: Clone> Clone for PerProviderHealthCheck<S> {
 
 impl<S> PerProviderHealthCheck<S>
 where
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Clone + Send + 'static,
+    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Clone + Send + 'static,
     S::Future: Send + 'static,
 {
     pub fn new<C: HealthChecker>(
@@ -217,16 +217,16 @@ where
 
 impl<S> Service<LlmRequest> for PerProviderHealthCheck<S>
 where
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Send + 'static,
+    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Send + 'static,
     S::Future: Send + 'static,
 {
     type Response = LlmResponse;
-    type Error = HiLlmError;
-    type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+    type Error = HiLLMError;
+    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         if !self.state.is_healthy() {
-            return Poll::Ready(Err(HiLlmError::ServiceUnavailable {
+            return Poll::Ready(Err(HiLLMError::ServiceUnavailable {
                 message: "provider is unhealthy (health check failed)".into(),
                 status: 503,
             }));
@@ -237,7 +237,7 @@ where
     fn call(&mut self, req: LlmRequest) -> Self::Future {
         if !self.state.is_healthy() {
             return Box::pin(async {
-                Err(HiLlmError::ServiceUnavailable {
+                Err(HiLLMError::ServiceUnavailable {
                     message: "provider is unhealthy (health check failed)".into(),
                     status: 503,
                 })
@@ -261,7 +261,7 @@ impl HealthCheckLayer {
 
 impl<S> Layer<S> for HealthCheckLayer
 where
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Clone + Send + 'static,
+    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Clone + Send + 'static,
     S::Future: Send + 'static,
 {
     type Service = HealthCheckService<S>;
@@ -283,7 +283,7 @@ where
 
 async fn run_health_probe<S>(mut svc: S, healthy: Arc<AtomicBool>, interval: Duration)
 where
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Send + 'static,
+    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Send + 'static,
     S::Future: Send + 'static,
 {
     loop {
@@ -326,16 +326,16 @@ impl<S> HealthCheckService<S> {
 
 impl<S> Service<LlmRequest> for HealthCheckService<S>
 where
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Send + 'static,
+    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Send + 'static,
     S::Future: Send + 'static,
 {
     type Response = LlmResponse;
-    type Error = HiLlmError;
-    type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+    type Error = HiLLMError;
+    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         if !self.healthy.load(Ordering::Acquire) {
-            return Poll::Ready(Err(HiLlmError::ServiceUnavailable {
+            return Poll::Ready(Err(HiLLMError::ServiceUnavailable {
                 message: "service is unhealthy (health check failed)".into(),
                 status: 503,
             }));
@@ -346,7 +346,7 @@ where
     fn call(&mut self, req: LlmRequest) -> Self::Future {
         if !self.healthy.load(Ordering::Acquire) {
             return Box::pin(async {
-                Err(HiLlmError::ServiceUnavailable {
+                Err(HiLLMError::ServiceUnavailable {
                     message: "service is unhealthy (health check failed)".into(),
                     status: 503,
                 })

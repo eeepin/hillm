@@ -1,5 +1,5 @@
 use crate::client::{BoxFuture, BoxStream, Client, ResponseClient};
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 use crate::http;
 use crate::provider;
 use crate::types::response::{CreateResponseRequest, ResponseObject, ResponsesStreamEvent};
@@ -11,7 +11,7 @@ impl ResponseClient for Client {
     fn create_response(
         &self,
         req: CreateResponseRequest,
-    ) -> BoxFuture<'_, HiLlmResult<ResponseObject>> {
+    ) -> BoxFuture<'_, HiLLMResult<ResponseObject>> {
         Box::pin(async move {
             // Force non-streaming for the non-stream call.
             let mut req = req;
@@ -53,7 +53,7 @@ impl ResponseClient for Client {
                 let raw_bytes_vec = serde_json::to_vec(&raw_bytes)?;
                 let response_value = codec.decode_response(&raw_bytes_vec)?;
                 return serde_json::from_value::<ResponseObject>(response_value)
-                    .map_err(HiLlmError::from);
+                    .map_err(HiLLMError::from);
             }
 
             // Legacy path for providers without a Responses codec.
@@ -78,21 +78,21 @@ impl ResponseClient for Client {
                 self.config.max_retries,
             )
             .await?;
-            serde_json::from_value::<ResponseObject>(raw).map_err(HiLlmError::from)
+            serde_json::from_value::<ResponseObject>(raw).map_err(HiLLMError::from)
         })
     }
 
     fn create_response_stream(
         &self,
         req: CreateResponseRequest,
-    ) -> BoxFuture<'_, HiLlmResult<BoxStream<'static, HiLlmResult<ResponsesStreamEvent>>>> {
+    ) -> BoxFuture<'_, HiLLMResult<BoxStream<'static, HiLLMResult<ResponsesStreamEvent>>>> {
         Box::pin(async move {
             // Streaming Responses requires the OpenAI Responses codec; fail
             // before sending when the provider does not support it.
             let codec = self
                 .provider
                 .codec_for(provider::APIType::OpenAIResponses)
-                .ok_or_else(|| HiLlmError::EndpointNotSupported {
+                .ok_or_else(|| HiLLMError::EndpointNotSupported {
                     endpoint: "responses".to_string(),
                     provider: self.provider.name().to_string(),
                 })?;
@@ -126,7 +126,7 @@ impl ResponseClient for Client {
                     .parse_stream_event(data)?
                     .map(serde_json::from_value::<ResponsesStreamEvent>)
                     .transpose()
-                    .map_err(HiLlmError::from)
+                    .map_err(HiLLMError::from)
             };
             let stream = http::stream::post_typed_stream(
                 &self.http_client,
@@ -142,7 +142,7 @@ impl ResponseClient for Client {
         })
     }
 
-    fn retrieve_response(&self, response_id: &str) -> BoxFuture<'_, HiLlmResult<ResponseObject>> {
+    fn retrieve_response(&self, response_id: &str) -> BoxFuture<'_, HiLLMResult<ResponseObject>> {
         let response_id = response_id.to_owned();
         Box::pin(async move {
             let url = format!(
@@ -166,11 +166,11 @@ impl ResponseClient for Client {
                 self.config.max_retries,
             )
             .await?;
-            serde_json::from_value::<ResponseObject>(raw).map_err(HiLlmError::from)
+            serde_json::from_value::<ResponseObject>(raw).map_err(HiLLMError::from)
         })
     }
 
-    fn cancel_response(&self, response_id: &str) -> BoxFuture<'_, HiLlmResult<ResponseObject>> {
+    fn cancel_response(&self, response_id: &str) -> BoxFuture<'_, HiLLMResult<ResponseObject>> {
         let response_id = response_id.to_owned();
         Box::pin(async move {
             let url = format!(
@@ -197,7 +197,7 @@ impl ResponseClient for Client {
                 self.config.max_retries,
             )
             .await?;
-            serde_json::from_value::<ResponseObject>(raw).map_err(HiLlmError::from)
+            serde_json::from_value::<ResponseObject>(raw).map_err(HiLLMError::from)
         })
     }
 }

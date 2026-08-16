@@ -1,5 +1,5 @@
 use crate::client::{str_pair, Client, ModelClient};
-use crate::error::HiLlmResult;
+use crate::error::HiLLMResult;
 use crate::http;
 use crate::types::model::ModelsListResponse;
 
@@ -7,7 +7,7 @@ use super::super::BoxFuture;
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 impl ModelClient for Client {
-    fn list_models(&self) -> BoxFuture<'_, HiLlmResult<ModelsListResponse>> {
+    fn list_models(&self) -> BoxFuture<'_, HiLLMResult<ModelsListResponse>> {
         Box::pin(async move {
             let url = self.provider.build_url(self.provider.models_path(), "");
             let auth_header = self.resolve_auth_header().await?;
@@ -27,7 +27,7 @@ impl ModelClient for Client {
             )
             .await?;
             self.provider.transform_response(&mut raw)?;
-            serde_json::from_value::<ModelsListResponse>(raw).map_err(crate::error::HiLlmError::from)
+            serde_json::from_value::<ModelsListResponse>(raw).map_err(crate::error::HiLLMError::from)
         })
     }
 }

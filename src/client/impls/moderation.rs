@@ -1,12 +1,12 @@
 use crate::client::{str_pair, BoxFuture, Client, ModerationClient};
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 use crate::http;
 use crate::types::moderation::{ModerationRequest, ModerationResponse};
 use crate::types::raw::RawExchange;
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 impl ModerationClient for Client {
-    fn moderate(&self, req: ModerationRequest) -> BoxFuture<'_, HiLlmResult<ModerationResponse>> {
+    fn moderate(&self, req: ModerationRequest) -> BoxFuture<'_, HiLLMResult<ModerationResponse>> {
         Box::pin(async move {
             let model = req.model.as_deref().unwrap_or_default();
             let prepared = self.prepare_request(&req, |p| p.moderations_path(), model, None)?;
@@ -37,14 +37,14 @@ impl ModerationClient for Client {
             )
             .await?;
             prepared.provider.transform_response(&mut raw)?;
-            serde_json::from_value::<ModerationResponse>(raw).map_err(HiLlmError::from)
+            serde_json::from_value::<ModerationResponse>(raw).map_err(HiLLMError::from)
         })
     }
 
     fn moderate_raw(
         &self,
         req: ModerationRequest,
-    ) -> BoxFuture<'_, HiLlmResult<RawExchange<ModerationResponse>>> {
+    ) -> BoxFuture<'_, HiLLMResult<RawExchange<ModerationResponse>>> {
         Box::pin(async move {
             let model = req.model.as_deref().unwrap_or_default();
             let prepared = self.prepare_request(&req, |p| p.moderations_path(), model, None)?;
@@ -79,7 +79,7 @@ impl ModerationClient for Client {
             let raw_response = Some(raw.clone());
             prepared.provider.transform_response(&mut raw)?;
             let data =
-                serde_json::from_value::<ModerationResponse>(raw).map_err(HiLlmError::from)?;
+                serde_json::from_value::<ModerationResponse>(raw).map_err(HiLLMError::from)?;
 
             Ok(RawExchange {
                 data,

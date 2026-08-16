@@ -1,12 +1,12 @@
 use super::super::{BoxFuture, Client, EmbeddingClient, str_pair};
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 use crate::http;
 use crate::types::embedding::{EmbeddingRequest, EmbeddingResponse};
 use crate::types::raw::RawExchange;
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 impl EmbeddingClient for Client {
-    fn embed(&self, req: EmbeddingRequest) -> BoxFuture<'_, HiLlmResult<EmbeddingResponse>> {
+    fn embed(&self, req: EmbeddingRequest) -> BoxFuture<'_, HiLLMResult<EmbeddingResponse>> {
         Box::pin(async move {
             let prepared = self.prepare_request(&req, |p| p.embeddings_path(), &req.model, None)?;
 
@@ -36,14 +36,14 @@ impl EmbeddingClient for Client {
             )
             .await?;
             prepared.provider.transform_response(&mut raw)?;
-            serde_json::from_value::<EmbeddingResponse>(raw).map_err(HiLlmError::from)
+            serde_json::from_value::<EmbeddingResponse>(raw).map_err(HiLLMError::from)
         })
     }
 
     fn embed_raw(
         &self,
         req: EmbeddingRequest,
-    ) -> BoxFuture<'_, HiLlmResult<RawExchange<EmbeddingResponse>>> {
+    ) -> BoxFuture<'_, HiLLMResult<RawExchange<EmbeddingResponse>>> {
         Box::pin(async move {
             let prepared = self.prepare_request(&req, |p| p.embeddings_path(), &req.model, None)?;
             let raw_request = prepared.body_json.clone();
@@ -77,7 +77,7 @@ impl EmbeddingClient for Client {
             let raw_response = Some(raw.clone());
             prepared.provider.transform_response(&mut raw)?;
             let data =
-                serde_json::from_value::<EmbeddingResponse>(raw).map_err(HiLlmError::from)?;
+                serde_json::from_value::<EmbeddingResponse>(raw).map_err(HiLLMError::from)?;
 
             Ok(RawExchange {
                 data,

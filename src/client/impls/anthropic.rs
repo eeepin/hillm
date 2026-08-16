@@ -1,5 +1,5 @@
 use crate::client::{AnthropicMessagesClient, BoxFuture, BoxStream, Client};
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 use crate::http;
 use crate::provider;
 use crate::types::anthropic::{
@@ -13,14 +13,14 @@ impl AnthropicMessagesClient for Client {
     fn create_message(
         &self,
         req: AnthropicMessagesRequest,
-    ) -> BoxFuture<'_, HiLlmResult<AnthropicMessagesResponse>> {
+    ) -> BoxFuture<'_, HiLLMResult<AnthropicMessagesResponse>> {
         Box::pin(async move {
             // Native Messages calls require an instance bound to the
             // Anthropic Messages API type; fail before sending otherwise.
             let codec = self
                 .provider
                 .codec_for(provider::APIType::AnthropicMessages)
-                .ok_or_else(|| HiLlmError::EndpointNotSupported {
+                .ok_or_else(|| HiLLMError::EndpointNotSupported {
                     endpoint: "messages".to_string(),
                     provider: self.provider.name().to_string(),
                 })?;
@@ -63,19 +63,19 @@ impl AnthropicMessagesClient for Client {
             let raw_bytes_vec = serde_json::to_vec(&raw_bytes)?;
             let response_value = codec.decode_response(&raw_bytes_vec)?;
             serde_json::from_value::<AnthropicMessagesResponse>(response_value)
-                .map_err(HiLlmError::from)
+                .map_err(HiLLMError::from)
         })
     }
 
     fn create_message_stream(
         &self,
         req: AnthropicMessagesRequest,
-    ) -> BoxFuture<'_, HiLlmResult<BoxStream<'static, HiLlmResult<AnthropicStreamEvent>>>> {
+    ) -> BoxFuture<'_, HiLLMResult<BoxStream<'static, HiLLMResult<AnthropicStreamEvent>>>> {
         Box::pin(async move {
             let codec = self
                 .provider
                 .codec_for(provider::APIType::AnthropicMessages)
-                .ok_or_else(|| HiLlmError::EndpointNotSupported {
+                .ok_or_else(|| HiLLMError::EndpointNotSupported {
                     endpoint: "messages".to_string(),
                     provider: self.provider.name().to_string(),
                 })?;
@@ -109,7 +109,7 @@ impl AnthropicMessagesClient for Client {
                     .parse_stream_event(data)?
                     .map(serde_json::from_value::<AnthropicStreamEvent>)
                     .transpose()
-                    .map_err(HiLlmError::from)
+                    .map_err(HiLLMError::from)
             };
             let stream = http::stream::post_typed_stream(
                 &self.http_client,

@@ -14,7 +14,7 @@ use super::hash::{ExactHashStrategy, HashKeyInput, HashKeyStrategy};
 use super::types::{LlmRequest, LlmRequestKind, LlmResponse};
 use crate::client::BoxFuture;
 use crate::embedding::EmbeddingProvider;
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 use crate::observability::usage::CacheState;
 use crate::tower::cache_policy::{
     CacheDecision, CachePolicy, CachePolicyContext, StandardCachePolicy,
@@ -64,7 +64,7 @@ pub enum CachedResponse {
     Chat(ChatCompletionResponse),
     Embed(EmbeddingResponse),
     Error {
-        error: Arc<HiLlmError>,
+        error: Arc<HiLLMError>,
         expires_at: Instant,
     },
 }
@@ -98,13 +98,13 @@ impl<'de> Deserialize<'de> for CachedResponse {
 }
 
 impl CachedResponse {
-    pub fn into_llm_response(self) -> HiLlmResult<LlmResponse> {
+    pub fn into_llm_response(self) -> HiLLMResult<LlmResponse> {
         match self {
             Self::Chat(r) => Ok(LlmResponse::Chat(r)),
             Self::Embed(r) => Ok(LlmResponse::Embed(r)),
             Self::Error { error, .. } => {
                 Err(
-                    Arc::try_unwrap(error).unwrap_or_else(|arc| HiLlmError::InternalError {
+                    Arc::try_unwrap(error).unwrap_or_else(|arc| HiLLMError::InternalError {
                         message: arc.to_string(),
                     }),
                 )
@@ -517,14 +517,14 @@ fn strategy_key(strategy: &dyn HashKeyStrategy, req: &LlmRequest) -> Option<(u64
 
 impl<S> Service<LlmRequest> for CacheService<S>
 where
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Clone + Send + 'static,
+    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Clone + Send + 'static,
     S::Future: Send + 'static,
 {
     type Response = LlmResponse;
-    type Error = HiLlmError;
-    type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+    type Error = HiLLMError;
+    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         self.inner.poll_ready(cx)
     }
 
@@ -800,7 +800,7 @@ mod tests {
 
         let key = 12345u64;
         let body = "test request".to_string();
-        let error = Arc::new(HiLlmError::InternalError {
+        let error = Arc::new(HiLLMError::InternalError {
             message: "test error".to_string(),
         });
         let expires_at = Instant::now() + Duration::from_secs(60);
@@ -828,7 +828,7 @@ mod tests {
 
         let key = 12345u64;
         let body = "test request".to_string();
-        let error = Arc::new(HiLlmError::InternalError {
+        let error = Arc::new(HiLLMError::InternalError {
             message: "test error".to_string(),
         });
         let expires_at = Instant::now() + Duration::from_secs(1);

@@ -1,12 +1,12 @@
 use crate::client::{str_pair, AudioClient, BoxFuture, Client};
-use crate::error::HiLlmResult;
+use crate::error::HiLLMResult;
 use crate::http;
 use crate::types::audio::{CreateSpeechRequest, CreateTranscriptionRequest, TranscriptionResponse};
 use crate::types::raw::RawExchange;
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 impl AudioClient for Client {
-    fn speech(&self, req: CreateSpeechRequest) -> BoxFuture<'_, HiLlmResult<bytes::Bytes>> {
+    fn speech(&self, req: CreateSpeechRequest) -> BoxFuture<'_, HiLLMResult<bytes::Bytes>> {
         Box::pin(async move {
             let prepared =
                 self.prepare_request(&req, |p| p.audio_speech_path(), &req.model, None)?;
@@ -42,7 +42,7 @@ impl AudioClient for Client {
     fn transcribe(
         &self,
         req: CreateTranscriptionRequest,
-    ) -> BoxFuture<'_, HiLlmResult<TranscriptionResponse>> {
+    ) -> BoxFuture<'_, HiLLMResult<TranscriptionResponse>> {
         Box::pin(async move {
             let prepared =
                 self.prepare_request(&req, |p| p.audio_transcriptions_path(), &req.model, None)?;
@@ -73,14 +73,14 @@ impl AudioClient for Client {
             )
             .await?;
             prepared.provider.transform_response(&mut raw)?;
-            serde_json::from_value::<TranscriptionResponse>(raw).map_err(crate::error::HiLlmError::from)
+            serde_json::from_value::<TranscriptionResponse>(raw).map_err(crate::error::HiLLMError::from)
         })
     }
 
     fn transcribe_raw(
         &self,
         req: CreateTranscriptionRequest,
-    ) -> BoxFuture<'_, HiLlmResult<RawExchange<TranscriptionResponse>>> {
+    ) -> BoxFuture<'_, HiLLMResult<RawExchange<TranscriptionResponse>>> {
         Box::pin(async move {
             let prepared =
                 self.prepare_request(&req, |p| p.audio_transcriptions_path(), &req.model, None)?;
@@ -115,7 +115,7 @@ impl AudioClient for Client {
             let raw_response = Some(raw.clone());
             prepared.provider.transform_response(&mut raw)?;
             let data =
-                serde_json::from_value::<TranscriptionResponse>(raw).map_err(crate::error::HiLlmError::from)?;
+                serde_json::from_value::<TranscriptionResponse>(raw).map_err(crate::error::HiLLMError::from)?;
 
             Ok(RawExchange {
                 data,

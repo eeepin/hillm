@@ -5,7 +5,7 @@ use secrecy::SecretString;
 
 use crate::auth::CredentialProvider;
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 use crate::http::transport::TransportConfig;
 use crate::provider::APIType;
 use crate::provider::outbound_policy::OutboundPolicyValidator;
@@ -186,18 +186,18 @@ impl ClientConfigBuilder {
     }
 
     #[cfg(any(feature = "default-http", feature = "wasm-http"))]
-    pub fn header(mut self, key: impl Into<String>, value: impl Into<String>) -> HiLlmResult<Self> {
+    pub fn header(mut self, key: impl Into<String>, value: impl Into<String>) -> HiLLMResult<Self> {
         let key = key.into();
         let value = value.into();
 
         reqwest::header::HeaderName::from_bytes(key.as_bytes()).map_err(|e| {
-            HiLlmError::InvalidHeader {
+            HiLLMError::InvalidHeader {
                 name: key.clone(),
                 reason: e.to_string(),
             }
         })?;
 
-        reqwest::header::HeaderValue::from_str(&value).map_err(|e| HiLlmError::InvalidHeader {
+        reqwest::header::HeaderValue::from_str(&value).map_err(|e| HiLLMError::InvalidHeader {
             name: key.clone(),
             reason: e.to_string(),
         })?;

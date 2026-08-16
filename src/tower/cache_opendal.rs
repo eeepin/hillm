@@ -7,7 +7,7 @@ use opendal::Operator;
 use serde::{Deserialize, Serialize};
 
 use super::cache::{CacheStore, CachedResponse};
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 
 #[derive(Serialize, Deserialize)]
 struct StoredEntry {
@@ -36,9 +36,9 @@ impl OpenDalCacheStore {
         config: HashMap<String, String>,
         prefix: impl Into<String>,
         ttl: Duration,
-    ) -> HiLlmResult<Self> {
+    ) -> HiLLMResult<Self> {
         let operator =
-            Operator::via_iter(scheme, config).map_err(|e| HiLlmError::InternalError {
+            Operator::via_iter(scheme, config).map_err(|e| HiLLMError::InternalError {
                 message: format!("failed to build OpenDAL operator for '{scheme}': {e}"),
             })?;
         Ok(Self::new(operator, prefix, ttl))

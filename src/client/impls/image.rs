@@ -1,5 +1,5 @@
 use crate::client::{str_pair, BoxFuture, Client, ImageClient};
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 use crate::http;
 use crate::types::image::{CreateImageRequest, ImagesResponse};
 use crate::types::raw::RawExchange;
@@ -9,7 +9,7 @@ impl ImageClient for Client {
     fn image_generate(
         &self,
         req: CreateImageRequest,
-    ) -> BoxFuture<'_, HiLlmResult<ImagesResponse>> {
+    ) -> BoxFuture<'_, HiLLMResult<ImagesResponse>> {
         Box::pin(async move {
             let model = req.model.as_deref().unwrap_or_default();
             let prepared =
@@ -41,14 +41,14 @@ impl ImageClient for Client {
             )
             .await?;
             prepared.provider.transform_response(&mut raw)?;
-            serde_json::from_value::<ImagesResponse>(raw).map_err(HiLlmError::from)
+            serde_json::from_value::<ImagesResponse>(raw).map_err(HiLLMError::from)
         })
     }
 
     fn image_generate_raw(
         &self,
         req: CreateImageRequest,
-    ) -> BoxFuture<'_, HiLlmResult<RawExchange<ImagesResponse>>> {
+    ) -> BoxFuture<'_, HiLLMResult<RawExchange<ImagesResponse>>> {
         Box::pin(async move {
             let model = req.model.as_deref().unwrap_or_default();
             let prepared =
@@ -83,7 +83,7 @@ impl ImageClient for Client {
 
             let raw_response = Some(raw.clone());
             prepared.provider.transform_response(&mut raw)?;
-            let data = serde_json::from_value::<ImagesResponse>(raw).map_err(HiLlmError::from)?;
+            let data = serde_json::from_value::<ImagesResponse>(raw).map_err(HiLLMError::from)?;
 
             Ok(RawExchange {
                 data,

@@ -6,7 +6,7 @@ use futures_core::Stream;
 use pin_project_lite::pin_project;
 
 use crate::client::BoxStream;
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 use crate::types::ChatCompletionChunk;
 use crate::util::bound::EVENT_STREAM_BUFFER_MAX_BYTES;
 
@@ -36,9 +36,9 @@ pub async fn post_eventstream<P>(
     body: Bytes,
     max_retries: u32,
     parse_event: P,
-) -> HiLlmResult<BoxStream<'static, HiLlmResult<ChatCompletionChunk>>>
+) -> HiLLMResult<BoxStream<'static, HiLLMResult<ChatCompletionChunk>>>
 where
-    P: Fn(&str, &str) -> HiLlmResult<Option<ChatCompletionChunk>> + Send + 'static,
+    P: Fn(&str, &str) -> HiLLMResult<Option<ChatCompletionChunk>> + Send + 'static,
 {
     let mut retry_count = 0u32;
 
@@ -75,25 +75,25 @@ struct EventHeader {
     value: String,
 }
 
-fn parse_headers(mut data: &[u8]) -> HiLlmResult<Vec<EventHeader>> {
+fn parse_headers(mut data: &[u8]) -> HiLLMResult<Vec<EventHeader>> {
     let mut headers = Vec::new();
     while !data.is_empty() {
         let name_len = data[0] as usize;
         data = &data[1..];
         if data.len() < name_len {
-            return Err(HiLlmError::Streaming {
+            return Err(HiLLMError::Streaming {
                 message: "EventStream header name truncated".into(),
             });
         }
         let name = std::str::from_utf8(&data[..name_len])
-            .map_err(|_| HiLlmError::Streaming {
+            .map_err(|_| HiLLMError::Streaming {
                 message: "EventStream header name is not UTF-8".into(),
             })?
             .to_owned();
         data = &data[name_len..];
 
         if data.is_empty() {
-            return Err(HiLlmError::Streaming {
+            return Err(HiLLMError::Streaming {
                 message: "EventStream header type byte missing".into(),
             });
         }
@@ -103,19 +103,19 @@ fn parse_headers(mut data: &[u8]) -> HiLlmResult<Vec<EventHeader>> {
         if value_type == HEADER_TYPE_STRING {
             // String: 2-byte big-endian length + UTF-8 value.
             if data.len() < 2 {
-                return Err(HiLlmError::Streaming {
+                return Err(HiLLMError::Streaming {
                     message: "EventStream string header length truncated".into(),
                 });
             }
             let value_len = u16::from_be_bytes([data[0], data[1]]) as usize;
             data = &data[2..];
             if data.len() < value_len {
-                return Err(HiLlmError::Streaming {
+                return Err(HiLLMError::Streaming {
                     message: "EventStream string header value truncated".into(),
                 });
             }
             let value = std::str::from_utf8(&data[..value_len])
-                .map_err(|_| HiLlmError::Streaming {
+                .map_err(|_| HiLLMError::Streaming {
                     message: "EventStream header value is not UTF-8".into(),
                 })?
                 .to_owned();
@@ -135,7 +135,7 @@ fn parse_headers(mut data: &[u8]) -> HiLlmResult<Vec<EventHeader>> {
                 6 => {
                     // bytes: 2-byte length prefix
                     if data.len() < 2 {
-                        return Err(HiLlmError::Streaming {
+                        return Err(HiLLMError::Streaming {
                             message: "EventStream bytes header length truncated".into(),
                         });
                     }
@@ -145,13 +145,13 @@ fn parse_headers(mut data: &[u8]) -> HiLlmResult<Vec<EventHeader>> {
                 8 => 8,  // timestamp
                 9 => 16, // uuid
                 _ => {
-                    return Err(HiLlmError::Streaming {
+                    return Err(HiLLMError::Streaming {
                         message: format!("unknown EventStream header type: {value_type}"),
                     });
                 }
             };
             if data.len() < skip {
-                return Err(HiLlmError::Streaming {
+                return Err(HiLLMError::Streaming {
                     message: "EventStream header value data truncated".into(),
                 });
             }
@@ -213,9 +213,9 @@ impl<S, P> EventStreamParser<S, P> {
 impl<S, P> Stream for EventStreamParser<S, P>
 where
     S: Stream<Item = std::result::Result<bytes::Bytes, reqwest::Error>>,
-    P: Fn(&str, &str) -> HiLlmResult<Option<ChatCompletionChunk>>,
+    P: Fn(&str, &str) -> HiLLMResult<Option<ChatCompletionChunk>>,
 {
-    type Item = HiLlmResult<ChatCompletionChunk>;
+    type Item = HiLLMResult<ChatCompletionChunk>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
@@ -230,7 +230,7 @@ where
                 ]) as usize;
 
                 if !(MIN_FRAME_SIZE..=EVENT_STREAM_BUFFER_MAX_BYTES).contains(&total_length) {
-                    return Poll::Ready(Some(Err(HiLlmError::Streaming {
+                    return Poll::Ready(Some(Err(HiLLMError::Streaming {
                         message: format!(
                             "EventStream frame size {total_length} is out of range [{MIN_FRAME_SIZE}, {EVENT_STREAM_BUFFER_MAX_BYTES}]"
                         ),
@@ -248,7 +248,7 @@ where
                         u32::from_be_bytes([frame[8], frame[9], frame[10], frame[11]]);
                     let prelude_crc_actual = crc32(&frame[..8]);
                     if prelude_crc_expected != prelude_crc_actual {
-                        return Poll::Ready(Some(Err(HiLlmError::Streaming {
+                        return Poll::Ready(Some(Err(HiLLMError::Streaming {
                             message: format!(
                                 "EventStream prelude CRC mismatch: expected {prelude_crc_expected:#010X}, got {prelude_crc_actual:#010X}"
                             ),
@@ -263,7 +263,7 @@ where
                     ]);
                     let message_crc_actual = crc32(&frame[..total_length - 4]);
                     if message_crc_expected != message_crc_actual {
-                        return Poll::Ready(Some(Err(HiLlmError::Streaming {
+                        return Poll::Ready(Some(Err(HiLLMError::Streaming {
                             message: format!(
                                 "EventStream message CRC mismatch: expected {message_crc_expected:#010X}, got {message_crc_actual:#010X}"
                             ),
@@ -273,7 +273,7 @@ where
                     let headers_start = 12;
                     let headers_end = headers_start + headers_length;
                     if headers_end > total_length - 4 {
-                        return Poll::Ready(Some(Err(HiLlmError::Streaming {
+                        return Poll::Ready(Some(Err(HiLLMError::Streaming {
                             message: "EventStream headers extend past frame boundary".into(),
                         })));
                     }
@@ -296,7 +296,7 @@ where
                     if message_type == "exception" {
                         let payload = &frame[headers_end..total_length - 4];
                         let payload_str = std::str::from_utf8(payload).unwrap_or("<binary>");
-                        return Poll::Ready(Some(Err(HiLlmError::Streaming {
+                        return Poll::Ready(Some(Err(HiLLMError::Streaming {
                             message: format!(
                                 "Bedrock EventStream exception ({event_type}): {payload_str}"
                             ),
@@ -311,7 +311,7 @@ where
                     let payload_str = match std::str::from_utf8(payload) {
                         Ok(s) => s,
                         Err(e) => {
-                            return Poll::Ready(Some(Err(HiLlmError::Streaming {
+                            return Poll::Ready(Some(Err(HiLLMError::Streaming {
                                 message: format!("EventStream payload is not UTF-8: {e}"),
                             })));
                         }
@@ -331,7 +331,7 @@ where
                 if !this.buffer.is_empty() {
                     let leftover = this.buffer.len();
                     this.buffer.clear();
-                    return Poll::Ready(Some(Err(HiLlmError::Streaming {
+                    return Poll::Ready(Some(Err(HiLLMError::Streaming {
                         message: format!(
                             "EventStream ended with {leftover} bytes of incomplete frame data"
                         ),
@@ -344,7 +344,7 @@ where
                 Poll::Ready(Some(Ok(bytes))) => {
                     if this.buffer.len() + bytes.len() > EVENT_STREAM_BUFFER_MAX_BYTES {
                         *this.done = true;
-                        return Poll::Ready(Some(Err(HiLlmError::Streaming {
+                        return Poll::Ready(Some(Err(HiLLMError::Streaming {
                             message: format!(
                                 "EventStream buffer exceeded {EVENT_STREAM_BUFFER_MAX_BYTES} bytes"
                             ),
@@ -353,7 +353,7 @@ where
                     this.buffer.extend_from_slice(&bytes);
                 }
                 Poll::Ready(Some(Err(e))) => {
-                    return Poll::Ready(Some(Err(HiLlmError::from(e))));
+                    return Poll::Ready(Some(Err(HiLLMError::from(e))));
                 }
                 Poll::Ready(None) => {
                     *this.done = true;

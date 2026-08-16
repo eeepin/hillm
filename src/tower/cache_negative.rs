@@ -7,10 +7,10 @@ use tower::{Layer, Service};
 use super::cache::{CacheStore, CachedResponse, InMemoryStore, hash_key};
 use super::types::{LlmRequest, LlmResponse};
 use crate::client::BoxFuture;
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 
 pub trait NegativeCachePolicy: Send + Sync + 'static {
-    fn cache_for(&self, error: &HiLlmError) -> Option<Duration>;
+    fn cache_for(&self, error: &HiLLMError) -> Option<Duration>;
 }
 
 pub struct FixedWindowNegativeCache {
@@ -38,7 +38,7 @@ impl Default for FixedWindowNegativeCache {
 }
 
 impl NegativeCachePolicy for FixedWindowNegativeCache {
-    fn cache_for(&self, error: &HiLlmError) -> Option<Duration> {
+    fn cache_for(&self, error: &HiLLMError) -> Option<Duration> {
         let eligible = if self.retryable_only {
             error.is_transient()
         } else {
@@ -108,14 +108,14 @@ impl<P: NegativeCachePolicy, S: Clone> Clone for NegativeCacheService<P, S> {
 impl<P, S> Service<LlmRequest> for NegativeCacheService<P, S>
 where
     P: NegativeCachePolicy,
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Send + 'static,
+    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Send + 'static,
     S::Future: Send + 'static,
 {
     type Response = LlmResponse;
-    type Error = HiLlmError;
-    type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+    type Error = HiLLMError;
+    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         self.inner.poll_ready(cx)
     }
 
@@ -133,7 +133,7 @@ where
             {
                 let expires_at = Instant::now() + window;
                 let cached_err = CachedResponse::Error {
-                    error: Arc::new(HiLlmError::InternalError {
+                    error: Arc::new(HiLLMError::InternalError {
                         message: err.to_string(),
                     }),
                     expires_at,
@@ -218,10 +218,10 @@ mod tests {
 
     impl Service<LlmRequest> for MockService {
         type Response = LlmResponse;
-        type Error = HiLlmError;
-        type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+        type Error = HiLLMError;
+        type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
 
-        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
             Poll::Ready(Ok(()))
         }
 
@@ -230,7 +230,7 @@ mod tests {
             let should_fail = self.should_fail;
             Box::pin(async move {
                 if should_fail {
-                    Err(HiLlmError::ServiceUnavailable {
+                    Err(HiLLMError::ServiceUnavailable {
                         message: "transient".to_string(),
                         status: 503,
                     })
@@ -244,7 +244,7 @@ mod tests {
     #[test]
     fn fixed_window_policy_caches_transient_errors() {
         let policy = FixedWindowNegativeCache::new(Duration::from_secs(10), true);
-        let transient = HiLlmError::ServiceUnavailable {
+        let transient = HiLLMError::ServiceUnavailable {
             message: "t".into(),
             status: 503,
         };
@@ -254,7 +254,7 @@ mod tests {
     #[test]
     fn fixed_window_policy_skips_terminal_when_retryable_only() {
         let policy = FixedWindowNegativeCache::new(Duration::from_secs(10), true);
-        let terminal = HiLlmError::BadRequest {
+        let terminal = HiLLMError::BadRequest {
             message: "t".into(),
             status: 400,
         };
@@ -264,7 +264,7 @@ mod tests {
     #[test]
     fn fixed_window_policy_caches_all_when_not_retryable_only() {
         let policy = FixedWindowNegativeCache::new(Duration::from_secs(10), false);
-        let terminal = HiLlmError::BadRequest {
+        let terminal = HiLLMError::BadRequest {
             message: "t".into(),
             status: 400,
         };

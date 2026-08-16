@@ -11,7 +11,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::time::SystemTime;
 
-use crate::error::HiLlmResult;
+use crate::error::HiLLMResult;
 
 #[derive(Debug, Clone)]
 pub struct VectorMetadata {
@@ -42,12 +42,12 @@ pub trait VectorStore: Send + Sync + 'static {
         id: String,
         vec: Vec<f32>,
         metadata: VectorMetadata,
-    ) -> Pin<Box<dyn Future<Output = HiLlmResult<()>> + Send + 'a>>;
+    ) -> Pin<Box<dyn Future<Output = HiLLMResult<()>> + Send + 'a>>;
 
     fn delete<'a>(
         &'a self,
         id: &'a str,
-    ) -> Pin<Box<dyn Future<Output = HiLlmResult<()>> + Send + 'a>>;
+    ) -> Pin<Box<dyn Future<Output = HiLLMResult<()>> + Send + 'a>>;
 
     fn dim(&self) -> usize;
 }

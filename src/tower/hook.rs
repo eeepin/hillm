@@ -14,7 +14,7 @@ use tower::Service;
 use super::cache::CACHE_STATE_CELL;
 use super::types::{LlmRequest, LlmResponse};
 use crate::client::BoxFuture;
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 use crate::observability::usage::{
     CacheState, UsageEvent, UsageEventOutcome, UsageSink, UsageSinkErased,
 };
@@ -28,7 +28,7 @@ pub trait LlmHook: Send + Sync + 'static {
     fn on_request(
         &self,
         _req: &LlmRequest,
-    ) -> Pin<Box<dyn Future<Output = HiLlmResult<()>> + Send + '_>> {
+    ) -> Pin<Box<dyn Future<Output = HiLLMResult<()>> + Send + '_>> {
         Box::pin(async { Ok(()) })
     }
 
@@ -45,7 +45,7 @@ pub trait LlmHook: Send + Sync + 'static {
     fn on_error(
         &self,
         _req: &LlmRequest,
-        _err: &HiLlmError,
+        _err: &HiLLMError,
     ) -> Pin<Box<dyn Future<Output = ()> + Send + '_>> {
         Box::pin(async {})
     }
@@ -113,14 +113,14 @@ impl<S: Clone> Clone for HooksService<S> {
 
 impl<S> Service<LlmRequest> for HooksService<S>
 where
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Send + 'static,
+    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Send + 'static,
     S::Future: Send + 'static,
 {
     type Response = LlmResponse;
-    type Error = HiLlmError;
-    type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+    type Error = HiLLMError;
+    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         self.inner.poll_ready(cx)
     }
 
@@ -141,7 +141,7 @@ where
                     Ok(Err(e)) => return Err(e),
                     Err(_panic) => {
                         tracing::error!("hook panicked during on_request");
-                        return Err(HiLlmError::HookRejected {
+                        return Err(HiLLMError::HookRejected {
                             message: "hook panicked".into(),
                         });
                     }
@@ -315,9 +315,9 @@ fn request_id(req: &LlmRequest) -> String {
     })
 }
 
-fn classify_error_outcome(err: &HiLlmError) -> UsageEventOutcome {
+fn classify_error_outcome(err: &HiLLMError) -> UsageEventOutcome {
     match err {
-        HiLlmError::Timeout => UsageEventOutcome::TimedOut,
+        HiLLMError::Timeout => UsageEventOutcome::TimedOut,
         _ => UsageEventOutcome::Error,
     }
 }

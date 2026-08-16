@@ -5,7 +5,7 @@ use tower::Service;
 
 use super::types::{LlmRequest, LlmResponse};
 use crate::client::BoxFuture;
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 
 pub struct FallbackLayer<F> {
     fallback: F,
@@ -52,16 +52,16 @@ where
 
 impl<S, F> Service<LlmRequest> for FallbackService<S, F>
 where
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Send + 'static,
+    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Send + 'static,
     S::Future: Send + 'static,
-    F: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Clone + Send + 'static,
+    F: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Clone + Send + 'static,
     F::Future: Send + 'static,
 {
     type Response = LlmResponse;
-    type Error = HiLlmError;
-    type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+    type Error = HiLLMError;
+    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         match self.primary.poll_ready(cx) {
             Poll::Pending => return Poll::Pending,
             Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
@@ -166,10 +166,10 @@ mod tests {
 
     impl Service<LlmRequest> for MockService {
         type Response = LlmResponse;
-        type Error = HiLlmError;
-        type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+        type Error = HiLLMError;
+        type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
 
-        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
             Poll::Ready(Ok(()))
         }
 
@@ -178,7 +178,7 @@ mod tests {
             let should_fail = self.should_fail;
             Box::pin(async move {
                 if should_fail {
-                    Err(HiLlmError::ServiceUnavailable {
+                    Err(HiLLMError::ServiceUnavailable {
                         message: "mock transient failure".to_string(),
                         status: 503,
                     })
@@ -194,16 +194,16 @@ mod tests {
 
     impl Service<LlmRequest> for TerminalFailService {
         type Response = LlmResponse;
-        type Error = HiLlmError;
-        type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+        type Error = HiLLMError;
+        type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
 
-        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
             Poll::Ready(Ok(()))
         }
 
         fn call(&mut self, _req: LlmRequest) -> Self::Future {
             Box::pin(async move {
-                Err(HiLlmError::BadRequest {
+                Err(HiLLMError::BadRequest {
                     message: "terminal failure".to_string(),
                     status: 400,
                 })

@@ -22,7 +22,7 @@ use bedrock::BedrockProvider;
 use datadriven::ConfigDrivenProvider;
 use openai::OpenAIProvider;
 
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 use crate::types::{ChatCompletionChunk, Modality};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -445,11 +445,11 @@ impl ProviderConfig {
 
     /// Validates the API type configuration.
     /// Returns an error if `default_api_type` is set but not in `available_api_types`.
-    pub fn validate_api_types(&self) -> HiLlmResult<()> {
+    pub fn validate_api_types(&self) -> HiLLMResult<()> {
         if let Some(default) = self.default_api_type {
             let available = self.effective_api_types();
             if !available.contains(&default) {
-                return Err(HiLlmError::BadRequest {
+                return Err(HiLLMError::BadRequest {
                     message: format!(
                         "default_api_type '{default}' is not in available_api_types {:?}",
                         available
@@ -531,7 +531,7 @@ pub(crate) trait Provider: Send + Sync {
         None
     }
 
-    fn validate(&self) -> HiLlmResult<()> {
+    fn validate(&self) -> HiLLMResult<()> {
         Ok(())
     }
 
@@ -601,11 +601,11 @@ pub(crate) trait Provider: Send + Sync {
 
     // --- Legacy request/response transforms ---
 
-    fn transform_request(&self, _body: &mut serde_json::Value) -> HiLlmResult<()> {
+    fn transform_request(&self, _body: &mut serde_json::Value) -> HiLLMResult<()> {
         Ok(())
     }
 
-    fn transform_response(&self, _body: &mut serde_json::Value) -> HiLlmResult<()> {
+    fn transform_response(&self, _body: &mut serde_json::Value) -> HiLLMResult<()> {
         Ok(())
     }
 
@@ -615,13 +615,13 @@ pub(crate) trait Provider: Send + Sync {
         StreamFormat::SSE
     }
 
-    fn parse_stream_event(&self, data: &str) -> HiLlmResult<Option<ChatCompletionChunk>> {
+    fn parse_stream_event(&self, data: &str) -> HiLLMResult<Option<ChatCompletionChunk>> {
         if data == "[DONE]" {
             return Ok(None);
         }
         serde_json::from_str(data)
             .map(Some)
-            .map_err(|e| HiLlmError::Streaming {
+            .map_err(|e| HiLLMError::Streaming {
                 message: format!("Failed to parse stream event: {e}"),
             })
     }
@@ -673,7 +673,7 @@ pub(crate) fn get_provider(name: &str) -> Option<Box<dyn Provider>> {
 pub(crate) fn create_provider(
     name: &str,
     api_type: APIType,
-) -> Result<Box<dyn Provider>, HiLlmError> {
+) -> Result<Box<dyn Provider>, HiLLMError> {
     // Custom providers are detected with an API type filter so that a
     // registered custom provider which does not support the requested API
     // type is not silently returned (and, when the name does not match a
@@ -703,12 +703,12 @@ pub(crate) fn create_provider(
         _ => {}
     }
 
-    let provider = get_provider(name).ok_or_else(|| HiLlmError::ProviderNotFound {
+    let provider = get_provider(name).ok_or_else(|| HiLLMError::ProviderNotFound {
         name: name.to_string(),
     })?;
 
     if !provider.available_api_types().contains(&api_type) {
-        return Err(HiLlmError::APITypeUnsupported {
+        return Err(HiLLMError::APITypeUnsupported {
             api_type: api_type.to_string(),
             provider: provider.name().to_string(),
         });
@@ -733,8 +733,8 @@ pub(crate) fn codec_for_api_type(api_type: APIType) -> Option<Box<dyn codec::API
 }
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
-pub async fn all_providers() -> HiLlmResult<Vec<ProviderConfig>> {
-    let registry = registry().await.map_err(|e| HiLlmError::InternalError {
+pub async fn all_providers() -> HiLLMResult<Vec<ProviderConfig>> {
+    let registry = registry().await.map_err(|e| HiLLMError::InternalError {
         message: e.to_string(),
     })?;
     Ok(registry
@@ -744,8 +744,8 @@ pub async fn all_providers() -> HiLlmResult<Vec<ProviderConfig>> {
 }
 
 #[cfg(not(any(feature = "default-http", feature = "wasm-http")))]
-pub fn all_providers() -> HiLlmResult<Vec<ProviderConfig>> {
-    let registry = registry().map_err(|e| HiLlmError::InternalError {
+pub fn all_providers() -> HiLLMResult<Vec<ProviderConfig>> {
+    let registry = registry().map_err(|e| HiLLMError::InternalError {
         message: e.to_string(),
     })?;
     Ok(registry
@@ -978,7 +978,7 @@ mod tests {
         let result = create_provider("openai", APIType::AnthropicMessages);
         assert!(result.is_err());
         if let Err(err) = result {
-            assert!(matches!(err, HiLlmError::APITypeUnsupported { .. }));
+            assert!(matches!(err, HiLLMError::APITypeUnsupported { .. }));
             let msg = err.to_string();
             assert!(msg.contains("openai"));
         }
@@ -1003,7 +1003,7 @@ mod tests {
         let result = create_provider("anthropic", APIType::OpenAIResponses);
         assert!(result.is_err());
         if let Err(err) = result {
-            assert!(matches!(err, HiLlmError::APITypeUnsupported { .. }));
+            assert!(matches!(err, HiLLMError::APITypeUnsupported { .. }));
         }
     }
 
@@ -1020,7 +1020,7 @@ mod tests {
         let result = create_provider("nonexistent_provider", APIType::OpenAIChatCompletions);
         assert!(result.is_err());
         if let Err(err) = result {
-            assert!(matches!(err, HiLlmError::ProviderNotFound { .. }));
+            assert!(matches!(err, HiLLMError::ProviderNotFound { .. }));
         }
     }
 }

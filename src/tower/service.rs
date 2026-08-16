@@ -11,7 +11,7 @@ use crate::client::{
     AudioClient, BoxFuture, ChatCompletionClient, EmbeddingClient, ImageClient, ModelClient,
     ModerationClient, OcrClient, RerankClient, SearchClient,
 };
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 use crate::types::ChatCompletionChunk;
 
 pub struct LlmService<C> {
@@ -60,10 +60,10 @@ where
         + 'static,
 {
     type Response = LlmResponse;
-    type Error = HiLlmError;
-    type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+    type Error = HiLLMError;
+    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
 
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         Poll::Ready(Ok(()))
     }
 
@@ -80,7 +80,7 @@ where
                     let chunks = collect_stream(stream).await?;
                     let static_stream: crate::client::BoxStream<
                         'static,
-                        HiLlmResult<ChatCompletionChunk>,
+                        HiLLMResult<ChatCompletionChunk>,
                     > = Box::pin(OwnedChunksStream { chunks });
                     Ok(LlmResponse::ChatStream(static_stream))
                 }
@@ -126,8 +126,8 @@ where
 }
 
 async fn collect_stream<'a>(
-    mut stream: crate::client::BoxStream<'a, HiLlmResult<ChatCompletionChunk>>,
-) -> HiLlmResult<VecDeque<ChatCompletionChunk>> {
+    mut stream: crate::client::BoxStream<'a, HiLLMResult<ChatCompletionChunk>>,
+) -> HiLLMResult<VecDeque<ChatCompletionChunk>> {
     let mut chunks = VecDeque::new();
     loop {
         let item = std::future::poll_fn(|cx| Pin::as_mut(&mut stream).poll_next(cx)).await;
@@ -145,7 +145,7 @@ struct OwnedChunksStream {
 }
 
 impl Stream for OwnedChunksStream {
-    type Item = HiLlmResult<ChatCompletionChunk>;
+    type Item = HiLLMResult<ChatCompletionChunk>;
 
     fn poll_next(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         Poll::Ready(self.chunks.pop_front().map(Ok))

@@ -5,7 +5,7 @@ use tower::{Layer, Service, ServiceExt as _};
 
 use super::types::{LlmRequest, LlmResponse};
 use crate::client::BoxFuture;
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RetryClass {
@@ -14,14 +14,14 @@ pub enum RetryClass {
 }
 
 pub trait RetryPolicy: Send + Sync + 'static {
-    fn classify(&self, error: &HiLlmError) -> RetryClass;
+    fn classify(&self, error: &HiLLMError) -> RetryClass;
 }
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DefaultRetryPolicy;
 
 impl RetryPolicy for DefaultRetryPolicy {
-    fn classify(&self, error: &HiLlmError) -> RetryClass {
+    fn classify(&self, error: &HiLLMError) -> RetryClass {
         if error.is_transient() {
             RetryClass::Transient
         } else {
@@ -100,7 +100,7 @@ impl<S: Clone, R: RetryPolicy> Clone for FallbackChainService<S, R> {
 
 impl<S, R> Service<LlmRequest> for FallbackChainService<S, R>
 where
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError>
+    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError>
         + Clone
         + Send
         + Sync
@@ -109,10 +109,10 @@ where
     R: RetryPolicy,
 {
     type Response = LlmResponse;
-    type Error = HiLlmError;
-    type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+    type Error = HiLLMError;
+    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
 
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         Poll::Ready(Ok(()))
     }
 
@@ -125,13 +125,13 @@ where
             tracing::debug!(chain_len, "fallback chain: starting walk");
 
             if chain.is_empty() {
-                return Err(HiLlmError::ServerError {
+                return Err(HiLLMError::ServerError {
                     message: "fallback chain is empty".into(),
                     status: 500,
                 });
             }
 
-            let mut last_err: Option<HiLlmError> = None;
+            let mut last_err: Option<HiLLMError> = None;
 
             for (attempt, svc_template) in chain.iter().enumerate() {
                 let mut svc = svc_template.clone();
@@ -196,7 +196,7 @@ where
                 }
             }
 
-            Err(last_err.unwrap_or(HiLlmError::ServerError {
+            Err(last_err.unwrap_or(HiLLMError::ServerError {
                 message: "fallback chain exhausted all services".into(),
                 status: 503,
             }))
@@ -303,10 +303,10 @@ mod tests {
 
     impl Service<LlmRequest> for MockService {
         type Response = LlmResponse;
-        type Error = HiLlmError;
-        type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+        type Error = HiLLMError;
+        type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
 
-        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
             Poll::Ready(Ok(()))
         }
 
@@ -317,11 +317,11 @@ mod tests {
             Box::pin(async move {
                 match behavior {
                     MockBehavior::Success => Ok(create_chat_response(&format!("{label} ok"))),
-                    MockBehavior::TransientFail => Err(HiLlmError::ServiceUnavailable {
+                    MockBehavior::TransientFail => Err(HiLLMError::ServiceUnavailable {
                         message: format!("{label} transient"),
                         status: 503,
                     }),
-                    MockBehavior::TerminalFail => Err(HiLlmError::BadRequest {
+                    MockBehavior::TerminalFail => Err(HiLLMError::BadRequest {
                         message: format!("{label} terminal"),
                         status: 400,
                     }),
@@ -459,11 +459,11 @@ mod tests {
     #[test]
     fn default_retry_policy_classifies_transient() {
         let policy = DefaultRetryPolicy;
-        let transient = HiLlmError::ServiceUnavailable {
+        let transient = HiLLMError::ServiceUnavailable {
             message: "t".into(),
             status: 503,
         };
-        let terminal = HiLlmError::BadRequest {
+        let terminal = HiLLMError::BadRequest {
             message: "t".into(),
             status: 400,
         };

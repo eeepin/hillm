@@ -10,12 +10,12 @@ use tower::{Layer, Service};
 use super::cache::{CachedResponse, record_cache_state};
 use super::types::{LlmRequest, LlmRequestKind, LlmResponse};
 use crate::client::BoxFuture;
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 use crate::observability::usage::CacheState;
 
 type InFlightMap = Arc<DashMap<u64, broadcast::Sender<SingleflightResult>>>;
 
-pub type SingleflightResult = std::result::Result<CachedResponse, Arc<HiLlmError>>;
+pub type SingleflightResult = std::result::Result<CachedResponse, Arc<HiLLMError>>;
 
 pub enum SingleflightHandle {
     Leader {
@@ -157,14 +157,14 @@ fn singleflight_key(req: &LlmRequest) -> Option<u64> {
 impl<C, S> Service<LlmRequest> for SingleflightService<C, S>
 where
     C: SingleflightCoordinator,
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Clone + Send + 'static,
+    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Clone + Send + 'static,
     S::Future: Send + 'static,
 {
     type Response = LlmResponse;
-    type Error = HiLlmError;
-    type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+    type Error = HiLLMError;
+    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         self.inner.poll_ready(cx)
     }
 
@@ -188,7 +188,7 @@ where
                         Ok(resp) => match resp {
                             LlmResponse::Chat(r) => Ok(CachedResponse::Chat(r.clone())),
                             LlmResponse::Embed(r) => Ok(CachedResponse::Embed(r.clone())),
-                            _ => Err(Arc::new(HiLlmError::InternalError {
+                            _ => Err(Arc::new(HiLLMError::InternalError {
                                 message: "singleflight: non-cacheable response variant in leader"
                                     .into(),
                             })),
@@ -220,14 +220,14 @@ where
                                 }
                                 Ok(Err(arc_err)) => Err(Arc::try_unwrap(arc_err)
                                     .unwrap_or_else(|arc| arc.to_singleflight_error())),
-                                Err(_) => Err(HiLlmError::InternalError {
+                                Err(_) => Err(HiLLMError::InternalError {
                                     message: "singleflight: follower lagged and retry also failed"
                                         .into(),
                                 }),
                             }
                         }
                         Err(tokio::sync::broadcast::error::RecvError::Closed) => {
-                            Err(HiLlmError::InternalError {
+                            Err(HiLLMError::InternalError {
                                 message:
                                     "singleflight: leader closed channel without sending a result"
                                         .into(),
@@ -310,10 +310,10 @@ mod tests {
 
     impl Service<LlmRequest> for MockService {
         type Response = LlmResponse;
-        type Error = HiLlmError;
-        type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+        type Error = HiLLMError;
+        type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
 
-        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
             Poll::Ready(Ok(()))
         }
 
@@ -479,17 +479,17 @@ mod tests {
 
         impl Service<LlmRequest> for FailingService {
             type Response = LlmResponse;
-            type Error = HiLlmError;
-            type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+            type Error = HiLLMError;
+            type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
 
-            fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+            fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
                 Poll::Ready(Ok(()))
             }
 
             fn call(&mut self, _req: LlmRequest) -> Self::Future {
                 Box::pin(async move {
                     sleep(Duration::from_millis(50)).await;
-                    Err(HiLlmError::InternalError {
+                    Err(HiLLMError::InternalError {
                         message: "test error".to_string(),
                     })
                 })

@@ -1,6 +1,6 @@
 //! AWS Bedrock Converse API codec implementation.
 
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 use crate::provider::APIType;
 use crate::provider::codec::APITypeCodec;
 use bytes::Bytes;
@@ -18,20 +18,20 @@ impl APITypeCodec for BedrockConverseCodec {
         "/converse"
     }
 
-    fn encode_request(&self, request: &serde_json::Value) -> HiLlmResult<Bytes> {
+    fn encode_request(&self, request: &serde_json::Value) -> HiLLMResult<Bytes> {
         Ok(Bytes::from(serde_json::to_vec(request)?))
     }
 
-    fn decode_response(&self, bytes: &[u8]) -> HiLlmResult<serde_json::Value> {
+    fn decode_response(&self, bytes: &[u8]) -> HiLLMResult<serde_json::Value> {
         Ok(serde_json::from_slice(bytes)?)
     }
 
-    fn parse_stream_event(&self, data: &str) -> HiLlmResult<Option<serde_json::Value>> {
+    fn parse_stream_event(&self, data: &str) -> HiLLMResult<Option<serde_json::Value>> {
         // Bedrock uses AWS EventStream format, not SSE
         // This is a placeholder - actual implementation would handle EventStream
         serde_json::from_str(data)
             .map(Some)
-            .map_err(|e| HiLlmError::Streaming {
+            .map_err(|e| HiLLMError::Streaming {
                 message: format!("Failed to parse BedrockStreamEvent: {}", e),
             })
     }

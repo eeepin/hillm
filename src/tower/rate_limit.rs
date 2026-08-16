@@ -8,7 +8,7 @@ use tower::{Layer, Service};
 
 use super::types::{LlmRequest, LlmResponse};
 use crate::client::BoxFuture;
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 use crate::provider::cost;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -97,14 +97,14 @@ impl<S: Clone> Clone for ModelRateLimitService<S> {
 
 impl<S> Service<LlmRequest> for ModelRateLimitService<S>
 where
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Send + 'static,
+    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Send + 'static,
     S::Future: Send + 'static,
 {
     type Response = LlmResponse;
-    type Error = HiLlmError;
-    type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+    type Error = HiLLMError;
+    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         self.inner.poll_ready(cx)
     }
 
@@ -123,7 +123,7 @@ where
                 && entry.request_count >= u64::from(rpm)
             {
                 return Box::pin(async move {
-                    Err(HiLlmError::RateLimited {
+                    Err(HiLLMError::RateLimited {
                         message: format!(
                             "model {model} exceeded {rpm} requests per {:.0}s window",
                             config.window.as_secs_f64()
@@ -137,7 +137,7 @@ where
                 && entry.token_count >= tpm
             {
                 return Box::pin(async move {
-                    Err(HiLlmError::RateLimited {
+                    Err(HiLLMError::RateLimited {
                         message: format!(
                             "model {model} exceeded {tpm} tokens per {:.0}s window",
                             config.window.as_secs_f64()
@@ -239,13 +239,13 @@ impl CostRateLimitState {
             .as_secs()
     }
 
-    fn check(&self, config: &CostRateLimitConfig) -> Option<HiLlmError> {
+    fn check(&self, config: &CostRateLimitConfig) -> Option<HiLLMError> {
         let now = Self::now_secs();
 
         if let Some(limit) = config.max_cost_per_minute {
             let spend = self.per_minute.spend_cost(now);
             if spend >= limit {
-                return Some(HiLlmError::RateLimited {
+                return Some(HiLLMError::RateLimited {
                     message: format!(
                         "cost rate limit exceeded: ${spend:.6} >= ${limit:.6} per minute"
                     ),
@@ -257,7 +257,7 @@ impl CostRateLimitState {
         if let Some(limit) = config.max_cost_per_hour {
             let spend = self.per_hour.spend_cost(now);
             if spend >= limit {
-                return Some(HiLlmError::RateLimited {
+                return Some(HiLLMError::RateLimited {
                     message: format!(
                         "cost rate limit exceeded: ${spend:.6} >= ${limit:.6} per hour"
                     ),
@@ -269,7 +269,7 @@ impl CostRateLimitState {
         if let Some(limit) = config.max_cost_per_day {
             let spend = self.per_day.spend_cost(now);
             if spend >= limit {
-                return Some(HiLlmError::RateLimited {
+                return Some(HiLLMError::RateLimited {
                     message: format!(
                         "cost rate limit exceeded: ${spend:.6} >= ${limit:.6} per day"
                     ),
@@ -339,14 +339,14 @@ impl<S: Clone> Clone for CostRateLimitService<S> {
 
 impl<S> Service<LlmRequest> for CostRateLimitService<S>
 where
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Send + 'static,
+    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Send + 'static,
     S::Future: Send + 'static,
 {
     type Response = LlmResponse;
-    type Error = HiLlmError;
-    type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+    type Error = HiLLMError;
+    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         self.inner.poll_ready(cx)
     }
 
@@ -536,7 +536,7 @@ mod tests {
         let result = state.check(&config);
         assert!(result.is_some(), "Should reject when over minute limit");
         if let Some(err) = result {
-            assert!(matches!(err, HiLlmError::RateLimited { .. }));
+            assert!(matches!(err, HiLLMError::RateLimited { .. }));
         }
     }
 }

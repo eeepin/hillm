@@ -12,7 +12,7 @@ use tower::{Layer, Service};
 
 use super::types::{LlmRequest, LlmResponse};
 use crate::client::BoxFuture;
-use crate::error::{HiLlmError, HiLlmResult};
+use crate::error::{HiLLMError, HiLLMResult};
 use crate::provider::cost;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -574,14 +574,14 @@ impl<S: Clone> Clone for BudgetService<S> {
 
 impl<S> Service<LlmRequest> for BudgetService<S>
 where
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Send + 'static,
+    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Send + 'static,
     S::Future: Send + 'static,
 {
     type Response = LlmResponse;
-    type Error = HiLlmError;
-    type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+    type Error = HiLLMError;
+    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         self.inner.poll_ready(cx)
     }
 
@@ -621,11 +621,11 @@ where
     }
 }
 
-fn check_budget(config: &BudgetConfig, state: &BudgetState, model: &str) -> Option<HiLlmError> {
+fn check_budget(config: &BudgetConfig, state: &BudgetState, model: &str) -> Option<HiLLMError> {
     if let Some(limit) = config.global_limit
         && state.global_spend() >= limit
     {
-        return Some(HiLlmError::BudgetExceeded {
+        return Some(HiLLMError::BudgetExceeded {
             message: format!(
                 "global budget exceeded: spent ${:.6}, limit ${:.6}",
                 state.global_spend(),
@@ -638,7 +638,7 @@ fn check_budget(config: &BudgetConfig, state: &BudgetState, model: &str) -> Opti
     if let Some(&limit) = config.model_limits.get(model)
         && state.model_spend(model) >= limit
     {
-        return Some(HiLlmError::BudgetExceeded {
+        return Some(HiLLMError::BudgetExceeded {
             message: format!(
                 "model {model} budget exceeded: spent ${:.6}, limit ${:.6}",
                 state.model_spend(model),
