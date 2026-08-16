@@ -1,4 +1,4 @@
-use crate::client::{BoxFuture, BoxStream, DefaultClient, ResponseClient};
+use crate::client::{BoxFuture, BoxStream, Client, ResponseClient};
 use crate::error::{HiLlmError, HiLlmResult};
 use crate::http;
 use crate::provider;
@@ -7,7 +7,7 @@ use crate::types::response::{CreateResponseRequest, ResponseObject, ResponsesStr
 use super::super::str_pair;
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
-impl ResponseClient for DefaultClient {
+impl ResponseClient for Client {
     fn create_response(
         &self,
         req: CreateResponseRequest,

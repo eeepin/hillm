@@ -535,7 +535,7 @@ pub(crate) trait Provider: Send + Sync {
         Ok(())
     }
 
-    // --- Legacy endpoint path methods (used by DefaultClient for non-codec paths) ---
+    // --- Legacy endpoint path methods (used by Client for non-codec paths) ---
 
     fn chat_completions_path(&self) -> &str {
         "/chat/completions"

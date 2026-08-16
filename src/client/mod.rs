@@ -111,7 +111,7 @@ pub(crate) fn str_pair(pair: &(String, String)) -> (&str, &str) {
 
 /// The LLM Client trait
 #[cfg(not(target_arch = "wasm32"))]
-pub trait LlmClient: Send + Sync {
+pub trait ChatCompletionClient: Send + Sync {
     fn chat(
         &self,
         req: ChatCompletionRequest,
@@ -146,7 +146,7 @@ pub trait LlmClient: Send + Sync {
 }
 
 #[cfg(target_arch = "wasm32")]
-pub trait LlmClient {
+pub trait ChatCompletionClient {
     fn chat(
         &self,
         req: ChatCompletionRequest,
@@ -180,7 +180,7 @@ pub trait LlmClient {
     fn ocr(&self, req: OcrRequest) -> BoxFuture<'_, HiLlmResult<OcrResponse>>;
 }
 
-pub trait LlmClientRaw: LlmClient {
+pub trait ChatCompletionClientRaw: ChatCompletionClient {
     fn chat_raw(
         &self,
         req: ChatCompletionRequest,
@@ -376,7 +376,7 @@ pub trait AnthropicMessagesClient {
 /// Default client based on `reqwest`.
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 #[derive(Clone)]
-pub struct DefaultClient {
+pub struct Client {
     config: ClientConfig,
     http_client: reqwest::Client,
     provider: Arc<dyn Provider>,
@@ -385,7 +385,7 @@ pub struct DefaultClient {
 }
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
-impl DefaultClient {
+impl Client {
     pub fn new(config: ClientConfig, provider: Option<String>) -> HiLlmResult<Self> {
         let provider = build_provider(&config, provider)?;
 

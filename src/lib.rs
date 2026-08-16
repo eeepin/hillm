@@ -1,6 +1,6 @@
 /// Provider authentications like api-keys, OAuth tokens...
 pub mod auth;
-/// Client traits for make llm requests with reqwest-backend [`client::DefaultClient`].
+/// Client traits for make llm requests with reqwest-backend [`client::Client`].
 pub mod client;
 #[cfg(feature = "tower")]
 pub mod embedding;
@@ -28,13 +28,13 @@ pub mod vectorstore;
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 pub use client::{
     AnthropicMessagesClient, BatchClient, BatchWaitError, BoxFuture, BoxStream, ClientBuilder,
-    ClientConfig, ClientConfigBuilder, DefaultClient, FileClient, FileConfig, LlmClient,
-    LlmClientRaw, ResponseClient, WaitForBatchConfig,
+    ClientConfig, ClientConfigBuilder, Client, FileClient, FileConfig, ChatCompletionClient,
+    ChatCompletionClientRaw, ResponseClient, WaitForBatchConfig,
 };
 #[cfg(not(any(feature = "default-http", feature = "wasm-http")))]
 pub use client::{
     AnthropicMessagesClient, BatchClient, BatchWaitError, BoxFuture, BoxStream, ClientConfig,
-    ClientConfigBuilder, FileConfig, LlmClient, LlmClientRaw, WaitForBatchConfig,
+    ClientConfigBuilder, FileConfig, ChatCompletionClient, ChatCompletionClientRaw, WaitForBatchConfig,
 };
 pub use error::{HiLlmError, HiLlmResult};
 pub use http::transport::TransportConfig;

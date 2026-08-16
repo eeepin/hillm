@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use regex::Regex;
 
-use crate::client::LlmClient;
+use crate::client::ChatCompletionClient;
 use crate::types::{
     ChatCompletionRequest, EmbeddingInput, EmbeddingRequest, Message, MessageContent,
     SystemMessage, UserMessage,
@@ -109,7 +109,7 @@ pub struct IntentPrototype {
 }
 
 pub struct EmbeddingSimilarityClassifier {
-    client: Arc<dyn LlmClient>,
+    client: Arc<dyn ChatCompletionClient>,
     embedding_model: String,
     prototypes: Vec<IntentPrototype>,
     threshold: f64,
@@ -117,7 +117,7 @@ pub struct EmbeddingSimilarityClassifier {
 
 impl EmbeddingSimilarityClassifier {
     pub fn new(
-        client: Arc<dyn LlmClient>,
+        client: Arc<dyn ChatCompletionClient>,
         embedding_model: impl Into<String>,
         prototypes: Vec<IntentPrototype>,
         threshold: f64,
@@ -215,14 +215,14 @@ impl RouteClassifier for EmbeddingSimilarityClassifier {
 }
 
 pub struct LlmClassifier {
-    client: Arc<dyn LlmClient>,
+    client: Arc<dyn ChatCompletionClient>,
     model: String,
     system_prompt: String,
 }
 
 impl LlmClassifier {
     pub fn new(
-        client: Arc<dyn LlmClient>,
+        client: Arc<dyn ChatCompletionClient>,
         model: impl Into<String>,
         system_prompt: impl Into<String>,
     ) -> Self {

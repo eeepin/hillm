@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use super::super::{BoxFuture, BoxStream, DefaultClient, LlmClientRaw, str_pair};
+use super::super::{BoxFuture, BoxStream, Client, ChatCompletionClientRaw, str_pair};
 use crate::error::{HiLlmError, HiLlmResult};
 use crate::http;
 use crate::provider;
@@ -15,7 +15,7 @@ use crate::types::rerank::{RerankRequest, RerankResponse};
 use crate::types::search::{SearchRequest, SearchResponse};
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
-impl LlmClientRaw for DefaultClient {
+impl ChatCompletionClientRaw for Client {
     fn chat_raw(
         &self,
         req: ChatCompletionRequest,

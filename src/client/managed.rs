@@ -4,7 +4,7 @@ use tower::{Layer, Service};
 
 use super::config::ClientConfig;
 use super::{
-    BatchClient, BoxFuture, BoxStream, DefaultClient, FileClient, LlmClient, ResponseClient,
+    BatchClient, BoxFuture, BoxStream, Client, FileClient, ChatCompletionClient, ResponseClient,
 };
 use crate::error::{HiLlmError, HiLlmResult};
 #[cfg(feature = "opendal")]
@@ -44,14 +44,14 @@ impl SyncService {
 }
 
 pub struct ManagedClient {
-    inner: Arc<DefaultClient>,
+    inner: Arc<Client>,
     service: Option<SyncService>,
     budget_state: Option<Arc<BudgetState>>,
 }
 
 impl ManagedClient {
     pub fn new(config: ClientConfig, provider: Option<String>) -> HiLlmResult<Self> {
-        let client = DefaultClient::new(config.clone(), provider.clone())?;
+        let client = Client::new(config.clone(), provider.clone())?;
         let inner = Arc::new(client);
 
         let (service, budget_state) =
@@ -65,7 +65,7 @@ impl ManagedClient {
     }
 
     #[must_use]
-    pub fn inner(&self) -> &DefaultClient {
+    pub fn inner(&self) -> &Client {
         &self.inner
     }
 
@@ -96,7 +96,7 @@ impl ManagedClient {
 
 fn build_service_stack(
     config: &ClientConfig,
-    client: Arc<DefaultClient>,
+    client: Arc<Client>,
     provider: impl Into<String>,
 ) -> (Option<SyncService>, Option<Arc<BudgetState>>) {
     let has_cache = config.cache_config.is_some();
@@ -219,7 +219,7 @@ fn build_service_stack(
     )
 }
 
-impl LlmClient for ManagedClient {
+impl ChatCompletionClient for ManagedClient {
     fn chat(
         &self,
         req: ChatCompletionRequest,

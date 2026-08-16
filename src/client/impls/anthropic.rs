@@ -1,4 +1,4 @@
-use crate::client::{AnthropicMessagesClient, BoxFuture, BoxStream, DefaultClient};
+use crate::client::{AnthropicMessagesClient, BoxFuture, BoxStream, Client};
 use crate::error::{HiLlmError, HiLlmResult};
 use crate::http;
 use crate::provider;
@@ -9,7 +9,7 @@ use crate::types::anthropic::{
 use super::super::str_pair;
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
-impl AnthropicMessagesClient for DefaultClient {
+impl AnthropicMessagesClient for Client {
     fn create_message(
         &self,
         req: AnthropicMessagesRequest,

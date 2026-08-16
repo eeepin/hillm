@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use futures_util::StreamExt;
 use hillm::client::{
-    AnthropicMessagesClient, ClientConfigBuilder, DefaultClient, LlmClient, ResponseClient,
+    AnthropicMessagesClient, ClientConfigBuilder, Client, ChatCompletionClient, ResponseClient,
 };
 use hillm::provider::APIType;
 use hillm::types::ChatCompletionRequest;
@@ -420,7 +420,7 @@ async fn openai_chat_route_url_headers_and_body() {
         .base_url(server.url())
         .api_type(APIType::OpenAIChatCompletions)
         .build();
-    let client = DefaultClient::new(config, None).expect("client builds");
+    let client = Client::new(config, None).expect("client builds");
 
     let resp = client
         .chat(simple_chat_request("mock-model"))
@@ -457,7 +457,7 @@ async fn openai_chat_stream_survives_arbitrary_chunk_split() {
         .base_url(server.url())
         .api_type(APIType::OpenAIChatCompletions)
         .build();
-    let client = DefaultClient::new(config, None).expect("client builds");
+    let client = Client::new(config, None).expect("client builds");
 
     let stream = client
         .chat_stream(simple_chat_request("mock-model"))
@@ -495,7 +495,7 @@ async fn openai_responses_route_url_headers_and_native_body() {
         .base_url(server.url())
         .api_type(APIType::OpenAIResponses)
         .build();
-    let client = DefaultClient::new(config, None).expect("client builds");
+    let client = Client::new(config, None).expect("client builds");
 
     let req = CreateResponseRequest {
         model: "mock-model".to_string(),
@@ -533,7 +533,7 @@ async fn openai_responses_stream_emits_native_events() {
         .base_url(server.url())
         .api_type(APIType::OpenAIResponses)
         .build();
-    let client = DefaultClient::new(config, None).expect("client builds");
+    let client = Client::new(config, None).expect("client builds");
 
     let req = CreateResponseRequest {
         model: "mock-model".to_string(),
@@ -580,7 +580,7 @@ async fn anthropic_messages_route_url_headers_and_native_body() {
         .base_url(server.url())
         .api_type(APIType::AnthropicMessages)
         .build();
-    let client = DefaultClient::new(config, None).expect("client builds");
+    let client = Client::new(config, None).expect("client builds");
 
     let resp = client
         .create_message(simple_anthropic_request("mock-model"))
@@ -621,7 +621,7 @@ async fn anthropic_messages_stream_emits_native_events() {
         .base_url(server.url())
         .api_type(APIType::AnthropicMessages)
         .build();
-    let client = DefaultClient::new(config, None).expect("client builds");
+    let client = Client::new(config, None).expect("client builds");
 
     let stream = client
         .create_message_stream(simple_anthropic_request("mock-model"))
@@ -674,7 +674,7 @@ async fn unsupported_api_type_fails_before_sending() {
     let config = ClientConfigBuilder::new("sk-test-key")
         .api_type(APIType::AnthropicMessages)
         .build();
-    let err = match DefaultClient::new(config, Some("openai".to_string())) {
+    let err = match Client::new(config, Some("openai".to_string())) {
         Err(err) => err,
         Ok(_) => panic!("expected APITypeUnsupported"),
     };
@@ -692,7 +692,7 @@ async fn streaming_other_routes_fails_before_sending_on_chat_instance() {
         .base_url(server.url())
         .api_type(APIType::OpenAIChatCompletions)
         .build();
-    let client = DefaultClient::new(config, None).expect("client builds");
+    let client = Client::new(config, None).expect("client builds");
 
     let req = CreateResponseRequest {
         model: "mock-model".to_string(),
@@ -745,7 +745,7 @@ async fn chat_on_anthropic_uses_explicit_compat_adapter() {
     let config = ClientConfigBuilder::new("sk-ant-test")
         .api_type(APIType::OpenAIChatCompletions)
         .build();
-    let client = DefaultClient::new(config, Some("anthropic".to_string()))
+    let client = Client::new(config, Some("anthropic".to_string()))
         .expect("compat adapter instance builds");
 
     let result = client.chat(simple_chat_request("mock-model")).await;

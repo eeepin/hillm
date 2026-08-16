@@ -279,7 +279,7 @@ impl<K, P> ClientBuilder<K, P> {
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 impl ClientBuilder<WithApiKey, WithProvider> {
-    pub fn build(self) -> HiLlmResult<super::DefaultClient> {
+    pub fn build(self) -> HiLlmResult<super::Client> {
         use super::config::ClientConfig;
 
         let config = ClientConfig {
@@ -313,6 +313,6 @@ impl ClientBuilder<WithApiKey, WithProvider> {
             enable_tracing: self.enable_tracing,
         };
 
-        super::DefaultClient::new(config, self.provider_name)
+        super::Client::new(config, self.provider_name)
     }
 }

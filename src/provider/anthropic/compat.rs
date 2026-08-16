@@ -4,7 +4,7 @@
 //! This module is the *explicit* compatibility layer required by the API-type
 //! routing design: the Anthropic provider's native protocol is
 //! [`APIType::AnthropicMessages`]. Callers that still want to use the OpenAI
-//! Chat Completions shapes ([`LlmClient::chat`](crate::client::LlmClient))
+//! Chat Completions shapes ([`ChatCompletionClient::chat`](crate::client::ChatCompletionClient))
 //! against Anthropic must opt in by creating a provider instance through
 //! [`AnthropicChatCompatProvider`] (e.g. by explicitly selecting
 //! [`APIType::OpenAIChatCompletions`] for the `anthropic` provider). The

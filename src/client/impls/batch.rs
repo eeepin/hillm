@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use crate::client::{
-    BatchClient, BatchRetriever, BatchWaitError, BoxFuture, DefaultClient, WaitForBatchConfig,
+    BatchClient, BatchRetriever, BatchWaitError, BoxFuture, Client, WaitForBatchConfig,
 };
 use crate::error::{HiLlmError, HiLlmResult};
 use crate::http;
@@ -12,7 +12,7 @@ use crate::types::batch::{
 use super::super::str_pair;
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
-impl BatchClient for DefaultClient {
+impl BatchClient for Client {
     fn create_batch(&self, req: CreateBatchRequest) -> BoxFuture<'_, HiLlmResult<BatchObject>> {
         Box::pin(async move {
             let url = self.provider.build_url(self.provider.batches_path(), "");
@@ -145,7 +145,7 @@ impl BatchClient for DefaultClient {
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-impl BatchRetriever for DefaultClient {
+impl BatchRetriever for Client {
     async fn fetch_batch_for_polling(&self, batch_id: &str) -> HiLlmResult<BatchObject> {
         self.retrieve_batch(batch_id).await
     }
@@ -196,7 +196,7 @@ pub async fn wait_for_batch_impl<R: BatchRetriever>(
 }
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
-impl DefaultClient {
+impl Client {
     pub async fn wait_for_batch(
         &self,
         batch_id: &str,

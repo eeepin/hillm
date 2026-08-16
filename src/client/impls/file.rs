@@ -1,4 +1,4 @@
-use crate::client::{BoxFuture, DefaultClient, FileClient};
+use crate::client::{BoxFuture, Client, FileClient};
 use crate::error::{HiLlmError, HiLlmResult};
 use crate::http;
 use crate::types::file::{
@@ -8,7 +8,7 @@ use crate::types::file::{
 use super::super::str_pair;
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
-impl FileClient for DefaultClient {
+impl FileClient for Client {
     fn create_file(&self, req: CreateFileRequest) -> BoxFuture<'_, HiLlmResult<FileObject>> {
         Box::pin(async move {
             let url = self.provider.build_url(self.provider.files_path(), "");

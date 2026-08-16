@@ -6,7 +6,7 @@
 //! ```
 
 use hillm::{
-    AssistantMessage, ChatCompletionRequest, ClientBuilder, LlmClient, Message, MessageContent,
+    AssistantMessage, ChatCompletionRequest, ClientBuilder, ChatCompletionClient, Message, MessageContent,
     UserMessage,
 };
 
