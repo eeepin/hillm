@@ -5,7 +5,7 @@ use std::net::IpAddr;
 use std::sync::{Arc, OnceLock, RwLock};
 use url::Url;
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum OutboundPolicy {
     #[default]
     Off,
@@ -35,10 +35,8 @@ pub fn current_policy() -> OutboundPolicy {
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 pub async fn validate_outbound_url(raw_url: &str) -> Result<(), HiLlmError> {
     let policy = current_policy();
-    if matches!(policy, OutboundPolicy::Off) {
-        return Ok(());
-    }
 
+    // Always parse URL and validate scheme, even when policy is Off
     let url = Url::parse(raw_url).map_err(|e| HiLlmError::OutboundForbidden {
         url: raw_url.to_string(),
         reason: format!("invalid URL: {e}"),
@@ -54,6 +52,7 @@ pub async fn validate_outbound_url(raw_url: &str) -> Result<(), HiLlmError> {
         }
     }
 
+    // When policy is Off, skip DNS and address range checks
     match policy {
         OutboundPolicy::Off => Ok(()),
         OutboundPolicy::DenyPrivate => check_deny_private(&url, raw_url).await,
@@ -63,10 +62,8 @@ pub async fn validate_outbound_url(raw_url: &str) -> Result<(), HiLlmError> {
 
 pub fn validate_outbound_url_sync(raw_url: &str) -> Result<(), HiLlmError> {
     let policy = current_policy();
-    if matches!(policy, OutboundPolicy::Off) {
-        return Ok(());
-    }
 
+    // Always parse URL and validate scheme, even when policy is Off
     let url = Url::parse(raw_url).map_err(|e| HiLlmError::OutboundForbidden {
         url: raw_url.to_string(),
         reason: format!("invalid URL: {e}"),
@@ -80,6 +77,11 @@ pub fn validate_outbound_url_sync(raw_url: &str) -> Result<(), HiLlmError> {
                 reason: format!("scheme '{other}' is not allowed; only http/https"),
             });
         }
+    }
+
+    // When policy is Off, skip address range checks
+    if matches!(policy, OutboundPolicy::Off) {
+        return Ok(());
     }
 
     match url.host() {
@@ -299,10 +301,19 @@ mod tests {
 
     #[test]
     #[serial(outbound_policy)]
-    fn validate_sync_off_passes_everything() {
+    fn validate_sync_off_rejects_non_http_scheme() {
         with_policy(OutboundPolicy::Off, || {
-            assert!(validate_outbound_url_sync("http://127.0.0.1/").is_ok());
-            assert!(validate_outbound_url_sync("http://169.254.169.254/").is_ok());
+            // Even with Off policy, non-http/https schemes should be rejected
+            let result = validate_outbound_url_sync("ftp://example.com/");
+            assert!(result.is_err(), "ftp:// scheme should be rejected even with Off policy");
+            let err = result.unwrap_err().to_string();
+            assert!(
+                err.contains("scheme"),
+                "error should mention 'scheme': {err}"
+            );
+
+            let result = validate_outbound_url_sync("file:///etc/passwd");
+            assert!(result.is_err(), "file:// scheme should be rejected even with Off policy");
         });
     }
 
@@ -389,14 +400,20 @@ mod tests {
     #[cfg(any(feature = "default-http", feature = "wasm-http"))]
     #[tokio::test]
     #[serial(outbound_policy)]
-    async fn validate_async_off_passes_everything() {
+    async fn validate_async_off_rejects_non_http_scheme() {
         set_outbound_policy(OutboundPolicy::Off);
-        assert!(validate_outbound_url("http://127.0.0.1/").await.is_ok());
+        // Even with Off policy, non-http/https schemes should be rejected
+        let result = validate_outbound_url("ftp://example.com/").await;
+        assert!(result.is_err(), "ftp:// scheme should be rejected even with Off policy");
+        let err = result.unwrap_err().to_string();
         assert!(
-            validate_outbound_url("http://169.254.169.254/")
-                .await
-                .is_ok()
+            err.contains("scheme"),
+            "error should mention 'scheme': {err}"
         );
+
+        let result = validate_outbound_url("file:///etc/passwd").await;
+        assert!(result.is_err(), "file:// scheme should be rejected even with Off policy");
+        set_outbound_policy(OutboundPolicy::Off);
     }
 
     #[cfg(any(feature = "default-http", feature = "wasm-http"))]
