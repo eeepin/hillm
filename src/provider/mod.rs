@@ -218,6 +218,8 @@ pub struct ContextTier {
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 async fn fetch_provider() -> Result<ProviderRegistry, ProviderError> {
+    use crate::util::bound::{RESPONSE_BODY_MAX_BYTES, check_bound};
+
     let client = reqwest::Client::new();
     let response = client
         .get(PROVIDER_API_URL)
@@ -228,6 +230,9 @@ async fn fetch_provider() -> Result<ProviderRegistry, ProviderError> {
     let text = response
         .text()
         .await
+        .map_err(|e| ProviderError::FetchError(e.to_string()))?;
+
+    check_bound("provider registry", 0, text.len(), RESPONSE_BODY_MAX_BYTES)
         .map_err(|e| ProviderError::FetchError(e.to_string()))?;
 
     parse_provider(&text)
