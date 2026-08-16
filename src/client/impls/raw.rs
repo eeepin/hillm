@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
-use super::super::{
-    str_pair, BoxFuture, BoxStream, DefaultClient, LlmClientRaw,
-};
+use super::super::{BoxFuture, BoxStream, DefaultClient, LlmClientRaw, str_pair};
 use crate::error::{HiLlmError, HiLlmResult};
 use crate::http;
 use crate::provider;
