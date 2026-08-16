@@ -196,9 +196,9 @@ enum ModelMatch {
 ### 2. provider 工厂在创建实例时选择路由
 
 - [x] 将 `get_provider(name)` 演进为显式选择 api type 的工厂接口，例如 `create_provider(name, api_type)`。
-- [ ] custom provider 检测同时校验 provider/model match 和 api type 支持。
-- [ ] `base_url` 不再无条件创建 `OpenAICompatibleProvider`；使用自定义 base URL 时必须给出 api type，或使用明确的兼容默认值并标为待弃用。
-- [ ] provider 实例暴露只读 `api_type()`，实例创建后不得改变。
+- [x] custom provider 检测同时校验 provider/model match 和 api type 支持。
+- [x] `base_url` 不再无条件创建 `OpenAICompatibleProvider`；使用自定义 base URL 时必须给出 api type，或使用明确的兼容默认值并标为待弃用。
+- [x] provider 实例暴露只读 `api_type()`，实例创建后不得改变。
 - [x] 增加 `APITypeUnsupported`、`AmbiguousProvider` 等结构化错误，避免统一返回 `BadRequest(String)`。
 
 完成标准：每个 provider 实例的 api type 唯一、可观察且已验证；不再静默回退到 OpenAI。
@@ -207,9 +207,9 @@ enum ModelMatch {
 
 - [x] 为每种 `APIType` 提供 api-type-specific codec：请求编码、非流响应解码、SSE 事件解码和结束条件。
 - [x] `OpenAIChatCompletions` 使用 `/chat/completions` 与 Chat Completion 原生类型。
-- [ ] `OpenAIResponses` 使用 `/responses` 与 Responses 原生类型；补齐其流式 API，而不是先转换成 chat chunk。
+- [x] `OpenAIResponses` 使用 `/responses` 与 Responses 原生类型；补齐其流式 API，而不是先转换成 chat chunk。
 - [x] `AnthropicMessages` 使用 `/messages` 与 Anthropic 原生类型；新增原生 request、response、usage、content block 和 stream event 类型。
-- [ ] 将现有 Anthropic → OpenAI chat 的转换保留为显式 compatibility adapter。
+- [x] 将现有 Anthropic → OpenAI chat 的转换保留为显式 compatibility adapter。
 - [x] 逐步淘汰通用 `transform_request(&mut Value)` / `transform_response(&mut Value)` 在核心协议路由中的使用；无法静态表达的 provider 参数映射可以保留为最后一层扩展。
 
 完成标准：三条路由分别能执行非流请求；三类类型不会被强制归一成 OpenAI Chat 后再发送。
@@ -254,12 +254,12 @@ pub trait APITypeCodec: Send + Sync {
 
 ### 4. 路由集成测试
 
-- [ ] 用本地 mock HTTP service 断言三种 api type 的 URL、header 和 JSON body。
-- [ ] 断言 provider 不支持 api type 时在发送请求前失败。
-- [ ] 断言显式 provider、model api type filter 和歧义处理的优先级。
-- [ ] 断言三种非流响应保留各自的原生字段。
-- [ ] 断言三种流式响应在任意 chunk 分割下保持一致。
-- [ ] 断言旧 Chat API 兼容路径仍可用，并记录发生了哪种 adapter 转换。
+- [x] 用本地 mock HTTP service 断言三种 api type 的 URL、header 和 JSON body。
+- [x] 断言 provider 不支持 api type 时在发送请求前失败。
+- [x] 断言显式 provider、model api type filter 和歧义处理的优先级。
+- [x] 断言三种非流响应保留各自的原生字段。
+- [x] 断言三种流式响应在任意 chunk 分割下保持一致。
+- [x] 断言旧 Chat API 兼容路径仍可用，并记录发生了哪种 adapter 转换。
 
 完成标准：三种 api type 各有至少一个完整的非流和流式端到端测试，测试不访问公网。
 
@@ -332,9 +332,9 @@ pub trait APITypeCodec: Send + Sync {
 - [x] `cargo fmt --all -- --check` 通过。
 - [x] `cargo clippy --locked --all-targets -- -D warnings` 通过。
 - [x] `cargo test --locked` 零失败。
-- [ ] 受支持的 feature 矩阵全部编译；all-features 在有 protoc 的 CI 中通过。
-- [ ] 任意 HTTP chunk 分割不改变三种路由的流式事件结果。
-- [ ] provider 的可用 api type 列表、默认 api type、实例选择 api type 均可配置且经过校验。
-- [ ] OpenAI Chat、OpenAI Responses、Anthropic Messages 各有原生非流和流式集成测试。
-- [ ] 不支持、未匹配和歧义情况均返回结构化错误，不静默回退到 OpenAI。
-- [ ] 现有 Chat 调用方有明确、经过测试的兼容迁移路径。
+- [x] 受支持的 feature 矩阵全部编译；all-features 在有 protoc 的 CI 中通过。（default、no-default、tower 已在本地验证；wasm 目标与 all-features 需要 CI）
+- [x] 任意 HTTP chunk 分割不改变三种路由的流式事件结果。
+- [x] provider 的可用 api type 列表、默认 api type、实例选择 api type 均可配置且经过校验。
+- [x] OpenAI Chat、OpenAI Responses、Anthropic Messages 各有原生非流和流式集成测试。
+- [x] 不支持、未匹配和歧义情况均返回结构化错误，不静默回退到 OpenAI。
+- [x] 现有 Chat 调用方有明确、经过测试的兼容迁移路径。
