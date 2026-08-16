@@ -1,4 +1,4 @@
-use super::{AuthType, Provider, ProviderConfig};
+use super::{APIType, AuthType, Provider, ProviderConfig};
 use crate::error::HiLlmResult;
 use std::borrow::Cow;
 
@@ -62,5 +62,20 @@ impl Provider for ConfigDrivenProvider {
             .models
             .iter()
             .any(|model_name| model == model_name)
+    }
+
+    fn available_api_types(&self) -> Vec<APIType> {
+        self.config.effective_api_types()
+    }
+
+    fn api_type(&self) -> APIType {
+        self.config.effective_default_api_type()
+    }
+
+    fn codec_for(&self, api_type: APIType) -> Option<Box<dyn super::codec::APITypeCodec>> {
+        if !self.config.effective_api_types().contains(&api_type) {
+            return None;
+        }
+        super::codec_for_api_type(api_type)
     }
 }

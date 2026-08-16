@@ -41,7 +41,7 @@ use crate::auth::Credential;
 use crate::http;
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 use crate::provider::{
-    self, Provider, openai::OpenAIProvider, openai_compatible::OpenAiCompatibleProvider,
+    self, APIType, Provider, openai::OpenAIProvider, openai_compatible::OpenAiCompatibleProvider,
 };
 
 pub use builder::{ClientBuilder, NoApiKey, NoProvider, WithApiKey, WithProvider};
@@ -327,7 +327,7 @@ pub struct DefaultClient {
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 impl DefaultClient {
     pub fn new(config: ClientConfig, provider: Option<String>) -> HiLlmResult<Self> {
-        let provider = build_provider(&config, provider);
+        let provider = build_provider(&config, provider)?;
 
         provider.validate()?;
 
@@ -521,24 +521,41 @@ impl DefaultClient {
 }
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
-fn build_provider(config: &ClientConfig, provider_name: Option<String>) -> Arc<dyn Provider> {
+fn build_provider(
+    config: &ClientConfig,
+    provider_name: Option<String>,
+) -> HiLlmResult<Arc<dyn Provider>> {
     if let Some(ref base_url) = config.base_url {
-        // TODO: make different special provider match
-        return Arc::new(OpenAiCompatibleProvider {
+        // A custom base URL no longer implicitly means "OpenAI-compatible
+        // chat completions". The API type is chosen explicitly:
+        //
+        // - `config.api_type` selects the protocol the endpoint speaks;
+        // - when absent, the compatibility default is OpenAI Chat
+        //   Completions. This fallback is DEPRECATED: future versions will
+        //   require an explicit API type whenever a custom base URL is used.
+        let api_type = config.api_type.unwrap_or(APIType::OpenAIChatCompletions);
+        return Ok(Arc::new(OpenAiCompatibleProvider {
             name: "custom".into(),
             base_url: base_url.clone(),
             env_var: None,
             models: vec![],
-        });
+            api_type,
+        }));
     }
 
-    if let Some(name) = provider_name
-        && let Some(p) = provider::get_provider(&name)
-    {
-        return Arc::from(p);
+    if let Some(name) = provider_name {
+        // Explicit API type selection is validated at creation time: if the
+        // named provider does not support the requested API type, fail with
+        // a structured error instead of silently falling back.
+        if let Some(api_type) = config.api_type {
+            return Ok(Arc::from(provider::create_provider(&name, api_type)?));
+        }
+        let provider = provider::get_provider(&name)
+            .ok_or_else(|| HiLlmError::ProviderNotFound { name: name.clone() })?;
+        return Ok(Arc::from(provider));
     }
 
-    Arc::new(OpenAIProvider)
+    Ok(Arc::new(OpenAIProvider::default()))
 }
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]

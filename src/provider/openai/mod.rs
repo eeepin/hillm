@@ -1,4 +1,5 @@
 use super::{Provider, registry_get};
+use crate::error::{HiLlmError, HiLlmResult};
 use crate::provider::APIType;
 use crate::provider::codec::APITypeCodec;
 use std::borrow::Cow;
@@ -9,7 +10,33 @@ pub mod responses_codec;
 pub use chat_completions_codec::OpenAIChatCompletionsCodec;
 pub use responses_codec::OpenAIResponsesCodec;
 
-pub(crate) struct OpenAIProvider;
+pub(crate) struct OpenAIProvider {
+    /// The API type this instance is bound to. Fixed at creation time.
+    api_type: APIType,
+}
+
+impl OpenAIProvider {
+    /// Creates a provider instance bound to `api_type`, failing with
+    /// [`HiLlmError::APITypeUnsupported`] if OpenAI does not support it.
+    pub(crate) fn with_api_type(api_type: APIType) -> HiLlmResult<Self> {
+        let available = [APIType::OpenAIChatCompletions, APIType::OpenAIResponses];
+        if !available.contains(&api_type) {
+            return Err(HiLlmError::APITypeUnsupported {
+                api_type: api_type.to_string(),
+                provider: "openai".to_string(),
+            });
+        }
+        Ok(Self { api_type })
+    }
+}
+
+impl Default for OpenAIProvider {
+    fn default() -> Self {
+        Self {
+            api_type: APIType::OpenAIChatCompletions,
+        }
+    }
+}
 
 impl Provider for OpenAIProvider {
     fn name(&self) -> &str {
@@ -40,6 +67,10 @@ impl Provider for OpenAIProvider {
 
     fn available_api_types(&self) -> Vec<APIType> {
         vec![APIType::OpenAIChatCompletions, APIType::OpenAIResponses]
+    }
+
+    fn api_type(&self) -> APIType {
+        self.api_type
     }
 
     fn codec_for(&self, api_type: APIType) -> Option<Box<dyn APITypeCodec>> {

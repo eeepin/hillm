@@ -378,6 +378,20 @@ pub(crate) trait Provider: Send + Sync {
         vec![APIType::OpenAIChatCompletions]
     }
 
+    /// The API type this provider instance is bound to.
+    ///
+    /// Fixed at creation time and must not change for the lifetime of the
+    /// instance. Instances returned by [`create_provider`] report the API
+    /// type that was explicitly selected; other instances report their
+    /// effective default.
+    #[allow(dead_code)]
+    fn api_type(&self) -> APIType {
+        self.available_api_types()
+            .first()
+            .copied()
+            .unwrap_or(APIType::OpenAIChatCompletions)
+    }
+
     #[allow(dead_code)]
     fn codec_for(&self, api_type: APIType) -> Option<Box<dyn codec::APITypeCodec>> {
         let _ = api_type;
@@ -492,16 +506,17 @@ pub(crate) trait Provider: Send + Sync {
 }
 
 pub(crate) fn get_provider(name: &str) -> Option<Box<dyn Provider>> {
-    if let Some(provider) = custom::detect_custom_provider(name, "") {
+    if let Ok(Some(provider)) = custom::detect_custom_provider(name, "", custom::ApiTypeFilter::Any)
+    {
         return Some(provider);
     }
 
     match name {
         "openai" => {
-            return Some(Box::new(OpenAIProvider));
+            return Some(Box::new(OpenAIProvider::default()));
         }
         "anthropic" => {
-            return Some(Box::new(AnthropicProvider));
+            return Some(Box::new(AnthropicProvider::default()));
         }
         "bedrock" => return Some(Box::new(BedrockProvider::from_env())),
         _ => {
@@ -523,12 +538,35 @@ pub(crate) fn get_provider(name: &str) -> Option<Box<dyn Provider>> {
 /// Create a provider instance validated against a specific API type.
 ///
 /// Unlike [`get_provider`], this function checks that the provider supports
-/// the requested `api_type` and returns a structured error if not.
+/// the requested `api_type` and returns a structured error if not. The
+/// returned instance is bound to `api_type` for its lifetime
+/// ([`Provider::api_type`] reports it).
 #[allow(dead_code)] // Part of APIType routing infrastructure, not yet consumed by client
 pub(crate) fn create_provider(
     name: &str,
     api_type: APIType,
 ) -> Result<Box<dyn Provider>, HiLlmError> {
+    // Custom providers are detected with an API type filter so that a
+    // registered custom provider which does not support the requested API
+    // type is not silently returned (and, when the name does not match a
+    // built-in, surfaces as APITypeUnsupported instead of ProviderNotFound).
+    if let Some(provider) =
+        custom::detect_custom_provider(name, "", custom::ApiTypeFilter::Exact(api_type))?
+    {
+        return Ok(provider);
+    }
+
+    // Built-in providers are bound to the explicitly requested API type.
+    match name {
+        "openai" => return Ok(Box::new(openai::OpenAIProvider::with_api_type(api_type)?)),
+        "anthropic" => {
+            return Ok(Box::new(anthropic::AnthropicProvider::with_api_type(
+                api_type,
+            )?));
+        }
+        _ => {}
+    }
+
     let provider = get_provider(name).ok_or_else(|| HiLlmError::ProviderNotFound {
         name: name.to_string(),
     })?;
@@ -541,6 +579,21 @@ pub(crate) fn create_provider(
     }
 
     Ok(provider)
+}
+
+/// Returns the codec implementation for an API type, if one exists.
+///
+/// Used by providers whose wire format is fully determined by the API type
+/// (custom, config-driven and OpenAI-compatible providers), so they do not
+/// need to duplicate the codec mapping.
+#[allow(dead_code)]
+pub(crate) fn codec_for_api_type(api_type: APIType) -> Option<Box<dyn codec::APITypeCodec>> {
+    match api_type {
+        APIType::OpenAIChatCompletions => Some(Box::new(openai::OpenAIChatCompletionsCodec)),
+        APIType::OpenAIResponses => Some(Box::new(openai::OpenAIResponsesCodec)),
+        APIType::AnthropicMessages => Some(Box::new(anthropic::codec::AnthropicMessagesCodec)),
+        APIType::BedrockConverse => Some(Box::new(bedrock::codec::BedrockConverseCodec)),
+    }
 }
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
@@ -768,13 +821,20 @@ mod tests {
     fn create_provider_returns_provider_for_supported_api_type() {
         let result = create_provider("openai", APIType::OpenAIChatCompletions);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap().name(), "openai");
+        let provider = result.unwrap();
+        assert_eq!(provider.name(), "openai");
+        assert_eq!(provider.api_type(), APIType::OpenAIChatCompletions);
     }
 
     #[test]
     fn create_provider_returns_provider_for_responses_api_type() {
         let result = create_provider("openai", APIType::OpenAIResponses);
         assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap().api_type(),
+            APIType::OpenAIResponses,
+            "instance must be bound to the requested api type"
+        );
     }
 
     #[test]
@@ -786,6 +846,35 @@ mod tests {
             let msg = err.to_string();
             assert!(msg.contains("openai"));
         }
+    }
+
+    #[test]
+    fn create_provider_rejects_chat_api_type_for_anthropic() {
+        // The Anthropic provider only speaks the native Messages protocol;
+        // requesting Chat Completions fails with a structured error instead
+        // of silently falling back.
+        let result = create_provider("anthropic", APIType::OpenAIChatCompletions);
+        assert!(result.is_err());
+        if let Err(err) = result {
+            assert!(matches!(err, HiLlmError::APITypeUnsupported { .. }));
+        }
+    }
+
+    #[test]
+    fn create_provider_rejects_responses_api_type_for_anthropic() {
+        let result = create_provider("anthropic", APIType::OpenAIResponses);
+        assert!(result.is_err());
+        if let Err(err) = result {
+            assert!(matches!(err, HiLlmError::APITypeUnsupported { .. }));
+        }
+    }
+
+    #[test]
+    fn create_provider_anthropic_binds_messages_api_type() {
+        let provider = create_provider("anthropic", APIType::AnthropicMessages)
+            .expect("anthropic supports messages");
+        assert_eq!(provider.api_type(), APIType::AnthropicMessages);
+        assert!(provider.codec_for(APIType::AnthropicMessages).is_some());
     }
 
     #[test]

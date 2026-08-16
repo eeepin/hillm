@@ -1,3 +1,5 @@
+use crate::error::HiLlmError;
+use crate::error::HiLlmResult;
 use crate::provider::anthropic::codec::AnthropicMessagesCodec;
 use crate::provider::{APIType, Provider, codec::APITypeCodec, registry_get};
 use std::borrow::Cow;
@@ -41,7 +43,48 @@ fn body_contains_document_block(value: &serde_json::Value) -> bool {
 }
 
 /// Anthropic provider
-pub struct AnthropicProvider;
+pub struct AnthropicProvider {
+    base_url: String,
+}
+
+/// Returns the Anthropic base URL, honoring the `ANTHROPIC_BASE_URL`
+/// environment variable when it is set to a non-empty value.
+pub(crate) fn anthropic_base_url() -> String {
+    std::env::var("ANTHROPIC_BASE_URL")
+        .ok()
+        .filter(|v| !v.is_empty())
+        .map(|v| v.trim_end_matches('/').to_string())
+        .unwrap_or_else(|| "https://api.anthropic.com/v1".to_owned())
+}
+
+impl AnthropicProvider {
+    /// Creates a provider instance, resolving `ANTHROPIC_BASE_URL`.
+    #[must_use]
+    pub(crate) fn new() -> Self {
+        Self {
+            base_url: anthropic_base_url(),
+        }
+    }
+
+    /// Creates a provider instance bound to `api_type`, failing with
+    /// [`HiLlmError::APITypeUnsupported`] unless it is
+    /// [`APIType::AnthropicMessages`].
+    pub(crate) fn with_api_type(api_type: APIType) -> HiLlmResult<Self> {
+        if api_type != APIType::AnthropicMessages {
+            return Err(HiLlmError::APITypeUnsupported {
+                api_type: api_type.to_string(),
+                provider: "anthropic".to_string(),
+            });
+        }
+        Ok(Self::new())
+    }
+}
+
+impl Default for AnthropicProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl Provider for AnthropicProvider {
     fn name(&self) -> &str {
@@ -49,7 +92,7 @@ impl Provider for AnthropicProvider {
     }
 
     fn base_url(&self) -> &str {
-        "https://api.anthropic.com/v1"
+        &self.base_url
     }
 
     fn auth_header<'a>(&'a self, api_key: &'a str) -> Option<(Cow<'static, str>, Cow<'a, str>)> {
@@ -115,6 +158,10 @@ impl Provider for AnthropicProvider {
 
     fn available_api_types(&self) -> Vec<APIType> {
         vec![APIType::AnthropicMessages]
+    }
+
+    fn api_type(&self) -> APIType {
+        APIType::AnthropicMessages
     }
 
     fn codec_for(&self, api_type: APIType) -> Option<Box<dyn APITypeCodec>> {

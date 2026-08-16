@@ -7,6 +7,7 @@ use crate::auth::CredentialProvider;
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 use crate::error::HiLlmResult;
 use crate::http::transport::TransportConfig;
+use crate::provider::APIType;
 #[cfg(feature = "tower")]
 use crate::tower::{BudgetConfig, CacheConfig, CacheStore, LlmHook, RateLimitConfig};
 
@@ -20,6 +21,7 @@ pub struct ClientBuilder<K = NoApiKey, P = NoProvider> {
     api_key: SecretString,
     provider_name: Option<String>,
     base_url: Option<String>,
+    api_type: Option<APIType>,
     timeout: Duration,
     max_retries: u32,
     transport: TransportConfig,
@@ -53,6 +55,7 @@ impl ClientBuilder<NoApiKey, NoProvider> {
             api_key: SecretString::from(String::new()),
             provider_name: None,
             base_url: None,
+            api_type: None,
             timeout: Duration::from_secs(60),
             max_retries: 3,
             transport: TransportConfig::default(),
@@ -94,6 +97,7 @@ impl<K, P> ClientBuilder<K, P> {
             api_key: SecretString::from(key.into()),
             provider_name: self.provider_name,
             base_url: self.base_url,
+            api_type: self.api_type,
             timeout: self.timeout,
             max_retries: self.max_retries,
             transport: self.transport,
@@ -127,6 +131,7 @@ impl<K, P> ClientBuilder<K, P> {
             api_key: self.api_key,
             provider_name: Some(provider_name.into()),
             base_url: self.base_url,
+            api_type: self.api_type,
             timeout: self.timeout,
             max_retries: self.max_retries,
             transport: self.transport,
@@ -158,6 +163,17 @@ impl<K, P> ClientBuilder<K, P> {
     pub fn base_url(mut self, url: impl Into<String>) -> Self {
         let url = url.into();
         self.base_url = Some(url.trim_end_matches('/').to_string());
+        self
+    }
+
+    /// Explicitly select the API type the provider instance should speak.
+    ///
+    /// When combined with a custom `base_url`, this declares which protocol
+    /// the endpoint implements. When omitted, the provider's effective
+    /// default API type is used (marked deprecated for custom base URLs —
+    /// prefer setting this explicitly).
+    pub fn api_type(mut self, api_type: APIType) -> Self {
+        self.api_type = Some(api_type);
         self
     }
 
@@ -255,6 +271,7 @@ impl ClientBuilder<WithApiKey, WithProvider> {
         let config = ClientConfig {
             api_key: self.api_key,
             base_url: self.base_url,
+            api_type: self.api_type,
             timeout: self.timeout,
             max_retries: self.max_retries,
             extra_headers: Vec::new(),

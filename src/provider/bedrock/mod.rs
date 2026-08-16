@@ -142,6 +142,10 @@ impl Provider for BedrockProvider {
         vec![APIType::BedrockConverse]
     }
 
+    fn api_type(&self) -> APIType {
+        APIType::BedrockConverse
+    }
+
     fn codec_for(&self, api_type: APIType) -> Option<Box<dyn APITypeCodec>> {
         match api_type {
             APIType::BedrockConverse => Some(Box::new(BedrockConverseCodec)),

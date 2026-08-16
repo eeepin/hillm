@@ -7,6 +7,7 @@ use crate::auth::CredentialProvider;
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 use crate::error::{HiLlmError, HiLlmResult};
 use crate::http::transport::TransportConfig;
+use crate::provider::APIType;
 #[cfg(feature = "tower")]
 use crate::tower::{BudgetConfig, CacheConfig, CacheStore, LlmHook, RateLimitConfig};
 
@@ -14,6 +15,10 @@ use crate::tower::{BudgetConfig, CacheConfig, CacheStore, LlmHook, RateLimitConf
 pub struct ClientConfig {
     pub api_key: SecretString,
     pub base_url: Option<String>,
+    /// Explicit API type selection for the provider instance.
+    ///
+    /// When `None`, the provider's effective default API type is used.
+    pub api_type: Option<APIType>,
     pub timeout: Duration,
     pub max_retries: u32,
     pub(crate) extra_headers: Vec<(String, String)>,
@@ -45,6 +50,7 @@ impl ClientConfig {
         Self {
             api_key: SecretString::from(api_key.into()),
             base_url: None,
+            api_type: None,
             timeout: Duration::from_secs(60),
             max_retries: 3,
             extra_headers: Vec::new(),
@@ -87,6 +93,7 @@ impl std::fmt::Debug for ClientConfig {
         let mut dbg = f.debug_struct("ClientConfig");
         dbg.field("api_key", &"[redacted]")
             .field("base_url", &self.base_url)
+            .field("api_type", &self.api_type)
             .field("timeout", &self.timeout)
             .field("max_retries", &self.max_retries)
             .field("extra_headers", &redacted_headers)
@@ -142,6 +149,16 @@ impl ClientConfigBuilder {
     pub fn base_url(mut self, url: impl Into<String>) -> Self {
         let url = url.into();
         self.config.base_url = Some(url.trim_end_matches('/').to_string());
+        self
+    }
+
+    /// Explicitly select the API type the provider instance should speak.
+    ///
+    /// When combined with a custom `base_url`, this declares which protocol
+    /// the endpoint implements. When omitted, the provider's effective
+    /// default API type is used.
+    pub fn api_type(mut self, api_type: APIType) -> Self {
+        self.config.api_type = Some(api_type);
         self
     }
 
