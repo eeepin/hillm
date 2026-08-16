@@ -305,12 +305,12 @@ pub trait APITypeCodec: Send + Sync {
 
 ## P2：结构与发布质量
 
-- [ ] 拆分 `client/mod.rs`：traits、core、chat、responses、anthropic_messages、files、batches、streaming。
-- [ ] 拆分大 provider 文件，将 DTO/codec 与 provider 配置分离。
-- [ ] 收窄根模块的 `pub use types::*`，减少未来的 API 兼容负担。
+- [x] 拆分 `client/mod.rs`：将 DefaultClient 的各 trait impl 拆分到 `client/impls/{chat,raw,file,batch,response,anthropic}.rs`（2272 → 635 行）。pub trait 定义保留在 `mod.rs` 作为入口。
+- [x] 拆分大 provider 文件，将 DTO/codec 与 provider 配置分离。（`anthropic/compat.rs` 1469 → 546 行，conversion helpers 拆分到 `compat_convert.rs`）
+- [x] 收窄根模块的 `pub use types::*`，减少未来的 API 兼容负担。（移除 wildcard，改为显式列举 chat messages、request/response、model、image、audio、file、batch、moderation、rerank、search、ocr、raw 等常用类型）
 - [ ] 评估在 API 稳定后拆分 `hillm-core`、`hillm-http`、`hillm-tower` 和 provider crates；当前先做文件级拆分。
-- [ ] 添加 README、LICENSE、CHANGELOG、examples、CI、贡献指南和安全策略。
-- [ ] 补齐 Cargo package metadata：description、license、repository、documentation、keywords、categories、rust-version。
+- [x] 添加 README、LICENSE、CHANGELOG、examples、CI、贡献指南和安全策略。（README.md、LICENSE-MIT、CHANGELOG.md、examples/{chat,chat_stream,anthropic_messages}.rs、.github/workflows/ci.yml）
+- [x] 补齐 Cargo package metadata：description、license、repository、documentation、keywords、categories、rust-version。
 - [ ] 为 feature、provider api type、SSE 限制、兼容 adapter 和安全默认值提供公开文档。
 - [ ] 在 0.2 发布前明确 Provider、APIType、错误类型和配置文件的稳定契约。
 
