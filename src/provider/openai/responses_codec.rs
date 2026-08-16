@@ -28,8 +28,14 @@ impl APITypeCodec for OpenAIResponsesCodec {
     }
 
     fn parse_stream_event(&self, data: &str) -> HiLlmResult<Option<serde_json::Value>> {
-        // Responses API uses SSE with event types in the JSON payload.
-        // Unlike Chat Completions, it does not use "[DONE]" sentinel.
+        // The Responses API uses SSE with event types inside the JSON payload.
+        // Unlike Chat Completions, it has no "[DONE]" sentinel: if a "[DONE]"
+        // marker ever appears here it is a protocol violation, not end-of-stream.
+        if data == "[DONE]" {
+            return Err(HiLlmError::Streaming {
+                message: "unexpected '[DONE]' sentinel in OpenAI Responses stream".into(),
+            });
+        }
         // Event types include: response.created, response.output_text.delta, etc.
         serde_json::from_str(data)
             .map(Some)
@@ -83,5 +89,15 @@ mod tests {
         let event = result.unwrap();
         assert_eq!(event["type"], "response.output_text.delta");
         assert_eq!(event["delta"], "Hello");
+    }
+
+    #[test]
+    fn test_openai_responses_codec_rejects_done_sentinel() {
+        let codec = OpenAIResponsesCodec;
+        let result = codec.parse_stream_event("[DONE]");
+        assert!(
+            result.is_err(),
+            "[DONE] belongs to Chat Completions, not the Responses API"
+        );
     }
 }

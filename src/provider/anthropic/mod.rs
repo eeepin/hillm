@@ -13,6 +13,7 @@ const BETA_PROMPT_CACHING: &str = "prompt-caching-2024-07-31";
 const BETA_PDFS: &str = "pdfs-2024-09-25";
 
 pub mod codec;
+pub mod compat;
 
 /// Recursively check if any value in the JSON body contains a `cache_control` field.
 fn body_contains_cache_control(value: &serde_json::Value) -> bool {

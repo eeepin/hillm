@@ -197,9 +197,14 @@ pub enum AnthropicStopReason {
 }
 
 /// Token usage.
+///
+/// `input_tokens` is absent from `message_delta` stream events (only
+/// `output_tokens` is sent there), so both fields deserialize with defaults.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AnthropicUsage {
+    #[serde(default)]
     pub input_tokens: u64,
+    #[serde(default)]
     pub output_tokens: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cache_creation_input_tokens: Option<u64>,

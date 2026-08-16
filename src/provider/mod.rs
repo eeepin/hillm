@@ -560,6 +560,14 @@ pub(crate) fn create_provider(
     match name {
         "openai" => return Ok(Box::new(openai::OpenAIProvider::with_api_type(api_type)?)),
         "anthropic" => {
+            // The native protocol for Anthropic is Messages. Selecting OpenAI
+            // Chat Completions for it yields the explicit compatibility
+            // adapter, never a hidden default.
+            if api_type == APIType::OpenAIChatCompletions {
+                return Ok(Box::new(
+                    anthropic::compat::AnthropicChatCompatProvider::new(),
+                ));
+            }
             return Ok(Box::new(anthropic::AnthropicProvider::with_api_type(
                 api_type,
             )?));
@@ -849,15 +857,17 @@ mod tests {
     }
 
     #[test]
-    fn create_provider_rejects_chat_api_type_for_anthropic() {
-        // The Anthropic provider only speaks the native Messages protocol;
-        // requesting Chat Completions fails with a structured error instead
-        // of silently falling back.
-        let result = create_provider("anthropic", APIType::OpenAIChatCompletions);
-        assert!(result.is_err());
-        if let Err(err) = result {
-            assert!(matches!(err, HiLlmError::APITypeUnsupported { .. }));
-        }
+    fn create_provider_anthropic_chat_completions_returns_explicit_compat_adapter() {
+        // Selecting Chat Completions for Anthropic is allowed, but only via
+        // the explicit compatibility adapter — the instance reports the Chat
+        // API type and a Chat codec, while the wire endpoint stays /messages.
+        let provider = create_provider("anthropic", APIType::OpenAIChatCompletions)
+            .expect("anthropic supports chat completions through the compat adapter");
+        assert_eq!(provider.api_type(), APIType::OpenAIChatCompletions);
+        let codec = provider
+            .codec_for(APIType::OpenAIChatCompletions)
+            .expect("compat codec");
+        assert_eq!(codec.endpoint_path(), "/messages");
     }
 
     #[test]

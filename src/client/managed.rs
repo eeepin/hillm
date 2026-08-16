@@ -23,7 +23,7 @@ use crate::types::image::{CreateImageRequest, ImagesResponse};
 use crate::types::moderation::{ModerationRequest, ModerationResponse};
 use crate::types::ocr::{OcrRequest, OcrResponse};
 use crate::types::rerank::{RerankRequest, RerankResponse};
-use crate::types::response::{CreateResponseRequest, ResponseObject};
+use crate::types::response::{CreateResponseRequest, ResponseObject, ResponsesStreamEvent};
 use crate::types::search::{SearchRequest, SearchResponse};
 use crate::types::{
     ChatCompletionChunk, ChatCompletionRequest, ChatCompletionResponse, EmbeddingRequest,
@@ -450,6 +450,13 @@ impl ResponseClient for ManagedClient {
         req: CreateResponseRequest,
     ) -> BoxFuture<'_, HiLlmResult<ResponseObject>> {
         self.inner.create_response(req)
+    }
+
+    fn create_response_stream(
+        &self,
+        req: CreateResponseRequest,
+    ) -> BoxFuture<'_, HiLlmResult<BoxStream<'static, HiLlmResult<ResponsesStreamEvent>>>> {
+        self.inner.create_response_stream(req)
     }
 
     fn retrieve_response(&self, response_id: &str) -> BoxFuture<'_, HiLlmResult<ResponseObject>> {
