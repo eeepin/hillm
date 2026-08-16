@@ -877,7 +877,8 @@ mod tests {
             }
         });
 
-        let mut sse_stream = SSEStream::new(stream);
+        let sse_stream = SSEStream::new(stream);
+        tokio::pin!(sse_stream);
 
         // Poll once to get an event
         let event = sse_stream.next().await.unwrap().unwrap();
