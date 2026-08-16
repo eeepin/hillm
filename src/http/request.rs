@@ -4,6 +4,7 @@ use bytes::Bytes;
 
 use crate::error::{HiLlmError, HiLlmResult};
 use crate::http::retry;
+use crate::util::bound::{check_bound, RESPONSE_BODY_MAX_BYTES};
 
 pub(crate) fn retry_after_from_response(resp: &reqwest::Response) -> Option<std::time::Duration> {
     let value = resp
@@ -12,6 +13,43 @@ pub(crate) fn retry_after_from_response(resp: &reqwest::Response) -> Option<std:
         .to_str()
         .ok()?;
     retry::parse_retry_after(value)
+}
+
+/// Read a JSON response body with a size bound to prevent OOM attacks.
+async fn read_bounded_json(resp: reqwest::Response) -> HiLlmResult<serde_json::Value> {
+    let text = resp.text().await.map_err(HiLlmError::from)?;
+    check_bound(
+        "response body",
+        0,
+        text.len(),
+        RESPONSE_BODY_MAX_BYTES,
+    )?;
+    serde_json::from_str(&text).map_err(HiLlmError::from)
+}
+
+/// Read a binary response body with a size bound to prevent OOM attacks.
+async fn read_bounded_bytes(resp: reqwest::Response) -> HiLlmResult<Bytes> {
+    let bytes = resp.bytes().await.map_err(HiLlmError::from)?;
+    check_bound(
+        "response body",
+        0,
+        bytes.len(),
+        RESPONSE_BODY_MAX_BYTES,
+    )?;
+    Ok(bytes)
+}
+
+/// Read an error response body with a size bound.
+async fn read_bounded_error_text(resp: reqwest::Response) -> String {
+    match resp.text().await {
+        Ok(text) if text.len() <= RESPONSE_BODY_MAX_BYTES => text,
+        Ok(text) => format!(
+            "(error body truncated: {} bytes exceeds {} byte limit)",
+            text.len(),
+            RESPONSE_BODY_MAX_BYTES
+        ),
+        Err(e) => format!("(failed to read body: {e})"),
+    }
 }
 
 pub(crate) async fn with_retry<F, Fut>(
@@ -44,10 +82,7 @@ where
             continue;
         }
 
-        let text = resp
-            .text()
-            .await
-            .unwrap_or_else(|e| format!("(failed to read body: {e})"));
+        let text = read_bounded_error_text(resp).await;
         return Err(HiLlmError::from_status(status, &text, server_retry_after));
     }
 }
@@ -97,9 +132,7 @@ pub async fn post_json_raw(
         span.record("http.retry_count", retry_count.saturating_sub(1));
     }
 
-    resp.json::<serde_json::Value>()
-        .await
-        .map_err(HiLlmError::from)
+    read_bounded_json(resp).await
 }
 
 #[cfg_attr(
@@ -147,7 +180,7 @@ pub async fn post_binary(
         span.record("http.retry_count", retry_count.saturating_sub(1));
     }
 
-    resp.bytes().await.map_err(HiLlmError::from)
+    read_bounded_bytes(resp).await
 }
 
 #[cfg_attr(
@@ -187,16 +220,11 @@ pub async fn post_multipart(
     let status = resp.status().as_u16();
     if !resp.status().is_success() {
         let server_retry_after = retry_after_from_response(&resp);
-        let text = resp
-            .text()
-            .await
-            .unwrap_or_else(|e| format!("(failed to read body: {e})"));
+        let text = read_bounded_error_text(resp).await;
         return Err(HiLlmError::from_status(status, &text, server_retry_after));
     }
 
-    resp.json::<serde_json::Value>()
-        .await
-        .map_err(HiLlmError::from)
+    read_bounded_json(resp).await
 }
 
 #[cfg_attr(
@@ -240,9 +268,7 @@ pub async fn get_json_raw(
         span.record("http.retry_count", retry_count.saturating_sub(1));
     }
 
-    resp.json::<serde_json::Value>()
-        .await
-        .map_err(HiLlmError::from)
+    read_bounded_json(resp).await
 }
 
 #[cfg_attr(
@@ -286,9 +312,7 @@ pub async fn delete_json(
         span.record("http.retry_count", retry_count.saturating_sub(1));
     }
 
-    resp.json::<serde_json::Value>()
-        .await
-        .map_err(HiLlmError::from)
+    read_bounded_json(resp).await
 }
 
 #[cfg_attr(
@@ -332,5 +356,5 @@ pub async fn get_binary(
         span.record("http.retry_count", retry_count.saturating_sub(1));
     }
 
-    resp.bytes().await.map_err(HiLlmError::from)
+    read_bounded_bytes(resp).await
 }
