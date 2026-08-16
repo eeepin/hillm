@@ -4,7 +4,7 @@ use tower::Layer;
 use tower::Service;
 use tracing::Instrument as _;
 
-use super::types::{LlmRequest, LlmResponse};
+use super::types::{LLMRequest, LLMResponse};
 use crate::client::BoxFuture;
 use crate::error::{HiLLMError, HiLLMResult};
 use crate::types::FinishReason;
@@ -34,20 +34,20 @@ where
     }
 }
 
-impl<S> Service<LlmRequest> for TracingService<S>
+impl<S> Service<LLMRequest> for TracingService<S>
 where
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Send + 'static,
+    S: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + Send + 'static,
     S::Future: Send + 'static,
 {
-    type Response = LlmResponse;
+    type Response = LLMResponse;
     type Error = HiLLMError;
-    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
+    type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, req: LlmRequest) -> Self::Future {
+    fn call(&mut self, req: LLMRequest) -> Self::Future {
         let operation_name = req.operation_name();
         let model_str = req.model().unwrap_or("");
         let system = model_str.split_once('/').map_or("", |(prefix, _)| prefix);
@@ -92,9 +92,9 @@ pub use tracing_opentelemetry;
 #[cfg(feature = "otel")]
 pub use opentelemetry;
 
-fn record_response(span: &tracing::Span, resp: &LlmResponse) {
+fn record_response(span: &tracing::Span, resp: &LLMResponse) {
     match resp {
-        LlmResponse::Chat(r) => {
+        LLMResponse::Chat(r) => {
             span.record("gen_ai.response.id", r.id.as_str());
             span.record("gen_ai.response.model", r.model.as_str());
 
@@ -104,18 +104,18 @@ fn record_response(span: &tracing::Span, resp: &LlmResponse) {
                 span.record("gen_ai.response.finish_reasons", finish_reasons.as_str());
             }
         }
-        LlmResponse::Embed(r) => {
+        LLMResponse::Embed(r) => {
             span.record("gen_ai.response.model", r.model.as_str());
         }
-        LlmResponse::ChatStream(_)
-        | LlmResponse::ListModels(_)
-        | LlmResponse::ImageGenerate(_)
-        | LlmResponse::Speech(_)
-        | LlmResponse::Transcribe(_)
-        | LlmResponse::Moderate(_)
-        | LlmResponse::Rerank(_)
-        | LlmResponse::Search(_)
-        | LlmResponse::Ocr(_) => {}
+        LLMResponse::ChatStream(_)
+        | LLMResponse::ListModels(_)
+        | LLMResponse::ImageGenerate(_)
+        | LLMResponse::Speech(_)
+        | LLMResponse::Transcribe(_)
+        | LLMResponse::Moderate(_)
+        | LLMResponse::Rerank(_)
+        | LLMResponse::Search(_)
+        | LLMResponse::Ocr(_) => {}
     }
 
     if let Some(usage) = resp.usage() {

@@ -8,7 +8,7 @@ use tokio::sync::broadcast;
 use tower::{Layer, Service};
 
 use super::cache::{CachedResponse, record_cache_state};
-use super::types::{LlmRequest, LlmRequestKind, LlmResponse};
+use super::types::{LLMRequest, LLMRequestKind, LLMResponse};
 use crate::client::BoxFuture;
 use crate::error::{HiLLMError, HiLLMResult};
 use crate::observability::usage::CacheState;
@@ -141,12 +141,12 @@ impl<C: SingleflightCoordinator, S: Clone> Clone for SingleflightService<C, S> {
     }
 }
 
-fn singleflight_key(req: &LlmRequest) -> Option<u64> {
+fn singleflight_key(req: &LLMRequest) -> Option<u64> {
     use std::hash::{DefaultHasher, Hash, Hasher};
 
     let json = match &req.kind {
-        LlmRequestKind::Chat(r) => serde_json::to_string(r).ok()?,
-        LlmRequestKind::Embed(r) => serde_json::to_string(r).ok()?,
+        LLMRequestKind::Chat(r) => serde_json::to_string(r).ok()?,
+        LLMRequestKind::Embed(r) => serde_json::to_string(r).ok()?,
         _ => return None,
     };
     let mut hasher = DefaultHasher::new();
@@ -154,21 +154,21 @@ fn singleflight_key(req: &LlmRequest) -> Option<u64> {
     Some(hasher.finish())
 }
 
-impl<C, S> Service<LlmRequest> for SingleflightService<C, S>
+impl<C, S> Service<LLMRequest> for SingleflightService<C, S>
 where
     C: SingleflightCoordinator,
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Clone + Send + 'static,
+    S: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + Clone + Send + 'static,
     S::Future: Send + 'static,
 {
-    type Response = LlmResponse;
+    type Response = LLMResponse;
     type Error = HiLLMError;
-    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
+    type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, req: LlmRequest) -> Self::Future {
+    fn call(&mut self, req: LLMRequest) -> Self::Future {
         let key = singleflight_key(&req);
         let Some(key) = key else {
             let fut = self.inner.call(req);
@@ -186,8 +186,8 @@ where
                     let result = inner.call(req).await;
                     let sf_result: SingleflightResult = match &result {
                         Ok(resp) => match resp {
-                            LlmResponse::Chat(r) => Ok(CachedResponse::Chat(r.clone())),
-                            LlmResponse::Embed(r) => Ok(CachedResponse::Embed(r.clone())),
+                            LLMResponse::Chat(r) => Ok(CachedResponse::Chat(r.clone())),
+                            LLMResponse::Embed(r) => Ok(CachedResponse::Embed(r.clone())),
                             _ => Err(Arc::new(HiLLMError::InternalError {
                                 message: "singleflight: non-cacheable response variant in leader"
                                     .into(),
@@ -243,16 +243,16 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tower::types::{LlmRequest, LlmRequestKind, LlmResponse};
+    use crate::tower::types::{LLMRequest, LLMRequestKind, LLMResponse};
     use crate::types::{ChatCompletionRequest, ChatCompletionResponse, Message, Usage};
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use tokio::time::{Duration, sleep};
     use tower::ServiceExt;
 
-    fn create_chat_request(content: &str) -> LlmRequest {
-        LlmRequest {
-            kind: LlmRequestKind::Chat(ChatCompletionRequest {
+    fn create_chat_request(content: &str) -> LLMRequest {
+        LLMRequest {
+            kind: LLMRequestKind::Chat(ChatCompletionRequest {
                 model: "test-model".to_string(),
                 messages: vec![Message::User(crate::types::UserMessage {
                     content: crate::types::MessageContent::Text(content.to_string()),
@@ -265,8 +265,8 @@ mod tests {
         }
     }
 
-    fn create_chat_response(content: &str) -> LlmResponse {
-        LlmResponse::Chat(ChatCompletionResponse {
+    fn create_chat_response(content: &str) -> LLMResponse {
+        LLMResponse::Chat(ChatCompletionResponse {
             id: "test-id".to_string(),
             object: "chat.completion".to_string(),
             created: 1234567890,
@@ -308,16 +308,16 @@ mod tests {
         }
     }
 
-    impl Service<LlmRequest> for MockService {
-        type Response = LlmResponse;
+    impl Service<LLMRequest> for MockService {
+        type Response = LLMResponse;
         type Error = HiLLMError;
-        type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
+        type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
 
         fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
             Poll::Ready(Ok(()))
         }
 
-        fn call(&mut self, _req: LlmRequest) -> Self::Future {
+        fn call(&mut self, _req: LLMRequest) -> Self::Future {
             let count = self.call_count.clone();
             let delay = self.delay;
             Box::pin(async move {
@@ -460,7 +460,7 @@ mod tests {
         let leader_result = leader_handle.await.unwrap().unwrap();
         let follower_result = follower_handle.await.unwrap().unwrap();
 
-        // 验证两个请求都成功（LlmResponse 是枚举类型，不是 Result）
+        // 验证两个请求都成功（LLMResponse 是枚举类型，不是 Result）
         // 只要没有 panic 或返回错误，就说明成功了
         let _ = leader_result;
         let _ = follower_result;
@@ -477,16 +477,16 @@ mod tests {
         #[derive(Clone)]
         struct FailingService;
 
-        impl Service<LlmRequest> for FailingService {
-            type Response = LlmResponse;
+        impl Service<LLMRequest> for FailingService {
+            type Response = LLMResponse;
             type Error = HiLLMError;
-            type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
+            type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
 
             fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
                 Poll::Ready(Ok(()))
             }
 
-            fn call(&mut self, _req: LlmRequest) -> Self::Future {
+            fn call(&mut self, _req: LLMRequest) -> Self::Future {
                 Box::pin(async move {
                     sleep(Duration::from_millis(50)).await;
                     Err(HiLLMError::InternalError {
@@ -549,8 +549,8 @@ mod tests {
         };
 
         // 创建一个非 cacheable 的请求（例如 Image 请求）
-        let req = LlmRequest {
-            kind: LlmRequestKind::ImageGenerate(Default::default()),
+        let req = LLMRequest {
+            kind: LLMRequestKind::ImageGenerate(Default::default()),
             tenant_id: None,
             idempotency_key: None,
         };

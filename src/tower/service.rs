@@ -6,7 +6,7 @@ use std::task::{Context, Poll};
 use futures_core::Stream;
 use tower::Service;
 
-use super::types::{LlmRequest, LlmRequestKind, LlmResponse};
+use super::types::{LLMRequest, LLMRequestKind, LLMResponse};
 use crate::client::{
     AudioClient, BoxFuture, ChatCompletionClient, EmbeddingClient, ImageClient, ModelClient,
     ModerationClient, OcrClient, RerankClient, SearchClient,
@@ -14,11 +14,11 @@ use crate::client::{
 use crate::error::{HiLLMError, HiLLMResult};
 use crate::types::ChatCompletionChunk;
 
-pub struct LlmService<C> {
+pub struct LLMService<C> {
     inner: Arc<C>,
 }
 
-impl<C> LlmService<C> {
+impl<C> LLMService<C> {
     #[must_use]
     pub fn new(client: C) -> Self {
         Self {
@@ -36,7 +36,7 @@ impl<C> LlmService<C> {
     }
 }
 
-impl<C> Clone for LlmService<C> {
+impl<C> Clone for LLMService<C> {
     fn clone(&self) -> Self {
         Self {
             inner: Arc::clone(&self.inner),
@@ -44,7 +44,7 @@ impl<C> Clone for LlmService<C> {
     }
 }
 
-impl<C> Service<LlmRequest> for LlmService<C>
+impl<C> Service<LLMRequest> for LLMService<C>
 where
     C: ChatCompletionClient
         + EmbeddingClient
@@ -59,66 +59,66 @@ where
         + Sync
         + 'static,
 {
-    type Response = LlmResponse;
+    type Response = LLMResponse;
     type Error = HiLLMError;
-    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
+    type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
 
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: LlmRequest) -> Self::Future {
+    fn call(&mut self, req: LLMRequest) -> Self::Future {
         let client = Arc::clone(&self.inner);
         Box::pin(async move {
             match req.kind {
-                LlmRequestKind::Chat(r) => {
+                LLMRequestKind::Chat(r) => {
                     let resp = client.chat(r).await?;
-                    Ok(LlmResponse::Chat(resp))
+                    Ok(LLMResponse::Chat(resp))
                 }
-                LlmRequestKind::ChatStream(r) => {
+                LLMRequestKind::ChatStream(r) => {
                     let stream = client.chat_stream(r).await?;
                     let chunks = collect_stream(stream).await?;
                     let static_stream: crate::client::BoxStream<
                         'static,
                         HiLLMResult<ChatCompletionChunk>,
                     > = Box::pin(OwnedChunksStream { chunks });
-                    Ok(LlmResponse::ChatStream(static_stream))
+                    Ok(LLMResponse::ChatStream(static_stream))
                 }
-                LlmRequestKind::Embed(r) => {
+                LLMRequestKind::Embed(r) => {
                     let resp = client.embed(r).await?;
-                    Ok(LlmResponse::Embed(resp))
+                    Ok(LLMResponse::Embed(resp))
                 }
-                LlmRequestKind::ListModels => {
+                LLMRequestKind::ListModels => {
                     let resp = client.list_models().await?;
-                    Ok(LlmResponse::ListModels(resp))
+                    Ok(LLMResponse::ListModels(resp))
                 }
-                LlmRequestKind::ImageGenerate(r) => {
+                LLMRequestKind::ImageGenerate(r) => {
                     let resp = client.image_generate(r).await?;
-                    Ok(LlmResponse::ImageGenerate(resp))
+                    Ok(LLMResponse::ImageGenerate(resp))
                 }
-                LlmRequestKind::Speech(r) => {
+                LLMRequestKind::Speech(r) => {
                     let resp = client.speech(r).await?;
-                    Ok(LlmResponse::Speech(resp))
+                    Ok(LLMResponse::Speech(resp))
                 }
-                LlmRequestKind::Transcribe(r) => {
+                LLMRequestKind::Transcribe(r) => {
                     let resp = client.transcribe(r).await?;
-                    Ok(LlmResponse::Transcribe(resp))
+                    Ok(LLMResponse::Transcribe(resp))
                 }
-                LlmRequestKind::Moderate(r) => {
+                LLMRequestKind::Moderate(r) => {
                     let resp = client.moderate(r).await?;
-                    Ok(LlmResponse::Moderate(resp))
+                    Ok(LLMResponse::Moderate(resp))
                 }
-                LlmRequestKind::Rerank(r) => {
+                LLMRequestKind::Rerank(r) => {
                     let resp = client.rerank(r).await?;
-                    Ok(LlmResponse::Rerank(resp))
+                    Ok(LLMResponse::Rerank(resp))
                 }
-                LlmRequestKind::Search(r) => {
+                LLMRequestKind::Search(r) => {
                     let resp = client.search(r).await?;
-                    Ok(LlmResponse::Search(resp))
+                    Ok(LLMResponse::Search(resp))
                 }
-                LlmRequestKind::Ocr(r) => {
+                LLMRequestKind::Ocr(r) => {
                     let resp = client.ocr(r).await?;
-                    Ok(LlmResponse::Ocr(resp))
+                    Ok(LLMResponse::Ocr(resp))
                 }
             }
         })

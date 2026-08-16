@@ -3,7 +3,7 @@ use std::task::{Context, Poll};
 
 use tower::{Layer, Service, ServiceExt as _};
 
-use super::types::{LlmRequest, LlmResponse};
+use super::types::{LLMRequest, LLMResponse};
 use crate::client::BoxFuture;
 use crate::error::{HiLLMError, HiLLMResult};
 
@@ -98,9 +98,9 @@ impl<S: Clone, R: RetryPolicy> Clone for FallbackChainService<S, R> {
     }
 }
 
-impl<S, R> Service<LlmRequest> for FallbackChainService<S, R>
+impl<S, R> Service<LLMRequest> for FallbackChainService<S, R>
 where
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError>
+    S: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError>
         + Clone
         + Send
         + Sync
@@ -108,15 +108,15 @@ where
     S::Future: Send + 'static,
     R: RetryPolicy,
 {
-    type Response = LlmResponse;
+    type Response = LLMResponse;
     type Error = HiLLMError;
-    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
+    type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
 
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, request: LlmRequest) -> Self::Future {
+    fn call(&mut self, request: LLMRequest) -> Self::Future {
         let chain = Arc::clone(&self.chain);
         let policy = Arc::clone(&self.policy);
 
@@ -207,7 +207,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tower::types::{LlmRequest, LlmResponse};
+    use crate::tower::types::{LLMRequest, LLMResponse};
     use crate::types::{
         AssistantMessage, ChatCompletionRequest, ChatCompletionResponse, Choice, Message,
         MessageContent, Usage,
@@ -216,9 +216,9 @@ mod tests {
     use std::task::{Context, Poll};
     use tower::{Service, ServiceExt};
 
-    fn create_chat_request(content: &str) -> LlmRequest {
-        LlmRequest {
-            kind: crate::tower::types::LlmRequestKind::Chat(ChatCompletionRequest {
+    fn create_chat_request(content: &str) -> LLMRequest {
+        LLMRequest {
+            kind: crate::tower::types::LLMRequestKind::Chat(ChatCompletionRequest {
                 model: "test-model".to_string(),
                 messages: vec![Message::User(crate::types::UserMessage {
                     content: MessageContent::Text(content.to_string()),
@@ -231,8 +231,8 @@ mod tests {
         }
     }
 
-    fn create_chat_response(content: &str) -> LlmResponse {
-        LlmResponse::Chat(ChatCompletionResponse {
+    fn create_chat_response(content: &str) -> LLMResponse {
+        LLMResponse::Chat(ChatCompletionResponse {
             id: "test-id".to_string(),
             object: "chat.completion".to_string(),
             created: 1234567890,
@@ -301,16 +301,16 @@ mod tests {
         }
     }
 
-    impl Service<LlmRequest> for MockService {
-        type Response = LlmResponse;
+    impl Service<LLMRequest> for MockService {
+        type Response = LLMResponse;
         type Error = HiLLMError;
-        type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
+        type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
 
         fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
             Poll::Ready(Ok(()))
         }
 
-        fn call(&mut self, _req: LlmRequest) -> Self::Future {
+        fn call(&mut self, _req: LLMRequest) -> Self::Future {
             self.call_count.fetch_add(1, Ordering::SeqCst);
             let behavior = self.behavior.clone();
             let label = self.label.clone();

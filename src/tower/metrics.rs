@@ -9,7 +9,7 @@ mod inner {
     use opentelemetry::metrics::{Counter, Histogram, Meter};
     use tower::{Layer, Service};
 
-    use super::super::types::{LlmRequest, LlmResponse};
+    use super::super::types::{LLMRequest, LLMResponse};
     use crate::client::BoxFuture;
     use crate::error::{HiLLMError, HiLLMResult};
 
@@ -237,20 +237,20 @@ mod inner {
         }
     }
 
-    impl<S> Service<LlmRequest> for MetricsService<S>
+    impl<S> Service<LLMRequest> for MetricsService<S>
     where
-        S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Send + 'static,
+        S: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + Send + 'static,
         S::Future: Send + 'static,
     {
-        type Response = LlmResponse;
+        type Response = LLMResponse;
         type Error = HiLLMError;
-        type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
+        type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
 
         fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
             self.inner.poll_ready(cx)
         }
 
-        fn call(&mut self, req: LlmRequest) -> Self::Future {
+        fn call(&mut self, req: LLMRequest) -> Self::Future {
             let start = Instant::now();
 
             let operation = req.operation_name();
@@ -269,8 +269,8 @@ mod inner {
                 if let Some(instr) = instruments() {
                     let response_model = match &result {
                         Ok(resp) => match resp {
-                            LlmResponse::Chat(r) => r.model.clone(),
-                            LlmResponse::Embed(r) => r.model.clone(),
+                            LLMResponse::Chat(r) => r.model.clone(),
+                            LLMResponse::Embed(r) => r.model.clone(),
                             _ => model_str.clone(),
                         },
                         Err(_) => model_str.clone(),
@@ -477,7 +477,7 @@ mod inner {
 
     use tower::{Layer, Service};
 
-    use super::super::types::{LlmRequest, LlmResponse};
+    use super::super::types::{LLMRequest, LLMResponse};
     use crate::client::BoxFuture;
     use crate::error::{HiLLMError, HiLLMResult};
 
@@ -504,20 +504,20 @@ mod inner {
         }
     }
 
-    impl<S> Service<LlmRequest> for MetricsService<S>
+    impl<S> Service<LLMRequest> for MetricsService<S>
     where
-        S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Send + 'static,
+        S: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + Send + 'static,
         S::Future: Send + 'static,
     {
-        type Response = LlmResponse;
+        type Response = LLMResponse;
         type Error = HiLLMError;
-        type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
+        type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
 
         fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
             self.inner.poll_ready(cx)
         }
 
-        fn call(&mut self, req: LlmRequest) -> Self::Future {
+        fn call(&mut self, req: LLMRequest) -> Self::Future {
             Box::pin(self.inner.call(req))
         }
     }

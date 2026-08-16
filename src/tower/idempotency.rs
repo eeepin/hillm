@@ -10,7 +10,7 @@ use tower::{Layer, Service};
 use crate::client::BoxFuture;
 use crate::error::{HiLLMError, HiLLMResult};
 use crate::tower::cache::CachedResponse;
-use crate::tower::types::{LlmRequest, LlmRequestKind, LlmResponse};
+use crate::tower::types::{LLMRequest, LLMRequestKind, LLMResponse};
 
 const IDEM_HASH_SEED_0: u64 = 0x5f72_616e_646f_6d5f; // _random_
 const IDEM_HASH_SEED_1: u64 = 0x7676_7669_705f_7631; // vvvip_v1
@@ -30,7 +30,7 @@ fn idem_random_state() -> &'static ahash::RandomState {
     })
 }
 
-fn compute_body_hash(request: &LlmRequest) -> Option<String> {
+fn compute_body_hash(request: &LLMRequest) -> Option<String> {
     let json = serde_json::to_string(&request.kind).ok()?;
 
     let h = idem_random_state().hash_one(&json);
@@ -244,21 +244,21 @@ impl<I: Clone, S: IdempotencyStore> Clone for IdempotencyService<I, S> {
     }
 }
 
-impl<I, S> Service<LlmRequest> for IdempotencyService<I, S>
+impl<I, S> Service<LLMRequest> for IdempotencyService<I, S>
 where
-    I: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Clone + Send + 'static,
+    I: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + Clone + Send + 'static,
     I::Future: Send + 'static,
     S: IdempotencyStore,
 {
-    type Response = LlmResponse;
+    type Response = LLMResponse;
     type Error = HiLLMError;
-    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
+    type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, request: LlmRequest) -> Self::Future {
+    fn call(&mut self, request: LLMRequest) -> Self::Future {
         let standby = self.inner.clone();
         let mut inner = std::mem::replace(&mut self.inner, standby);
 
@@ -327,8 +327,8 @@ where
             match &result {
                 Ok(resp) => {
                     let cached = match resp {
-                        LlmResponse::Chat(r) => Some(CachedResponse::Chat(r.clone())),
-                        LlmResponse::Embed(r) => Some(CachedResponse::Embed(r.clone())),
+                        LLMResponse::Chat(r) => Some(CachedResponse::Chat(r.clone())),
+                        LLMResponse::Embed(r) => Some(CachedResponse::Embed(r.clone())),
                         _ => None,
                     };
                     if let Some(cached_resp) = cached {
@@ -356,8 +356,8 @@ fn store_err(e: IdempotencyStoreError) -> HiLLMError {
 
 #[must_use]
 #[allow(dead_code)]
-pub(crate) fn is_cacheable_kind(kind: &LlmRequestKind) -> bool {
-    matches!(kind, LlmRequestKind::Chat(_) | LlmRequestKind::Embed(_))
+pub(crate) fn is_cacheable_kind(kind: &LLMRequestKind) -> bool {
+    matches!(kind, LLMRequestKind::Chat(_) | LLMRequestKind::Embed(_))
 }
 
 #[cfg(test)]
@@ -394,9 +394,9 @@ mod tests {
         })
     }
 
-    fn create_test_chat_request(content: &str) -> LlmRequest {
-        LlmRequest {
-            kind: LlmRequestKind::Chat(ChatCompletionRequest {
+    fn create_test_chat_request(content: &str) -> LLMRequest {
+        LLMRequest {
+            kind: LLMRequestKind::Chat(ChatCompletionRequest {
                 model: "test-model".to_string(),
                 messages: vec![Message::User(crate::types::UserMessage {
                     content: MessageContent::Text(content.to_string()),
@@ -597,20 +597,20 @@ mod tests {
 
     #[test]
     fn is_cacheable_kind_chat() {
-        let kind = LlmRequestKind::Chat(ChatCompletionRequest::default());
+        let kind = LLMRequestKind::Chat(ChatCompletionRequest::default());
         assert!(is_cacheable_kind(&kind));
     }
 
     #[test]
     fn is_cacheable_kind_embed() {
         use crate::types::EmbeddingRequest;
-        let kind = LlmRequestKind::Embed(EmbeddingRequest::default());
+        let kind = LLMRequestKind::Embed(EmbeddingRequest::default());
         assert!(is_cacheable_kind(&kind));
     }
 
     #[test]
     fn is_cacheable_kind_list_models() {
-        let kind = LlmRequestKind::ListModels;
+        let kind = LLMRequestKind::ListModels;
         assert!(!is_cacheable_kind(&kind));
     }
 

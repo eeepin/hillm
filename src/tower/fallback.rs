@@ -3,7 +3,7 @@ use std::task::{Context, Poll};
 use tower::Layer;
 use tower::Service;
 
-use super::types::{LlmRequest, LlmResponse};
+use super::types::{LLMRequest, LLMResponse};
 use crate::client::BoxFuture;
 use crate::error::{HiLLMError, HiLLMResult};
 
@@ -50,16 +50,16 @@ where
     }
 }
 
-impl<S, F> Service<LlmRequest> for FallbackService<S, F>
+impl<S, F> Service<LLMRequest> for FallbackService<S, F>
 where
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Send + 'static,
+    S: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + Send + 'static,
     S::Future: Send + 'static,
-    F: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Clone + Send + 'static,
+    F: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + Clone + Send + 'static,
     F::Future: Send + 'static,
 {
-    type Response = LlmResponse;
+    type Response = LLMResponse;
     type Error = HiLLMError;
-    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
+    type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         match self.primary.poll_ready(cx) {
@@ -70,7 +70,7 @@ where
         self.fallback.poll_ready(cx)
     }
 
-    fn call(&mut self, req: LlmRequest) -> Self::Future {
+    fn call(&mut self, req: LLMRequest) -> Self::Future {
         let fallback_req = req.clone();
         let primary_fut = self.primary.call(req);
 
@@ -96,7 +96,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tower::types::{LlmRequest, LlmResponse};
+    use crate::tower::types::{LLMRequest, LLMResponse};
     use crate::types::{
         AssistantMessage, ChatCompletionRequest, ChatCompletionResponse, Choice, Message,
         MessageContent, Usage,
@@ -106,9 +106,9 @@ mod tests {
     use std::task::{Context, Poll};
     use tower::{Service, ServiceExt};
 
-    fn create_chat_request(content: &str) -> LlmRequest {
-        LlmRequest {
-            kind: crate::tower::types::LlmRequestKind::Chat(ChatCompletionRequest {
+    fn create_chat_request(content: &str) -> LLMRequest {
+        LLMRequest {
+            kind: crate::tower::types::LLMRequestKind::Chat(ChatCompletionRequest {
                 model: "test-model".to_string(),
                 messages: vec![Message::User(crate::types::UserMessage {
                     content: MessageContent::Text(content.to_string()),
@@ -121,8 +121,8 @@ mod tests {
         }
     }
 
-    fn create_chat_response(content: &str) -> LlmResponse {
-        LlmResponse::Chat(ChatCompletionResponse {
+    fn create_chat_response(content: &str) -> LLMResponse {
+        LLMResponse::Chat(ChatCompletionResponse {
             id: "test-id".to_string(),
             object: "chat.completion".to_string(),
             created: 1234567890,
@@ -164,16 +164,16 @@ mod tests {
         }
     }
 
-    impl Service<LlmRequest> for MockService {
-        type Response = LlmResponse;
+    impl Service<LLMRequest> for MockService {
+        type Response = LLMResponse;
         type Error = HiLLMError;
-        type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
+        type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
 
         fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
             Poll::Ready(Ok(()))
         }
 
-        fn call(&mut self, _req: LlmRequest) -> Self::Future {
+        fn call(&mut self, _req: LLMRequest) -> Self::Future {
             self.call_count.fetch_add(1, Ordering::SeqCst);
             let should_fail = self.should_fail;
             Box::pin(async move {
@@ -192,16 +192,16 @@ mod tests {
     #[derive(Clone)]
     struct TerminalFailService;
 
-    impl Service<LlmRequest> for TerminalFailService {
-        type Response = LlmResponse;
+    impl Service<LLMRequest> for TerminalFailService {
+        type Response = LLMResponse;
         type Error = HiLLMError;
-        type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
+        type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
 
         fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
             Poll::Ready(Ok(()))
         }
 
-        fn call(&mut self, _req: LlmRequest) -> Self::Future {
+        fn call(&mut self, _req: LLMRequest) -> Self::Future {
             Box::pin(async move {
                 Err(HiLLMError::BadRequest {
                     message: "terminal failure".to_string(),

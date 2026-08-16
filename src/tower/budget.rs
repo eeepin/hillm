@@ -10,7 +10,7 @@ use std::time::{Duration, SystemTime};
 use dashmap::DashMap;
 use tower::{Layer, Service};
 
-use super::types::{LlmRequest, LlmResponse};
+use super::types::{LLMRequest, LLMResponse};
 use crate::client::BoxFuture;
 use crate::error::{HiLLMError, HiLLMResult};
 use crate::provider::cost;
@@ -572,20 +572,20 @@ impl<S: Clone> Clone for BudgetService<S> {
     }
 }
 
-impl<S> Service<LlmRequest> for BudgetService<S>
+impl<S> Service<LLMRequest> for BudgetService<S>
 where
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Send + 'static,
+    S: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + Send + 'static,
     S::Future: Send + 'static,
 {
-    type Response = LlmResponse;
+    type Response = LLMResponse;
     type Error = HiLLMError;
-    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
+    type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, req: LlmRequest) -> Self::Future {
+    fn call(&mut self, req: LLMRequest) -> Self::Future {
         let model = req.model().unwrap_or("unknown").to_owned();
         let config = self.config.clone();
         let state = Arc::clone(&self.state);

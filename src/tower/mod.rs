@@ -68,7 +68,7 @@ pub use health::{
     HttpProbeHealthChecker, PerProviderHealthCheck,
 };
 pub use hedge::{FixedDelayHedge, HedgeLayer, HedgePolicy, HedgeService};
-pub use hook::{HooksLayer, HooksService, LlmHook};
+pub use hook::{HooksLayer, HooksService, LLMHook};
 pub use idempotency::{
     IdempotencyEntry, IdempotencyLayer, IdempotencyService, IdempotencyStore,
     IdempotencyStoreError, InMemoryIdempotencyStore,
@@ -80,13 +80,13 @@ pub use rate_limit::{
 };
 pub use route_classify::{
     CascadeClassifier, ClassifierVerdictCache, ClassifyContext, EmbeddingSimilarityClassifier,
-    IntentPrototype, KeywordClassifier, LlmClassifier, RouteClassifier,
+    IntentPrototype, KeywordClassifier, LLMClassifier, RouteClassifier,
 };
 pub use router::{
     DEFAULT_CONCURRENCY_LIMIT, DynamicRouter, ProviderConfig, Router, RouterError, RoutingStrategy,
     StaticDiscover, UpstreamDiscover, Weight,
 };
-pub use service::LlmService;
+pub use service::LLMService;
 pub use tower::ServiceExt;
 pub use tracing::{TracingLayer, TracingService};
-pub use types::{LlmRequest, LlmRequestKind, LlmResponse};
+pub use types::{LLMRequest, LLMRequestKind, LLMResponse};

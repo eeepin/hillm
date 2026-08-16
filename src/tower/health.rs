@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use tower::{Layer, Service};
 
-use super::types::{LlmRequest, LlmResponse};
+use super::types::{LLMRequest, LLMResponse};
 use crate::client::BoxFuture;
 use crate::error::{HiLLMError, HiLLMResult};
 
@@ -189,7 +189,7 @@ impl<S: Clone> Clone for PerProviderHealthCheck<S> {
 
 impl<S> PerProviderHealthCheck<S>
 where
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Clone + Send + 'static,
+    S: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + Clone + Send + 'static,
     S::Future: Send + 'static,
 {
     pub fn new<C: HealthChecker>(
@@ -215,14 +215,14 @@ where
     }
 }
 
-impl<S> Service<LlmRequest> for PerProviderHealthCheck<S>
+impl<S> Service<LLMRequest> for PerProviderHealthCheck<S>
 where
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Send + 'static,
+    S: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + Send + 'static,
     S::Future: Send + 'static,
 {
-    type Response = LlmResponse;
+    type Response = LLMResponse;
     type Error = HiLLMError;
-    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
+    type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         if !self.state.is_healthy() {
@@ -234,7 +234,7 @@ where
         self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, req: LlmRequest) -> Self::Future {
+    fn call(&mut self, req: LLMRequest) -> Self::Future {
         if !self.state.is_healthy() {
             return Box::pin(async {
                 Err(HiLLMError::ServiceUnavailable {
@@ -261,7 +261,7 @@ impl HealthCheckLayer {
 
 impl<S> Layer<S> for HealthCheckLayer
 where
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Clone + Send + 'static,
+    S: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + Clone + Send + 'static,
     S::Future: Send + 'static,
 {
     type Service = HealthCheckService<S>;
@@ -283,7 +283,7 @@ where
 
 async fn run_health_probe<S>(mut svc: S, healthy: Arc<AtomicBool>, interval: Duration)
 where
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Send + 'static,
+    S: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + Send + 'static,
     S::Future: Send + 'static,
 {
     loop {
@@ -293,7 +293,7 @@ where
             break;
         }
 
-        let result = svc.call(LlmRequest::ListModels()).await;
+        let result = svc.call(LLMRequest::ListModels()).await;
         let is_healthy = result.is_ok();
         healthy.store(is_healthy, Ordering::Release);
 
@@ -324,14 +324,14 @@ impl<S> HealthCheckService<S> {
     }
 }
 
-impl<S> Service<LlmRequest> for HealthCheckService<S>
+impl<S> Service<LLMRequest> for HealthCheckService<S>
 where
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Send + 'static,
+    S: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + Send + 'static,
     S::Future: Send + 'static,
 {
-    type Response = LlmResponse;
+    type Response = LLMResponse;
     type Error = HiLLMError;
-    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
+    type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         if !self.healthy.load(Ordering::Acquire) {
@@ -343,7 +343,7 @@ where
         self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, req: LlmRequest) -> Self::Future {
+    fn call(&mut self, req: LLMRequest) -> Self::Future {
         if !self.healthy.load(Ordering::Acquire) {
             return Box::pin(async {
                 Err(HiLLMError::ServiceUnavailable {

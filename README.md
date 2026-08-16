@@ -2,7 +2,7 @@
 
 A unified Rust client abstraction for multiple LLM providers.
 
-`hillm` provides a single, ergonomic API surface (`LlmClient`, `ResponseClient`, `FileClient`, `BatchClient`) that routes requests to **OpenAI**, **Anthropic**, **AWS Bedrock**, and any custom OpenAI-compatible endpoint — with first-class support for streaming, caching, circuit breaking, fallbacks, hedging, rate limiting, budgets, multi-tenant credential resolution, and CEL-expression guardrails.
+`hillm` provides a single, ergonomic API surface (`LLMClient`, `ResponseClient`, `FileClient`, `BatchClient`) that routes requests to **OpenAI**, **Anthropic**, **AWS Bedrock**, and any custom OpenAI-compatible endpoint — with first-class support for streaming, caching, circuit breaking, fallbacks, hedging, rate limiting, budgets, multi-tenant credential resolution, and CEL-expression guardrails.
 
 ## Status
 

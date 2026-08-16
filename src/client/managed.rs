@@ -11,10 +11,10 @@ use super::{
 use crate::error::{HiLLMError, HiLLMResult};
 #[cfg(feature = "opendal")]
 use crate::tower::OpenDalCacheStore;
-use crate::tower::types::{LlmRequest, LlmResponse};
+use crate::tower::types::{LLMRequest, LLMResponse};
 use crate::tower::{
     BudgetLayer, BudgetState, CacheBackend, CacheLayer, CooldownLayer, CostTrackingLayer,
-    HealthCheckLayer, HooksLayer, LlmService, ModelRateLimitLayer, TracingLayer,
+    HealthCheckLayer, HooksLayer, LLMService, ModelRateLimitLayer, TracingLayer,
 };
 use crate::types::audio::{CreateSpeechRequest, CreateTranscriptionRequest, TranscriptionResponse};
 use crate::types::batch::{BatchListQuery, BatchListResponse, BatchObject, CreateBatchRequest};
@@ -34,11 +34,11 @@ use crate::types::{
 };
 
 struct SyncService {
-    inner: Mutex<tower::util::BoxCloneService<LlmRequest, LlmResponse, HiLLMError>>,
+    inner: Mutex<tower::util::BoxCloneService<LLMRequest, LLMResponse, HiLLMError>>,
 }
 
 impl SyncService {
-    fn clone_service(&self) -> tower::util::BoxCloneService<LlmRequest, LlmResponse, HiLLMError> {
+    fn clone_service(&self) -> tower::util::BoxCloneService<LLMRequest, LLMResponse, HiLLMError> {
         match self.inner.lock() {
             Ok(guard) => guard.clone(),
             Err(poisoned) => poisoned.into_inner().clone(),
@@ -82,7 +82,7 @@ impl ManagedClient {
         self.service.is_some()
     }
 
-    fn call_service(&self, req: LlmRequest) -> BoxFuture<'static, HiLLMResult<LlmResponse>> {
+    fn call_service(&self, req: LLMRequest) -> BoxFuture<'static, HiLLMResult<LLMResponse>> {
         let mut svc = match self.service.as_ref() {
             Some(s) => s.clone_service(),
             None => {
@@ -124,11 +124,11 @@ fn build_service_stack(
         return (None, None);
     }
 
-    let base = LlmService::new_from_arc(client);
+    let base = LLMService::new_from_arc(client);
 
     let mut budget_state: Option<Arc<BudgetState>> = None;
 
-    type Bcs = tower::util::BoxCloneService<LlmRequest, LlmResponse, HiLLMError>;
+    type Bcs = tower::util::BoxCloneService<LLMRequest, LLMResponse, HiLLMError>;
 
     let svc: Bcs = tower::util::BoxCloneService::new(base);
 
@@ -230,10 +230,10 @@ impl ChatCompletionClient for ManagedClient {
         if self.service.is_none() {
             return self.inner.chat(req);
         }
-        let fut = self.call_service(LlmRequest::Chat(req));
+        let fut = self.call_service(LLMRequest::Chat(req));
         Box::pin(async move {
             match fut.await? {
-                LlmResponse::Chat(r) => Ok(r),
+                LLMResponse::Chat(r) => Ok(r),
                 other => Err(HiLLMError::InternalError {
                     message: format!("expected Chat response, got {other:?}"),
                 }),
@@ -248,10 +248,10 @@ impl ChatCompletionClient for ManagedClient {
         if self.service.is_none() {
             return self.inner.chat_stream(req);
         }
-        let fut = self.call_service(LlmRequest::ChatStream(req));
+        let fut = self.call_service(LLMRequest::ChatStream(req));
         Box::pin(async move {
             match fut.await? {
-                LlmResponse::ChatStream(s) => Ok(s),
+                LLMResponse::ChatStream(s) => Ok(s),
                 other => Err(HiLLMError::InternalError {
                     message: format!("expected ChatStream response, got {other:?}"),
                 }),
@@ -264,7 +264,7 @@ impl ChatCompletionClient for ManagedClient {
         req: ChatCompletionRequest,
     ) -> BoxFuture<'_, HiLLMResult<RawExchange<ChatCompletionResponse>>> {
         // Raw exchanges bypass middleware — the service stack operates on parsed
-        // LlmRequest/LlmResponse and cannot capture the underlying HTTP bytes.
+        // LLMRequest/LLMResponse and cannot capture the underlying HTTP bytes.
         self.inner.chat_raw(req)
     }
 
@@ -284,10 +284,10 @@ impl EmbeddingClient for ManagedClient {
         if self.service.is_none() {
             return self.inner.embed(req);
         }
-        let fut = self.call_service(LlmRequest::Embed(req));
+        let fut = self.call_service(LLMRequest::Embed(req));
         Box::pin(async move {
             match fut.await? {
-                LlmResponse::Embed(r) => Ok(r),
+                LLMResponse::Embed(r) => Ok(r),
                 other => Err(HiLLMError::InternalError {
                     message: format!("expected Embed response, got {other:?}"),
                 }),
@@ -311,10 +311,10 @@ impl ImageClient for ManagedClient {
         if self.service.is_none() {
             return self.inner.image_generate(req);
         }
-        let fut = self.call_service(LlmRequest::ImageGenerate(req));
+        let fut = self.call_service(LLMRequest::ImageGenerate(req));
         Box::pin(async move {
             match fut.await? {
-                LlmResponse::ImageGenerate(r) => Ok(r),
+                LLMResponse::ImageGenerate(r) => Ok(r),
                 other => Err(HiLLMError::InternalError {
                     message: format!("expected ImageGenerate response, got {other:?}"),
                 }),
@@ -335,10 +335,10 @@ impl AudioClient for ManagedClient {
         if self.service.is_none() {
             return self.inner.speech(req);
         }
-        let fut = self.call_service(LlmRequest::Speech(req));
+        let fut = self.call_service(LLMRequest::Speech(req));
         Box::pin(async move {
             match fut.await? {
-                LlmResponse::Speech(r) => Ok(r),
+                LLMResponse::Speech(r) => Ok(r),
                 other => Err(HiLLMError::InternalError {
                     message: format!("expected Speech response, got {other:?}"),
                 }),
@@ -353,10 +353,10 @@ impl AudioClient for ManagedClient {
         if self.service.is_none() {
             return self.inner.transcribe(req);
         }
-        let fut = self.call_service(LlmRequest::Transcribe(req));
+        let fut = self.call_service(LLMRequest::Transcribe(req));
         Box::pin(async move {
             match fut.await? {
-                LlmResponse::Transcribe(r) => Ok(r),
+                LLMResponse::Transcribe(r) => Ok(r),
                 other => Err(HiLLMError::InternalError {
                     message: format!("expected Transcribe response, got {other:?}"),
                 }),
@@ -377,10 +377,10 @@ impl ModerationClient for ManagedClient {
         if self.service.is_none() {
             return self.inner.moderate(req);
         }
-        let fut = self.call_service(LlmRequest::Moderate(req));
+        let fut = self.call_service(LLMRequest::Moderate(req));
         Box::pin(async move {
             match fut.await? {
-                LlmResponse::Moderate(r) => Ok(r),
+                LLMResponse::Moderate(r) => Ok(r),
                 other => Err(HiLLMError::InternalError {
                     message: format!("expected Moderate response, got {other:?}"),
                 }),
@@ -401,10 +401,10 @@ impl RerankClient for ManagedClient {
         if self.service.is_none() {
             return self.inner.rerank(req);
         }
-        let fut = self.call_service(LlmRequest::Rerank(req));
+        let fut = self.call_service(LLMRequest::Rerank(req));
         Box::pin(async move {
             match fut.await? {
-                LlmResponse::Rerank(r) => Ok(r),
+                LLMResponse::Rerank(r) => Ok(r),
                 other => Err(HiLLMError::InternalError {
                     message: format!("expected Rerank response, got {other:?}"),
                 }),
@@ -425,10 +425,10 @@ impl SearchClient for ManagedClient {
         if self.service.is_none() {
             return self.inner.search(req);
         }
-        let fut = self.call_service(LlmRequest::Search(req));
+        let fut = self.call_service(LLMRequest::Search(req));
         Box::pin(async move {
             match fut.await? {
-                LlmResponse::Search(r) => Ok(r),
+                LLMResponse::Search(r) => Ok(r),
                 other => Err(HiLLMError::InternalError {
                     message: format!("expected Search response, got {other:?}"),
                 }),
@@ -449,10 +449,10 @@ impl OcrClient for ManagedClient {
         if self.service.is_none() {
             return self.inner.ocr(req);
         }
-        let fut = self.call_service(LlmRequest::Ocr(req));
+        let fut = self.call_service(LLMRequest::Ocr(req));
         Box::pin(async move {
             match fut.await? {
-                LlmResponse::Ocr(r) => Ok(r),
+                LLMResponse::Ocr(r) => Ok(r),
                 other => Err(HiLLMError::InternalError {
                     message: format!("expected Ocr response, got {other:?}"),
                 }),
@@ -470,10 +470,10 @@ impl ModelClient for ManagedClient {
         if self.service.is_none() {
             return self.inner.list_models();
         }
-        let fut = self.call_service(LlmRequest::ListModels());
+        let fut = self.call_service(LLMRequest::ListModels());
         Box::pin(async move {
             match fut.await? {
-                LlmResponse::ListModels(r) => Ok(r),
+                LLMResponse::ListModels(r) => Ok(r),
                 other => Err(HiLLMError::InternalError {
                     message: format!("expected ListModels response, got {other:?}"),
                 }),

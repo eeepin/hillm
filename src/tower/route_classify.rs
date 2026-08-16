@@ -220,13 +220,13 @@ where
     }
 }
 
-pub struct LlmClassifier<C> {
+pub struct LLMClassifier<C> {
     client: Arc<C>,
     model: String,
     system_prompt: String,
 }
 
-impl<C> LlmClassifier<C>
+impl<C> LLMClassifier<C>
 where
     C: ChatCompletionClient + EmbeddingClient + Send + Sync + 'static,
 {
@@ -270,7 +270,7 @@ where
     }
 }
 
-impl<C> RouteClassifier for LlmClassifier<C>
+impl<C> RouteClassifier for LLMClassifier<C>
 where
     C: ChatCompletionClient + EmbeddingClient + Send + Sync + 'static,
 {

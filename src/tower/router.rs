@@ -17,7 +17,7 @@ use tower::limit::ConcurrencyLimit;
 use tower::ready_cache::ReadyCache;
 
 use super::route_classify::RouteClassifier;
-use super::types::{LlmRequest, LlmRequestKind, LlmResponse};
+use super::types::{LLMRequest, LLMRequestKind, LLMResponse};
 use crate::client::BoxFuture;
 use crate::error::{HiLLMError, HiLLMResult};
 use crate::provider::cost::completion_cost;
@@ -197,20 +197,20 @@ impl<S: Clone> Clone for Router<S> {
     }
 }
 
-impl<S> Service<LlmRequest> for Router<S>
+impl<S> Service<LLMRequest> for Router<S>
 where
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Clone + Send + 'static,
+    S: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + Clone + Send + 'static,
     S::Future: Send + 'static,
 {
-    type Response = LlmResponse;
+    type Response = LLMResponse;
     type Error = HiLLMError;
-    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
+    type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
 
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: LlmRequest) -> Self::Future {
+    fn call(&mut self, req: LLMRequest) -> Self::Future {
         match &self.strategy {
             RoutingStrategy::RoundRobin => {
                 let idx = self.counter.fetch_add(1, Ordering::Relaxed) % self.deployments.len();
@@ -327,7 +327,7 @@ where
                 let available_models: Vec<String> = (0..n).map(|i| i.to_string()).collect();
 
                 let (prompt, system_prompt) = match &req.kind {
-                    LlmRequestKind::Chat(r) => {
+                    LLMRequestKind::Chat(r) => {
                         let prompt = r
                             .messages
                             .iter()
@@ -474,18 +474,18 @@ impl Default for ProviderConfig {
 pub struct DynamicRouter<D>
 where
     D: Discover<Key = String>,
-    D::Service: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError>,
+    D::Service: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError>,
 {
     discover: D,
-    services: ReadyCache<String, ConcurrencyLimit<D::Service>, LlmRequest>,
+    services: ReadyCache<String, ConcurrencyLimit<D::Service>, LLMRequest>,
     provider_configs: HashMap<String, ProviderConfig>,
-    _marker: PhantomData<LlmRequest>,
+    _marker: PhantomData<LLMRequest>,
 }
 
 impl<D> fmt::Debug for DynamicRouter<D>
 where
     D: Discover<Key = String> + fmt::Debug,
-    D::Service: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + fmt::Debug,
+    D::Service: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("DynamicRouter")
@@ -498,8 +498,8 @@ impl<D> DynamicRouter<D>
 where
     D: Discover<Key = String> + Unpin,
     D::Service:
-        Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Send + Unpin + 'static,
-    <D::Service as Service<LlmRequest>>::Future: Send + 'static,
+        Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + Send + Unpin + 'static,
+    <D::Service as Service<LLMRequest>>::Future: Send + 'static,
     D::Error: Into<tower::BoxError>,
 {
     pub fn new(discover: D) -> Self {
@@ -557,17 +557,17 @@ where
     }
 }
 
-impl<D> Service<LlmRequest> for DynamicRouter<D>
+impl<D> Service<LLMRequest> for DynamicRouter<D>
 where
     D: Discover<Key = String> + Unpin + Send,
     D::Service:
-        Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Send + Unpin + 'static,
-    <D::Service as Service<LlmRequest>>::Future: Send + 'static,
+        Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + Send + Unpin + 'static,
+    <D::Service as Service<LLMRequest>>::Future: Send + 'static,
     D::Error: Into<tower::BoxError>,
 {
-    type Response = LlmResponse;
+    type Response = LLMResponse;
     type Error = HiLLMError;
-    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
+    type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         if let Err(e) = self.update_from_discover(cx) {
@@ -583,7 +583,7 @@ where
         }
     }
 
-    fn call(&mut self, req: LlmRequest) -> Self::Future {
+    fn call(&mut self, req: LLMRequest) -> Self::Future {
         if self.services.ready_len() == 0 {
             return Box::pin(async { Err(RouterError::NoReadyUpstream { code: 2002 }.into()) });
         }
@@ -685,7 +685,7 @@ mod tests {
     // Test infrastructure: mock service and request builder
     // -----------------------------------------------------------------------
 
-    use crate::tower::types::{LlmRequest, LlmResponse};
+    use crate::tower::types::{LLMRequest, LLMResponse};
     use crate::types::{
         AssistantMessage, ChatCompletionRequest, ChatCompletionResponse, Choice, Message,
         MessageContent, Usage,
@@ -693,9 +693,9 @@ mod tests {
     use std::sync::atomic::{AtomicU32, Ordering as StdOrdering};
     use tower::ServiceExt;
 
-    fn create_chat_request(content: &str) -> LlmRequest {
-        LlmRequest {
-            kind: crate::tower::types::LlmRequestKind::Chat(ChatCompletionRequest {
+    fn create_chat_request(content: &str) -> LLMRequest {
+        LLMRequest {
+            kind: crate::tower::types::LLMRequestKind::Chat(ChatCompletionRequest {
                 model: "test-model".to_string(),
                 messages: vec![Message::User(crate::types::UserMessage {
                     content: MessageContent::Text(content.to_string()),
@@ -708,8 +708,8 @@ mod tests {
         }
     }
 
-    fn create_chat_response() -> LlmResponse {
-        LlmResponse::Chat(ChatCompletionResponse {
+    fn create_chat_response() -> LLMResponse {
+        LLMResponse::Chat(ChatCompletionResponse {
             id: "test-id".to_string(),
             object: "chat.completion".to_string(),
             created: 1234567890,
@@ -768,16 +768,16 @@ mod tests {
         }
     }
 
-    impl Service<LlmRequest> for MockService {
-        type Response = LlmResponse;
+    impl Service<LLMRequest> for MockService {
+        type Response = LLMResponse;
         type Error = HiLLMError;
-        type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
+        type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
 
         fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
             Poll::Ready(Ok(()))
         }
 
-        fn call(&mut self, _req: LlmRequest) -> Self::Future {
+        fn call(&mut self, _req: LLMRequest) -> Self::Future {
             self.call_count.fetch_add(1, StdOrdering::SeqCst);
             let behavior = self.behavior.clone();
             Box::pin(async move {

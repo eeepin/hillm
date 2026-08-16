@@ -5,7 +5,7 @@ use std::task::{Context, Poll};
 use tower::Layer;
 use tower::Service;
 
-use super::types::{LlmRequest, LlmResponse};
+use super::types::{LLMRequest, LLMResponse};
 use crate::client::BoxFuture;
 use crate::error::{HiLLMError, HiLLMResult};
 use crate::guardrail::registry::GuardrailRegistry;
@@ -60,20 +60,20 @@ impl<S: Clone> Clone for GuardrailService<S> {
     }
 }
 
-impl<S> Service<LlmRequest> for GuardrailService<S>
+impl<S> Service<LLMRequest> for GuardrailService<S>
 where
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Send + 'static,
+    S: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + Send + 'static,
     S::Future: Send + 'static,
 {
-    type Response = LlmResponse;
+    type Response = LLMResponse;
     type Error = HiLLMError;
-    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
+    type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, req: LlmRequest) -> Self::Future {
+    fn call(&mut self, req: LLMRequest) -> Self::Future {
         let registry = Arc::clone(&self.registry);
         let metadata = Arc::clone(&self.metadata);
         let inner_fut = self.inner.call(req.clone());
@@ -113,15 +113,15 @@ where
             let response = inner_fut.await?;
 
             let response_json = match &response {
-                LlmResponse::Chat(r) => match serde_json::to_value(r) {
+                LLMResponse::Chat(r) => match serde_json::to_value(r) {
                     Ok(v) => v,
                     Err(_) => return Ok(response),
                 },
-                LlmResponse::Embed(r) => match serde_json::to_value(r) {
+                LLMResponse::Embed(r) => match serde_json::to_value(r) {
                     Ok(v) => v,
                     Err(_) => return Ok(response),
                 },
-                LlmResponse::ListModels(r) => match serde_json::to_value(r) {
+                LLMResponse::ListModels(r) => match serde_json::to_value(r) {
                     Ok(v) => v,
                     Err(_) => return Ok(response),
                 },

@@ -10,7 +10,7 @@ use crate::http::transport::TransportConfig;
 use crate::provider::APIType;
 use crate::provider::outbound_policy::OutboundPolicyValidator;
 #[cfg(feature = "tower")]
-use crate::tower::{BudgetConfig, CacheConfig, CacheStore, LlmHook, RateLimitConfig};
+use crate::tower::{BudgetConfig, CacheConfig, CacheStore, LLMHook, RateLimitConfig};
 
 pub struct NoApiKey;
 pub struct WithApiKey;
@@ -36,7 +36,7 @@ pub struct ClientBuilder<K = NoApiKey, P = NoProvider> {
     #[cfg(feature = "tower")]
     budget_config: Option<BudgetConfig>,
     #[cfg(feature = "tower")]
-    hooks: Vec<Arc<dyn LlmHook>>,
+    hooks: Vec<Arc<dyn LLMHook>>,
     #[cfg(feature = "tower")]
     cooldown_duration: Option<Duration>,
     #[cfg(feature = "tower")]
@@ -235,13 +235,13 @@ impl<K, P> ClientBuilder<K, P> {
     }
 
     #[cfg(feature = "tower")]
-    pub fn hook(mut self, hook: Arc<dyn LlmHook>) -> Self {
+    pub fn hook(mut self, hook: Arc<dyn LLMHook>) -> Self {
         self.hooks.push(hook);
         self
     }
 
     #[cfg(feature = "tower")]
-    pub fn hooks(mut self, hooks: Vec<Arc<dyn LlmHook>>) -> Self {
+    pub fn hooks(mut self, hooks: Vec<Arc<dyn LLMHook>>) -> Self {
         self.hooks = hooks;
         self
     }

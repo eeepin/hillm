@@ -3,7 +3,7 @@ use std::task::{Context, Poll};
 use tower::Layer;
 use tower::Service;
 
-use super::types::{LlmRequest, LlmResponse};
+use super::types::{LLMRequest, LLMResponse};
 use crate::client::BoxFuture;
 use crate::error::{HiLLMError, HiLLMResult};
 use crate::provider::cost;
@@ -49,20 +49,20 @@ where
     }
 }
 
-impl<S> Service<LlmRequest> for CostTrackingService<S>
+impl<S> Service<LLMRequest> for CostTrackingService<S>
 where
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Send + 'static,
+    S: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + Send + 'static,
     S::Future: Send + 'static,
 {
-    type Response = LlmResponse;
+    type Response = LLMResponse;
     type Error = HiLLMError;
-    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
+    type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, req: LlmRequest) -> Self::Future {
+    fn call(&mut self, req: LLMRequest) -> Self::Future {
         let model = req.model().map(ToOwned::to_owned);
         let fut = self.inner.call(req);
         let provider = self.provider.clone();
@@ -75,7 +75,7 @@ where
     }
 }
 
-fn record_cost(provider: &str, model: &Option<String>, resp: &LlmResponse) {
+fn record_cost(provider: &str, model: &Option<String>, resp: &LLMResponse) {
     let Some(model) = model else { return };
     let Some(usage) = resp.usage() else { return };
 

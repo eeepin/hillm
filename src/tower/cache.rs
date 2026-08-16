@@ -11,7 +11,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use tower::{Layer, Service};
 
 use super::hash::{ExactHashStrategy, HashKeyInput, HashKeyStrategy};
-use super::types::{LlmRequest, LlmRequestKind, LlmResponse};
+use super::types::{LLMRequest, LLMRequestKind, LLMResponse};
 use crate::client::BoxFuture;
 use crate::embedding::EmbeddingProvider;
 use crate::error::{HiLLMError, HiLLMResult};
@@ -98,10 +98,10 @@ impl<'de> Deserialize<'de> for CachedResponse {
 }
 
 impl CachedResponse {
-    pub fn into_llm_response(self) -> HiLLMResult<LlmResponse> {
+    pub fn into_llm_response(self) -> HiLLMResult<LLMResponse> {
         match self {
-            Self::Chat(r) => Ok(LlmResponse::Chat(r)),
-            Self::Embed(r) => Ok(LlmResponse::Embed(r)),
+            Self::Chat(r) => Ok(LLMResponse::Chat(r)),
+            Self::Embed(r) => Ok(LLMResponse::Embed(r)),
             Self::Error { error, .. } => {
                 Err(
                     Arc::try_unwrap(error).unwrap_or_else(|arc| HiLLMError::InternalError {
@@ -443,10 +443,10 @@ impl<S> CacheService<S> {
     }
 }
 
-pub(crate) fn hash_key(req: &LlmRequest) -> Option<(u64, String)> {
+pub(crate) fn hash_key(req: &LLMRequest) -> Option<(u64, String)> {
     let json = match &req.kind {
-        LlmRequestKind::Chat(r) => serde_json::to_string(r).ok()?,
-        LlmRequestKind::Embed(r) => serde_json::to_string(r).ok()?,
+        LLMRequestKind::Chat(r) => serde_json::to_string(r).ok()?,
+        LLMRequestKind::Embed(r) => serde_json::to_string(r).ok()?,
         _ => return None,
     };
 
@@ -455,10 +455,10 @@ pub(crate) fn hash_key(req: &LlmRequest) -> Option<(u64, String)> {
     Some((hasher.finish(), json))
 }
 
-fn strategy_key(strategy: &dyn HashKeyStrategy, req: &LlmRequest) -> Option<(u64, String)> {
+fn strategy_key(strategy: &dyn HashKeyStrategy, req: &LLMRequest) -> Option<(u64, String)> {
     let req_tenant = req.tenant_id().map(|t| t.as_ref().to_owned());
     let (model, messages_json, params_json, tenant_id, system_prompt) = match &req.kind {
-        LlmRequestKind::Chat(r) => {
+        LLMRequestKind::Chat(r) => {
             let msgs = serde_json::to_string(&r.messages).ok()?;
             let params = serde_json::json!({
                 "temperature": r.temperature,
@@ -488,7 +488,7 @@ fn strategy_key(strategy: &dyn HashKeyStrategy, req: &LlmRequest) -> Option<(u64
                 system_prompt,
             )
         }
-        LlmRequestKind::Embed(r) => {
+        LLMRequestKind::Embed(r) => {
             let input = serde_json::to_string(&r.input).ok()?;
             let params = serde_json::json!({
                 "dimensions": r.dimensions,
@@ -515,24 +515,24 @@ fn strategy_key(strategy: &dyn HashKeyStrategy, req: &LlmRequest) -> Option<(u64
     Some(strategy.key_for(&input))
 }
 
-impl<S> Service<LlmRequest> for CacheService<S>
+impl<S> Service<LLMRequest> for CacheService<S>
 where
-    S: Service<LlmRequest, Response = LlmResponse, Error = HiLLMError> + Clone + Send + 'static,
+    S: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + Clone + Send + 'static,
     S::Future: Send + 'static,
 {
-    type Response = LlmResponse;
+    type Response = LLMResponse;
     type Error = HiLLMError;
-    type Future = BoxFuture<'static, HiLLMResult<LlmResponse>>;
+    type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
         self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, req: LlmRequest) -> Self::Future {
+    fn call(&mut self, req: LLMRequest) -> Self::Future {
         static EMPTY_METADATA: OnceLock<HashMap<String, String>> = OnceLock::new();
         let empty_meta = EMPTY_METADATA.get_or_init(HashMap::new);
 
-        let stream = matches!(req.kind, LlmRequestKind::ChatStream(_));
+        let stream = matches!(req.kind, LLMRequestKind::ChatStream(_));
         let model = req.model().unwrap_or("").to_owned();
         let tenant_id_str: Option<String> = req.tenant_id().map(|t| t.as_ref().to_owned());
         let ctx = CachePolicyContext {
@@ -604,8 +604,8 @@ where
             let resp = fut.await?;
             if let Some((k, body)) = key_and_body {
                 let cached = match &resp {
-                    LlmResponse::Chat(r) => Some(CachedResponse::Chat(r.clone())),
-                    LlmResponse::Embed(r) => Some(CachedResponse::Embed(r.clone())),
+                    LLMResponse::Chat(r) => Some(CachedResponse::Chat(r.clone())),
+                    LLMResponse::Embed(r) => Some(CachedResponse::Embed(r.clone())),
                     _ => None,
                 };
                 if let Some(cached_resp) = cached {

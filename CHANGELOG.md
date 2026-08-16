@@ -32,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release.
 
-- Unified `LlmClient`, `ResponseClient`, `FileClient`, `BatchClient`, `AnthropicMessagesClient` traits.
+- Unified `LLMClient`, `ResponseClient`, `FileClient`, `BatchClient`, `AnthropicMessagesClient` traits.
 - Three explicit API routes: `OpenAIChatCompletions`, `OpenAIResponses`, `AnthropicMessages`.
 - Tower middleware: cache, singleflight, circuit, fallback, hedge, budget, rate limit, router, health, idempotency, guardrails, hooks.
 - Multi-tenant credential resolution (in-memory, etcd).
