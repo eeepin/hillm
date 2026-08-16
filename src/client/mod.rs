@@ -109,7 +109,10 @@ pub(crate) fn str_pair(pair: &(String, String)) -> (&str, &str) {
     (pair.0.as_str(), pair.1.as_str())
 }
 
-/// The LLM Client trait
+/// OpenAI Chat Completions API client.
+///
+/// This trait is specifically for the Chat Completions API route.
+/// For other APIs (embeddings, images, audio, etc.), use their dedicated traits.
 #[cfg(not(target_arch = "wasm32"))]
 pub trait ChatCompletionClient: Send + Sync {
     fn chat(
@@ -122,27 +125,18 @@ pub trait ChatCompletionClient: Send + Sync {
         req: ChatCompletionRequest,
     ) -> BoxFuture<'_, HiLlmResult<BoxStream<'static, HiLlmResult<ChatCompletionChunk>>>>;
 
-    fn embed(&self, req: EmbeddingRequest) -> BoxFuture<'_, HiLlmResult<EmbeddingResponse>>;
-
-    fn list_models(&self) -> BoxFuture<'_, HiLlmResult<ModelsListResponse>>;
-
-    fn image_generate(&self, req: CreateImageRequest)
-    -> BoxFuture<'_, HiLlmResult<ImagesResponse>>;
-
-    fn speech(&self, req: CreateSpeechRequest) -> BoxFuture<'_, HiLlmResult<bytes::Bytes>>;
-
-    fn transcribe(
+    fn chat_raw(
         &self,
-        req: CreateTranscriptionRequest,
-    ) -> BoxFuture<'_, HiLlmResult<TranscriptionResponse>>;
+        req: ChatCompletionRequest,
+    ) -> BoxFuture<'_, HiLlmResult<RawExchange<ChatCompletionResponse>>>;
 
-    fn moderate(&self, req: ModerationRequest) -> BoxFuture<'_, HiLlmResult<ModerationResponse>>;
-
-    fn rerank(&self, req: RerankRequest) -> BoxFuture<'_, HiLlmResult<RerankResponse>>;
-
-    fn search(&self, req: SearchRequest) -> BoxFuture<'_, HiLlmResult<SearchResponse>>;
-
-    fn ocr(&self, req: OcrRequest) -> BoxFuture<'_, HiLlmResult<OcrResponse>>;
+    fn chat_stream_raw(
+        &self,
+        req: ChatCompletionRequest,
+    ) -> BoxFuture<
+        '_,
+        HiLlmResult<RawStreamExchange<BoxStream<'static, HiLlmResult<ChatCompletionChunk>>>>,
+    >;
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -157,30 +151,6 @@ pub trait ChatCompletionClient {
         req: ChatCompletionRequest,
     ) -> BoxFuture<'_, HiLlmResult<BoxStream<'static, HiLlmResult<ChatCompletionChunk>>>>;
 
-    fn embed(&self, req: EmbeddingRequest) -> BoxFuture<'_, HiLlmResult<EmbeddingResponse>>;
-
-    fn list_models(&self) -> BoxFuture<'_, HiLlmResult<ModelsListResponse>>;
-
-    fn image_generate(&self, req: CreateImageRequest)
-    -> BoxFuture<'_, HiLlmResult<ImagesResponse>>;
-
-    fn speech(&self, req: CreateSpeechRequest) -> BoxFuture<'_, HiLlmResult<bytes::Bytes>>;
-
-    fn transcribe(
-        &self,
-        req: CreateTranscriptionRequest,
-    ) -> BoxFuture<'_, HiLlmResult<TranscriptionResponse>>;
-
-    fn moderate(&self, req: ModerationRequest) -> BoxFuture<'_, HiLlmResult<ModerationResponse>>;
-
-    fn rerank(&self, req: RerankRequest) -> BoxFuture<'_, HiLlmResult<RerankResponse>>;
-
-    fn search(&self, req: SearchRequest) -> BoxFuture<'_, HiLlmResult<SearchResponse>>;
-
-    fn ocr(&self, req: OcrRequest) -> BoxFuture<'_, HiLlmResult<OcrResponse>>;
-}
-
-pub trait ChatCompletionClientRaw: ChatCompletionClient {
     fn chat_raw(
         &self,
         req: ChatCompletionRequest,
@@ -193,38 +163,150 @@ pub trait ChatCompletionClientRaw: ChatCompletionClient {
         '_,
         HiLlmResult<RawStreamExchange<BoxStream<'static, HiLlmResult<ChatCompletionChunk>>>>,
     >;
+}
 
-    fn embed_raw(
+/// OpenAI Embeddings API client.
+#[cfg(not(target_arch = "wasm32"))]
+pub trait EmbeddingClient: Send + Sync {
+    fn embed(&self, req: EmbeddingRequest) -> BoxFuture<'_, HiLlmResult<EmbeddingResponse>>;
+
+    fn embed_raw(&self, req: EmbeddingRequest) -> BoxFuture<'_, HiLlmResult<RawExchange<EmbeddingResponse>>>;
+}
+
+#[cfg(target_arch = "wasm32")]
+pub trait EmbeddingClient {
+    fn embed(&self, req: EmbeddingRequest) -> BoxFuture<'_, HiLlmResult<EmbeddingResponse>>;
+
+    fn embed_raw(&self, req: EmbeddingRequest) -> BoxFuture<'_, HiLlmResult<RawExchange<EmbeddingResponse>>>;
+}
+
+/// OpenAI Images API client.
+#[cfg(not(target_arch = "wasm32"))]
+pub trait ImageClient: Send + Sync {
+    fn image_generate(
         &self,
-        req: EmbeddingRequest,
-    ) -> BoxFuture<'_, HiLlmResult<RawExchange<EmbeddingResponse>>>;
+        req: CreateImageRequest,
+    ) -> BoxFuture<'_, HiLlmResult<ImagesResponse>>;
 
     fn image_generate_raw(
         &self,
         req: CreateImageRequest,
     ) -> BoxFuture<'_, HiLlmResult<RawExchange<ImagesResponse>>>;
+}
+
+#[cfg(target_arch = "wasm32")]
+pub trait ImageClient {
+    fn image_generate(
+        &self,
+        req: CreateImageRequest,
+    ) -> BoxFuture<'_, HiLlmResult<ImagesResponse>>;
+
+    fn image_generate_raw(
+        &self,
+        req: CreateImageRequest,
+    ) -> BoxFuture<'_, HiLlmResult<RawExchange<ImagesResponse>>>;
+}
+
+/// OpenAI Audio API client (speech and transcription).
+#[cfg(not(target_arch = "wasm32"))]
+pub trait AudioClient: Send + Sync {
+    fn speech(&self, req: CreateSpeechRequest) -> BoxFuture<'_, HiLlmResult<bytes::Bytes>>;
+
+    fn transcribe(
+        &self,
+        req: CreateTranscriptionRequest,
+    ) -> BoxFuture<'_, HiLlmResult<TranscriptionResponse>>;
 
     fn transcribe_raw(
         &self,
         req: CreateTranscriptionRequest,
     ) -> BoxFuture<'_, HiLlmResult<RawExchange<TranscriptionResponse>>>;
+}
 
-    fn moderate_raw(
-        &self,
-        req: ModerationRequest,
-    ) -> BoxFuture<'_, HiLlmResult<RawExchange<ModerationResponse>>>;
+#[cfg(target_arch = "wasm32")]
+pub trait AudioClient {
+    fn speech(&self, req: CreateSpeechRequest) -> BoxFuture<'_, HiLlmResult<bytes::Bytes>>;
 
-    fn rerank_raw(
+    fn transcribe(
         &self,
-        req: RerankRequest,
-    ) -> BoxFuture<'_, HiLlmResult<RawExchange<RerankResponse>>>;
+        req: CreateTranscriptionRequest,
+    ) -> BoxFuture<'_, HiLlmResult<TranscriptionResponse>>;
 
-    fn search_raw(
+    fn transcribe_raw(
         &self,
-        req: SearchRequest,
-    ) -> BoxFuture<'_, HiLlmResult<RawExchange<SearchResponse>>>;
+        req: CreateTranscriptionRequest,
+    ) -> BoxFuture<'_, HiLlmResult<RawExchange<TranscriptionResponse>>>;
+}
+
+/// OpenAI Moderations API client.
+#[cfg(not(target_arch = "wasm32"))]
+pub trait ModerationClient: Send + Sync {
+    fn moderate(&self, req: ModerationRequest) -> BoxFuture<'_, HiLlmResult<ModerationResponse>>;
+
+    fn moderate_raw(&self, req: ModerationRequest) -> BoxFuture<'_, HiLlmResult<RawExchange<ModerationResponse>>>;
+}
+
+#[cfg(target_arch = "wasm32")]
+pub trait ModerationClient {
+    fn moderate(&self, req: ModerationRequest) -> BoxFuture<'_, HiLlmResult<ModerationResponse>>;
+
+    fn moderate_raw(&self, req: ModerationRequest) -> BoxFuture<'_, HiLlmResult<RawExchange<ModerationResponse>>>;
+}
+
+/// Rerank API client.
+#[cfg(not(target_arch = "wasm32"))]
+pub trait RerankClient: Send + Sync {
+    fn rerank(&self, req: RerankRequest) -> BoxFuture<'_, HiLlmResult<RerankResponse>>;
+
+    fn rerank_raw(&self, req: RerankRequest) -> BoxFuture<'_, HiLlmResult<RawExchange<RerankResponse>>>;
+}
+
+#[cfg(target_arch = "wasm32")]
+pub trait RerankClient {
+    fn rerank(&self, req: RerankRequest) -> BoxFuture<'_, HiLlmResult<RerankResponse>>;
+
+    fn rerank_raw(&self, req: RerankRequest) -> BoxFuture<'_, HiLlmResult<RawExchange<RerankResponse>>>;
+}
+
+/// Search API client.
+#[cfg(not(target_arch = "wasm32"))]
+pub trait SearchClient: Send + Sync {
+    fn search(&self, req: SearchRequest) -> BoxFuture<'_, HiLlmResult<SearchResponse>>;
+
+    fn search_raw(&self, req: SearchRequest) -> BoxFuture<'_, HiLlmResult<RawExchange<SearchResponse>>>;
+}
+
+#[cfg(target_arch = "wasm32")]
+pub trait SearchClient {
+    fn search(&self, req: SearchRequest) -> BoxFuture<'_, HiLlmResult<SearchResponse>>;
+
+    fn search_raw(&self, req: SearchRequest) -> BoxFuture<'_, HiLlmResult<RawExchange<SearchResponse>>>;
+}
+
+/// OCR API client.
+#[cfg(not(target_arch = "wasm32"))]
+pub trait OcrClient: Send + Sync {
+    fn ocr(&self, req: OcrRequest) -> BoxFuture<'_, HiLlmResult<OcrResponse>>;
 
     fn ocr_raw(&self, req: OcrRequest) -> BoxFuture<'_, HiLlmResult<RawExchange<OcrResponse>>>;
+}
+
+#[cfg(target_arch = "wasm32")]
+pub trait OcrClient {
+    fn ocr(&self, req: OcrRequest) -> BoxFuture<'_, HiLlmResult<OcrResponse>>;
+
+    fn ocr_raw(&self, req: OcrRequest) -> BoxFuture<'_, HiLlmResult<RawExchange<OcrResponse>>>;
+}
+
+/// Models API client.
+#[cfg(not(target_arch = "wasm32"))]
+pub trait ModelClient: Send + Sync {
+    fn list_models(&self) -> BoxFuture<'_, HiLlmResult<ModelsListResponse>>;
+}
+
+#[cfg(target_arch = "wasm32")]
+pub trait ModelClient {
+    fn list_models(&self) -> BoxFuture<'_, HiLlmResult<ModelsListResponse>>;
 }
 
 #[cfg(not(target_arch = "wasm32"))]

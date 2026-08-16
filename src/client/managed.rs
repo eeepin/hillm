@@ -4,7 +4,9 @@ use tower::{Layer, Service};
 
 use super::config::ClientConfig;
 use super::{
-    BatchClient, BoxFuture, BoxStream, Client, FileClient, ChatCompletionClient, ResponseClient,
+    AudioClient, BatchClient, BoxFuture, BoxStream, ChatCompletionClient, Client, EmbeddingClient,
+    FileClient, ImageClient, ModerationClient, ModelClient, OcrClient, RerankClient,
+    ResponseClient, SearchClient,
 };
 use crate::error::{HiLlmError, HiLlmResult};
 #[cfg(feature = "opendal")]
@@ -22,6 +24,7 @@ use crate::types::file::{
 use crate::types::image::{CreateImageRequest, ImagesResponse};
 use crate::types::moderation::{ModerationRequest, ModerationResponse};
 use crate::types::ocr::{OcrRequest, OcrResponse};
+use crate::types::raw::{RawExchange, RawStreamExchange};
 use crate::types::rerank::{RerankRequest, RerankResponse};
 use crate::types::response::{CreateResponseRequest, ResponseObject, ResponsesStreamEvent};
 use crate::types::search::{SearchRequest, SearchResponse};
@@ -256,6 +259,27 @@ impl ChatCompletionClient for ManagedClient {
         })
     }
 
+    fn chat_raw(
+        &self,
+        req: ChatCompletionRequest,
+    ) -> BoxFuture<'_, HiLlmResult<RawExchange<ChatCompletionResponse>>> {
+        // Raw exchanges bypass middleware — the service stack operates on parsed
+        // LlmRequest/LlmResponse and cannot capture the underlying HTTP bytes.
+        self.inner.chat_raw(req)
+    }
+
+    fn chat_stream_raw(
+        &self,
+        req: ChatCompletionRequest,
+    ) -> BoxFuture<
+        '_,
+        HiLlmResult<RawStreamExchange<BoxStream<'static, HiLlmResult<ChatCompletionChunk>>>>,
+    > {
+        self.inner.chat_stream_raw(req)
+    }
+}
+
+impl EmbeddingClient for ManagedClient {
     fn embed(&self, req: EmbeddingRequest) -> BoxFuture<'_, HiLlmResult<EmbeddingResponse>> {
         if self.service.is_none() {
             return self.inner.embed(req);
@@ -271,21 +295,15 @@ impl ChatCompletionClient for ManagedClient {
         })
     }
 
-    fn list_models(&self) -> BoxFuture<'_, HiLlmResult<ModelsListResponse>> {
-        if self.service.is_none() {
-            return self.inner.list_models();
-        }
-        let fut = self.call_service(LlmRequest::ListModels());
-        Box::pin(async move {
-            match fut.await? {
-                LlmResponse::ListModels(r) => Ok(r),
-                other => Err(HiLlmError::InternalError {
-                    message: format!("expected ListModels response, got {other:?}"),
-                }),
-            }
-        })
+    fn embed_raw(
+        &self,
+        req: EmbeddingRequest,
+    ) -> BoxFuture<'_, HiLlmResult<RawExchange<EmbeddingResponse>>> {
+        self.inner.embed_raw(req)
     }
+}
 
+impl ImageClient for ManagedClient {
     fn image_generate(
         &self,
         req: CreateImageRequest,
@@ -304,6 +322,15 @@ impl ChatCompletionClient for ManagedClient {
         })
     }
 
+    fn image_generate_raw(
+        &self,
+        req: CreateImageRequest,
+    ) -> BoxFuture<'_, HiLlmResult<RawExchange<ImagesResponse>>> {
+        self.inner.image_generate_raw(req)
+    }
+}
+
+impl AudioClient for ManagedClient {
     fn speech(&self, req: CreateSpeechRequest) -> BoxFuture<'_, HiLlmResult<bytes::Bytes>> {
         if self.service.is_none() {
             return self.inner.speech(req);
@@ -337,6 +364,15 @@ impl ChatCompletionClient for ManagedClient {
         })
     }
 
+    fn transcribe_raw(
+        &self,
+        req: CreateTranscriptionRequest,
+    ) -> BoxFuture<'_, HiLlmResult<RawExchange<TranscriptionResponse>>> {
+        self.inner.transcribe_raw(req)
+    }
+}
+
+impl ModerationClient for ManagedClient {
     fn moderate(&self, req: ModerationRequest) -> BoxFuture<'_, HiLlmResult<ModerationResponse>> {
         if self.service.is_none() {
             return self.inner.moderate(req);
@@ -352,6 +388,15 @@ impl ChatCompletionClient for ManagedClient {
         })
     }
 
+    fn moderate_raw(
+        &self,
+        req: ModerationRequest,
+    ) -> BoxFuture<'_, HiLlmResult<RawExchange<ModerationResponse>>> {
+        self.inner.moderate_raw(req)
+    }
+}
+
+impl RerankClient for ManagedClient {
     fn rerank(&self, req: RerankRequest) -> BoxFuture<'_, HiLlmResult<RerankResponse>> {
         if self.service.is_none() {
             return self.inner.rerank(req);
@@ -367,6 +412,15 @@ impl ChatCompletionClient for ManagedClient {
         })
     }
 
+    fn rerank_raw(
+        &self,
+        req: RerankRequest,
+    ) -> BoxFuture<'_, HiLlmResult<RawExchange<RerankResponse>>> {
+        self.inner.rerank_raw(req)
+    }
+}
+
+impl SearchClient for ManagedClient {
     fn search(&self, req: SearchRequest) -> BoxFuture<'_, HiLlmResult<SearchResponse>> {
         if self.service.is_none() {
             return self.inner.search(req);
@@ -382,6 +436,15 @@ impl ChatCompletionClient for ManagedClient {
         })
     }
 
+    fn search_raw(
+        &self,
+        req: SearchRequest,
+    ) -> BoxFuture<'_, HiLlmResult<RawExchange<SearchResponse>>> {
+        self.inner.search_raw(req)
+    }
+}
+
+impl OcrClient for ManagedClient {
     fn ocr(&self, req: OcrRequest) -> BoxFuture<'_, HiLlmResult<OcrResponse>> {
         if self.service.is_none() {
             return self.inner.ocr(req);
@@ -392,6 +455,27 @@ impl ChatCompletionClient for ManagedClient {
                 LlmResponse::Ocr(r) => Ok(r),
                 other => Err(HiLlmError::InternalError {
                     message: format!("expected Ocr response, got {other:?}"),
+                }),
+            }
+        })
+    }
+
+    fn ocr_raw(&self, req: OcrRequest) -> BoxFuture<'_, HiLlmResult<RawExchange<OcrResponse>>> {
+        self.inner.ocr_raw(req)
+    }
+}
+
+impl ModelClient for ManagedClient {
+    fn list_models(&self) -> BoxFuture<'_, HiLlmResult<ModelsListResponse>> {
+        if self.service.is_none() {
+            return self.inner.list_models();
+        }
+        let fut = self.call_service(LlmRequest::ListModels());
+        Box::pin(async move {
+            match fut.await? {
+                LlmResponse::ListModels(r) => Ok(r),
+                other => Err(HiLlmError::InternalError {
+                    message: format!("expected ListModels response, got {other:?}"),
                 }),
             }
         })

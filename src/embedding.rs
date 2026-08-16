@@ -2,7 +2,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use crate::client::ChatCompletionClient;
+use crate::client::EmbeddingClient;
 use crate::error::HiLlmResult;
 use crate::types::EmbeddingRequest;
 
@@ -18,14 +18,14 @@ pub trait EmbeddingProvider: Send + Sync + 'static {
 }
 
 pub struct SelfHostedEmbeddingProvider {
-    client: Arc<dyn ChatCompletionClient>,
+    client: Arc<dyn EmbeddingClient>,
     model: String,
     dim: usize,
 }
 
 impl SelfHostedEmbeddingProvider {
     #[must_use]
-    pub fn new(client: Arc<dyn ChatCompletionClient>, model: impl Into<String>, dim: usize) -> Self {
+    pub fn new(client: Arc<dyn EmbeddingClient>, model: impl Into<String>, dim: usize) -> Self {
         Self {
             client,
             model: model.into(),

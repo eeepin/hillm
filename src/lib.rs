@@ -27,14 +27,17 @@ pub mod vectorstore;
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 pub use client::{
-    AnthropicMessagesClient, BatchClient, BatchWaitError, BoxFuture, BoxStream, ClientBuilder,
-    ClientConfig, ClientConfigBuilder, Client, FileClient, FileConfig, ChatCompletionClient,
-    ChatCompletionClientRaw, ResponseClient, WaitForBatchConfig,
+    AnthropicMessagesClient, AudioClient, BatchClient, BatchWaitError, BoxFuture, BoxStream,
+    ChatCompletionClient, Client, ClientBuilder, ClientConfig, ClientConfigBuilder,
+    EmbeddingClient, FileClient, FileConfig, ImageClient, ModelClient, ModerationClient,
+    OcrClient, ResponseClient, RerankClient, SearchClient, WaitForBatchConfig,
 };
 #[cfg(not(any(feature = "default-http", feature = "wasm-http")))]
 pub use client::{
-    AnthropicMessagesClient, BatchClient, BatchWaitError, BoxFuture, BoxStream, ClientConfig,
-    ClientConfigBuilder, FileConfig, ChatCompletionClient, ChatCompletionClientRaw, WaitForBatchConfig,
+    AnthropicMessagesClient, AudioClient, BatchClient, BatchWaitError, BoxFuture, BoxStream,
+    ChatCompletionClient, ClientConfig, ClientConfigBuilder, EmbeddingClient, FileConfig,
+    ImageClient, ModelClient, ModerationClient, OcrClient, RerankClient, SearchClient,
+    WaitForBatchConfig,
 };
 pub use error::{HiLlmError, HiLlmResult};
 pub use http::transport::TransportConfig;

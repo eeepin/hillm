@@ -7,7 +7,10 @@ use futures_core::Stream;
 use tower::Service;
 
 use super::types::{LlmRequest, LlmRequestKind, LlmResponse};
-use crate::client::{BoxFuture, ChatCompletionClient};
+use crate::client::{
+    AudioClient, BoxFuture, ChatCompletionClient, EmbeddingClient, ImageClient, ModelClient,
+    ModerationClient, OcrClient, RerankClient, SearchClient,
+};
 use crate::error::{HiLlmError, HiLlmResult};
 use crate::types::ChatCompletionChunk;
 
@@ -43,7 +46,18 @@ impl<C> Clone for LlmService<C> {
 
 impl<C> Service<LlmRequest> for LlmService<C>
 where
-    C: ChatCompletionClient + Send + Sync + 'static,
+    C: ChatCompletionClient
+        + EmbeddingClient
+        + ImageClient
+        + AudioClient
+        + ModerationClient
+        + RerankClient
+        + SearchClient
+        + OcrClient
+        + ModelClient
+        + Send
+        + Sync
+        + 'static,
 {
     type Response = LlmResponse;
     type Error = HiLlmError;

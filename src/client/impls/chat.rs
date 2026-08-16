@@ -1,19 +1,12 @@
 use std::sync::Arc;
 
 use crate::client::str_pair;
-use crate::client::{BoxFuture, BoxStream, Client, ChatCompletionClient};
+use crate::client::{BoxFuture, BoxStream, ChatCompletionClient, Client};
 use crate::error::{HiLlmError, HiLlmResult};
 use crate::http;
 use crate::provider;
-use crate::types::audio::{CreateSpeechRequest, CreateTranscriptionRequest, TranscriptionResponse};
 use crate::types::chat::{ChatCompletionChunk, ChatCompletionRequest, ChatCompletionResponse};
-use crate::types::embedding::{EmbeddingRequest, EmbeddingResponse};
-use crate::types::image::{CreateImageRequest, ImagesResponse};
-use crate::types::model::ModelsListResponse;
-use crate::types::moderation::{ModerationRequest, ModerationResponse};
-use crate::types::ocr::{OcrRequest, OcrResponse};
-use crate::types::rerank::{RerankRequest, RerankResponse};
-use crate::types::search::{SearchRequest, SearchResponse};
+use crate::types::raw::{RawExchange, RawStreamExchange};
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 impl ChatCompletionClient for Client {
@@ -225,9 +218,15 @@ impl ChatCompletionClient for Client {
         })
     }
 
-    fn embed(&self, req: EmbeddingRequest) -> BoxFuture<'_, HiLlmResult<EmbeddingResponse>> {
+
+    fn chat_raw(
+        &self,
+        req: ChatCompletionRequest,
+    ) -> BoxFuture<'_, HiLlmResult<RawExchange<ChatCompletionResponse>>> {
         Box::pin(async move {
-            let prepared = self.prepare_request(&req, |p| p.embeddings_path(), &req.model, None)?;
+            let prepared =
+                self.prepare_request(&req, |p| p.chat_completions_path(), &req.model, Some(false))?;
+            let raw_request = prepared.body_json.clone();
 
             let auth_header = self
                 .resolve_auth_header_for_provider(prepared.provider.as_ref())
@@ -254,51 +253,42 @@ impl ChatCompletionClient for Client {
                 self.config.max_retries,
             )
             .await?;
+
+            let raw_response = Some(raw.clone());
             prepared.provider.transform_response(&mut raw)?;
-            serde_json::from_value::<EmbeddingResponse>(raw).map_err(HiLlmError::from)
+            let data =
+                serde_json::from_value::<ChatCompletionResponse>(raw).map_err(HiLlmError::from)?;
+
+            Ok(RawExchange {
+                data,
+                raw_request,
+                raw_response,
+            })
         })
     }
 
-    fn list_models(&self) -> BoxFuture<'_, HiLlmResult<ModelsListResponse>> {
+    fn chat_stream_raw(
+        &self,
+        req: ChatCompletionRequest,
+    ) -> BoxFuture<
+        '_,
+        HiLlmResult<RawStreamExchange<BoxStream<'static, HiLlmResult<ChatCompletionChunk>>>>,
+    > {
         Box::pin(async move {
-            let url = self.provider.build_url(self.provider.models_path(), "");
-            let auth_header = self.resolve_auth_header().await?;
-            let auth = auth_header.as_ref().map(str_pair);
-            let all_headers = self.all_headers("GET", &url, &serde_json::Value::Null, &[]);
-            let extra: Vec<(&str, &str)> = all_headers
-                .iter()
-                .map(|(n, v)| (n.as_str(), v.as_str()))
-                .collect();
+            let prepared =
+                self.prepare_request(&req, |p| p.chat_completions_path(), &req.model, Some(true))?;
+            let raw_request = prepared.body_json.clone();
+            let url = prepared
+                .provider
+                .build_stream_url(prepared.provider.chat_completions_path(), &req.model);
 
-            let mut raw = http::request::get_json_raw(
-                &self.http_client,
+            let auth_header = self
+                .resolve_auth_header_for_provider(prepared.provider.as_ref())
+                .await?;
+            let all_headers = self.all_headers_for_provider(
+                prepared.provider.as_ref(),
+                "POST",
                 &url,
-                auth,
-                &extra,
-                self.config.max_retries,
-            )
-            .await?;
-            self.provider.transform_response(&mut raw)?;
-            serde_json::from_value::<ModelsListResponse>(raw).map_err(HiLlmError::from)
-        })
-    }
-
-    fn image_generate(
-        &self,
-        req: CreateImageRequest,
-    ) -> BoxFuture<'_, HiLlmResult<ImagesResponse>> {
-        Box::pin(async move {
-            let model = req.model.as_deref().unwrap_or_default();
-            let prepared =
-                self.prepare_request(&req, |p| p.image_generations_path(), model, None)?;
-
-            let auth_header = self
-                .resolve_auth_header_for_provider(prepared.provider.as_ref())
-                .await?;
-            let all_headers = self.all_headers_for_provider(
-                prepared.provider.as_ref(),
-                "POST",
-                &prepared.url,
                 &prepared.body_json,
                 &prepared.body_bytes,
             );
@@ -306,227 +296,41 @@ impl ChatCompletionClient for Client {
                 .iter()
                 .map(|(n, v)| (n.as_str(), v.as_str()))
                 .collect();
-
             let auth = auth_header.as_ref().map(str_pair);
-            let mut raw = http::request::post_json_raw(
-                &self.http_client,
-                &prepared.url,
-                auth,
-                &extra,
-                prepared.body_bytes,
-                self.config.max_retries,
-            )
-            .await?;
-            prepared.provider.transform_response(&mut raw)?;
-            serde_json::from_value::<ImagesResponse>(raw).map_err(HiLlmError::from)
-        })
-    }
 
-    fn speech(&self, req: CreateSpeechRequest) -> BoxFuture<'_, HiLlmResult<bytes::Bytes>> {
-        Box::pin(async move {
-            let prepared =
-                self.prepare_request(&req, |p| p.audio_speech_path(), &req.model, None)?;
+            let stream = match prepared.provider.stream_format() {
+                provider::StreamFormat::SSE => {
+                    let provider = Arc::clone(&prepared.provider);
+                    let parse_event = move |data: &str| provider.parse_stream_event(data);
+                    http::stream::post_stream(
+                        &self.http_client,
+                        &url,
+                        auth,
+                        &extra,
+                        prepared.body_bytes,
+                        self.config.max_retries,
+                        parse_event,
+                    )
+                    .await?
+                }
+                provider::StreamFormat::AwsEventStream => {
+                    http::eventstream::post_eventstream(
+                        &self.http_client,
+                        &url,
+                        auth,
+                        &extra,
+                        prepared.body_bytes,
+                        self.config.max_retries,
+                        provider::bedrock::parse_bedrock_stream_event,
+                    )
+                    .await?
+                }
+            };
 
-            let auth_header = self
-                .resolve_auth_header_for_provider(prepared.provider.as_ref())
-                .await?;
-            let all_headers = self.all_headers_for_provider(
-                prepared.provider.as_ref(),
-                "POST",
-                &prepared.url,
-                &prepared.body_json,
-                &prepared.body_bytes,
-            );
-            let extra: Vec<(&str, &str)> = all_headers
-                .iter()
-                .map(|(n, v)| (n.as_str(), v.as_str()))
-                .collect();
-
-            let auth = auth_header.as_ref().map(str_pair);
-            http::request::post_binary(
-                &self.http_client,
-                &prepared.url,
-                auth,
-                &extra,
-                prepared.body_bytes,
-                self.config.max_retries,
-            )
-            .await
-        })
-    }
-
-    fn transcribe(
-        &self,
-        req: CreateTranscriptionRequest,
-    ) -> BoxFuture<'_, HiLlmResult<TranscriptionResponse>> {
-        Box::pin(async move {
-            let prepared =
-                self.prepare_request(&req, |p| p.audio_transcriptions_path(), &req.model, None)?;
-
-            let auth_header = self
-                .resolve_auth_header_for_provider(prepared.provider.as_ref())
-                .await?;
-            let all_headers = self.all_headers_for_provider(
-                prepared.provider.as_ref(),
-                "POST",
-                &prepared.url,
-                &prepared.body_json,
-                &prepared.body_bytes,
-            );
-            let extra: Vec<(&str, &str)> = all_headers
-                .iter()
-                .map(|(n, v)| (n.as_str(), v.as_str()))
-                .collect();
-
-            let auth = auth_header.as_ref().map(str_pair);
-            let mut raw = http::request::post_json_raw(
-                &self.http_client,
-                &prepared.url,
-                auth,
-                &extra,
-                prepared.body_bytes,
-                self.config.max_retries,
-            )
-            .await?;
-            prepared.provider.transform_response(&mut raw)?;
-            serde_json::from_value::<TranscriptionResponse>(raw).map_err(HiLlmError::from)
-        })
-    }
-
-    fn moderate(&self, req: ModerationRequest) -> BoxFuture<'_, HiLlmResult<ModerationResponse>> {
-        Box::pin(async move {
-            let model = req.model.as_deref().unwrap_or_default();
-            let prepared = self.prepare_request(&req, |p| p.moderations_path(), model, None)?;
-
-            let auth_header = self
-                .resolve_auth_header_for_provider(prepared.provider.as_ref())
-                .await?;
-            let all_headers = self.all_headers_for_provider(
-                prepared.provider.as_ref(),
-                "POST",
-                &prepared.url,
-                &prepared.body_json,
-                &prepared.body_bytes,
-            );
-            let extra: Vec<(&str, &str)> = all_headers
-                .iter()
-                .map(|(n, v)| (n.as_str(), v.as_str()))
-                .collect();
-
-            let auth = auth_header.as_ref().map(str_pair);
-            let mut raw = http::request::post_json_raw(
-                &self.http_client,
-                &prepared.url,
-                auth,
-                &extra,
-                prepared.body_bytes,
-                self.config.max_retries,
-            )
-            .await?;
-            prepared.provider.transform_response(&mut raw)?;
-            serde_json::from_value::<ModerationResponse>(raw).map_err(HiLlmError::from)
-        })
-    }
-
-    fn rerank(&self, req: RerankRequest) -> BoxFuture<'_, HiLlmResult<RerankResponse>> {
-        Box::pin(async move {
-            let prepared = self.prepare_request(&req, |p| p.rerank_path(), &req.model, None)?;
-
-            let auth_header = self
-                .resolve_auth_header_for_provider(prepared.provider.as_ref())
-                .await?;
-            let all_headers = self.all_headers_for_provider(
-                prepared.provider.as_ref(),
-                "POST",
-                &prepared.url,
-                &prepared.body_json,
-                &prepared.body_bytes,
-            );
-            let extra: Vec<(&str, &str)> = all_headers
-                .iter()
-                .map(|(n, v)| (n.as_str(), v.as_str()))
-                .collect();
-
-            let auth = auth_header.as_ref().map(str_pair);
-            let mut raw = http::request::post_json_raw(
-                &self.http_client,
-                &prepared.url,
-                auth,
-                &extra,
-                prepared.body_bytes,
-                self.config.max_retries,
-            )
-            .await?;
-            prepared.provider.transform_response(&mut raw)?;
-            serde_json::from_value::<RerankResponse>(raw).map_err(HiLlmError::from)
-        })
-    }
-
-    fn search(&self, req: SearchRequest) -> BoxFuture<'_, HiLlmResult<SearchResponse>> {
-        Box::pin(async move {
-            let prepared = self.prepare_request(&req, |p| p.search_path(), &req.model, None)?;
-
-            let auth_header = self
-                .resolve_auth_header_for_provider(prepared.provider.as_ref())
-                .await?;
-            let all_headers = self.all_headers_for_provider(
-                prepared.provider.as_ref(),
-                "POST",
-                &prepared.url,
-                &prepared.body_json,
-                &prepared.body_bytes,
-            );
-            let extra: Vec<(&str, &str)> = all_headers
-                .iter()
-                .map(|(n, v)| (n.as_str(), v.as_str()))
-                .collect();
-
-            let auth = auth_header.as_ref().map(str_pair);
-            let mut raw = http::request::post_json_raw(
-                &self.http_client,
-                &prepared.url,
-                auth,
-                &extra,
-                prepared.body_bytes,
-                self.config.max_retries,
-            )
-            .await?;
-            prepared.provider.transform_response(&mut raw)?;
-            serde_json::from_value::<SearchResponse>(raw).map_err(HiLlmError::from)
-        })
-    }
-
-    fn ocr(&self, req: OcrRequest) -> BoxFuture<'_, HiLlmResult<OcrResponse>> {
-        Box::pin(async move {
-            let prepared = self.prepare_request(&req, |p| p.ocr_path(), &req.model, None)?;
-
-            let auth_header = self
-                .resolve_auth_header_for_provider(prepared.provider.as_ref())
-                .await?;
-            let all_headers = self.all_headers_for_provider(
-                prepared.provider.as_ref(),
-                "POST",
-                &prepared.url,
-                &prepared.body_json,
-                &prepared.body_bytes,
-            );
-            let extra: Vec<(&str, &str)> = all_headers
-                .iter()
-                .map(|(n, v)| (n.as_str(), v.as_str()))
-                .collect();
-
-            let auth = auth_header.as_ref().map(str_pair);
-            let mut raw = http::request::post_json_raw(
-                &self.http_client,
-                &prepared.url,
-                auth,
-                &extra,
-                prepared.body_bytes,
-                self.config.max_retries,
-            )
-            .await?;
-            prepared.provider.transform_response(&mut raw)?;
-            serde_json::from_value::<OcrResponse>(raw).map_err(HiLlmError::from)
+            Ok(RawStreamExchange {
+                stream,
+                raw_request,
+            })
         })
     }
 }

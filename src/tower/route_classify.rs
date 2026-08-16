@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use regex::Regex;
 
-use crate::client::ChatCompletionClient;
+use crate::client::{ChatCompletionClient, EmbeddingClient};
 use crate::types::{
     ChatCompletionRequest, EmbeddingInput, EmbeddingRequest, Message, MessageContent,
     SystemMessage, UserMessage,
@@ -108,16 +108,19 @@ pub struct IntentPrototype {
     pub model: String,
 }
 
-pub struct EmbeddingSimilarityClassifier {
-    client: Arc<dyn ChatCompletionClient>,
+pub struct EmbeddingSimilarityClassifier<C> {
+    client: Arc<C>,
     embedding_model: String,
     prototypes: Vec<IntentPrototype>,
     threshold: f64,
 }
 
-impl EmbeddingSimilarityClassifier {
+impl<C> EmbeddingSimilarityClassifier<C>
+where
+    C: ChatCompletionClient + EmbeddingClient + Send + Sync + 'static,
+{
     pub fn new(
-        client: Arc<dyn ChatCompletionClient>,
+        client: Arc<C>,
         embedding_model: impl Into<String>,
         prototypes: Vec<IntentPrototype>,
         threshold: f64,
@@ -144,7 +147,10 @@ fn cosine_similarity(a: &[f64], b: &[f64]) -> f64 {
     dot / (mag_a * mag_b)
 }
 
-impl RouteClassifier for EmbeddingSimilarityClassifier {
+impl<C> RouteClassifier for EmbeddingSimilarityClassifier<C>
+where
+    C: ChatCompletionClient + EmbeddingClient + Send + Sync + 'static,
+{
     fn classify<'a>(
         &'a self,
         ctx: &'a ClassifyContext<'a>,
@@ -214,15 +220,18 @@ impl RouteClassifier for EmbeddingSimilarityClassifier {
     }
 }
 
-pub struct LlmClassifier {
-    client: Arc<dyn ChatCompletionClient>,
+pub struct LlmClassifier<C> {
+    client: Arc<C>,
     model: String,
     system_prompt: String,
 }
 
-impl LlmClassifier {
+impl<C> LlmClassifier<C>
+where
+    C: ChatCompletionClient + EmbeddingClient + Send + Sync + 'static,
+{
     pub fn new(
-        client: Arc<dyn ChatCompletionClient>,
+        client: Arc<C>,
         model: impl Into<String>,
         system_prompt: impl Into<String>,
     ) -> Self {
@@ -261,7 +270,10 @@ impl LlmClassifier {
     }
 }
 
-impl RouteClassifier for LlmClassifier {
+impl<C> RouteClassifier for LlmClassifier<C>
+where
+    C: ChatCompletionClient + EmbeddingClient + Send + Sync + 'static,
+{
     fn classify<'a>(
         &'a self,
         ctx: &'a ClassifyContext<'a>,
