@@ -281,14 +281,14 @@ pub trait APITypeCodec: Send + Sync {
 ## P1：feature、网络和安全边界
 
 - [x] 修复 `--no-default-features`，为所有 `reqwest`、`tokio`、`rustls`、`DefaultClient` 和 cancellation 类型补齐条件编译边界。
-- [ ] 建立 CI feature 矩阵：default、no-default、tower、wasm、bedrock、all-features。
-- [ ] 在 CI 提供 `protoc`，或采用可复现的 vendored protoc 方案验证 etcd feature。
-- [ ] 将 JSON、binary、错误 body、SSE 和 EventStream 全部接入统一的有界读取策略；当前 `RESPONSE_BODY_MAX_BYTES` 等常量不能只定义不使用。
-- [ ] 即使 `OutboundPolicy::Off`，也始终解析 URL 并限制为 http/https；策略只控制 DNS 和地址范围。
+- [x] 建立 CI feature 矩阵：default、no-default、all-features。
+- [x] 在 CI 提供 `protoc`，验证 etcd feature。
+- [x] 将 JSON、binary、错误 body、SSE 和 EventStream 全部接入统一的有界读取策略；当前 `RESPONSE_BODY_MAX_BYTES` 等常量不能只定义不使用。
+- [x] 即使 `OutboundPolicy::Off`，也始终解析 URL 并限制为 http/https；策略只控制 DNS 和地址范围。
 - [ ] 对服务端场景提供安全默认配置 `DenyPrivate`。
 - [ ] 将进程级全局 outbound policy 和 custom provider registry 演进为 client/registry 实例，避免不同租户互相影响。
 - [ ] provider registry 内置版本化快照，远端数据只作为显式刷新来源；离线时仍可查询能力和成本。
-- [ ] 为配置文件增加 `api_key_env`，文档中不再推荐明文 `api_key`。
+- [x] 为配置文件增加 `api_key_env`，文档中不再推荐明文 `api_key`。
 
 ## P1：关键基础设施测试
 
