@@ -383,7 +383,10 @@ api_key_env = "HILLM_TEST_API_KEY"
 "#;
         let file_config = FileConfig::from_toml_str(toml).expect("TOML should parse");
         assert_eq!(file_config.api_key.as_deref(), Some("sk-from-file"));
-        assert_eq!(file_config.api_key_env.as_deref(), Some("HILLM_TEST_API_KEY"));
+        assert_eq!(
+            file_config.api_key_env.as_deref(),
+            Some("HILLM_TEST_API_KEY")
+        );
 
         let config = file_config.into_builder().build();
         // api_key_env should take precedence
@@ -417,7 +420,10 @@ api_key_env = "HILLM_TEST_ONLY_ENV"
 "#;
         let file_config = FileConfig::from_toml_str(toml).expect("TOML should parse");
         assert!(file_config.api_key.is_none());
-        assert_eq!(file_config.api_key_env.as_deref(), Some("HILLM_TEST_ONLY_ENV"));
+        assert_eq!(
+            file_config.api_key_env.as_deref(),
+            Some("HILLM_TEST_ONLY_ENV")
+        );
 
         let config = file_config.into_builder().build();
         assert_eq!(config.api_key.expose_secret(), "sk-only-env");

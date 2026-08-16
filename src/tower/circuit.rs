@@ -337,9 +337,12 @@ where
 mod tests {
     use super::*;
     use crate::tower::types::{LlmRequest, LlmResponse};
-    use crate::types::{AssistantMessage, ChatCompletionRequest, ChatCompletionResponse, Choice, Message, MessageContent, Usage};
+    use crate::types::{
+        AssistantMessage, ChatCompletionRequest, ChatCompletionResponse, Choice, Message,
+        MessageContent, Usage,
+    };
     use std::sync::Arc;
-    use tokio::time::{sleep, Duration};
+    use tokio::time::{Duration, sleep};
     use tower::ServiceExt;
 
     fn create_chat_request(content: &str) -> LlmRequest {
@@ -438,7 +441,12 @@ mod tests {
             let req = create_chat_request(&format!("test {}", i));
             let result = svc.ready().await.unwrap().call(req).await;
             assert!(result.is_err());
-            assert_eq!(policy.state(), CircuitState::Closed, "Circuit should still be closed after {} failures", i + 1);
+            assert_eq!(
+                policy.state(),
+                CircuitState::Closed,
+                "Circuit should still be closed after {} failures",
+                i + 1
+            );
         }
 
         // Third failure should open circuit
@@ -446,7 +454,11 @@ mod tests {
         let req = create_chat_request("test 3");
         let result = svc.ready().await.unwrap().call(req).await;
         assert!(result.is_err());
-        assert_eq!(policy.state(), CircuitState::Open, "Circuit should be open after 3 failures");
+        assert_eq!(
+            policy.state(),
+            CircuitState::Open,
+            "Circuit should be open after 3 failures"
+        );
     }
 
     #[tokio::test]
@@ -479,7 +491,10 @@ mod tests {
 
     #[tokio::test]
     async fn circuit_enters_half_open_after_backoff() {
-        let policy = Arc::new(ExponentialBackoffCircuit::new(2, Duration::from_millis(100)));
+        let policy = Arc::new(ExponentialBackoffCircuit::new(
+            2,
+            Duration::from_millis(100),
+        ));
         let mock = MockService::new(true);
         let service = CircuitService {
             inner: mock,
@@ -499,13 +514,19 @@ mod tests {
         sleep(Duration::from_millis(250)).await;
 
         // Circuit should transition to HalfOpen on next check
-        assert!(policy.should_allow(), "Circuit should allow probe request after backoff");
+        assert!(
+            policy.should_allow(),
+            "Circuit should allow probe request after backoff"
+        );
         assert_eq!(policy.state(), CircuitState::HalfOpen);
     }
 
     #[tokio::test]
     async fn circuit_closes_after_successful_probe() {
-        let policy = Arc::new(ExponentialBackoffCircuit::new(2, Duration::from_millis(100)));
+        let policy = Arc::new(ExponentialBackoffCircuit::new(
+            2,
+            Duration::from_millis(100),
+        ));
 
         // Start with failing service to open circuit
         let failing_mock = MockService::new(true);
@@ -537,12 +558,19 @@ mod tests {
         let req = create_chat_request("probe");
         let result = svc.ready().await.unwrap().call(req).await;
         assert!(result.is_ok());
-        assert_eq!(policy.state(), CircuitState::Closed, "Circuit should close after successful probe");
+        assert_eq!(
+            policy.state(),
+            CircuitState::Closed,
+            "Circuit should close after successful probe"
+        );
     }
 
     #[tokio::test]
     async fn circuit_reopens_after_failed_probe() {
-        let policy = Arc::new(ExponentialBackoffCircuit::new(2, Duration::from_millis(100)));
+        let policy = Arc::new(ExponentialBackoffCircuit::new(
+            2,
+            Duration::from_millis(100),
+        ));
         let mock = MockService::new(true);
         let service = CircuitService {
             inner: mock,
@@ -568,7 +596,11 @@ mod tests {
         assert!(result.is_err());
 
         // Circuit should be open again
-        assert_eq!(policy.state(), CircuitState::Open, "Circuit should reopen after failed probe");
+        assert_eq!(
+            policy.state(),
+            CircuitState::Open,
+            "Circuit should reopen after failed probe"
+        );
     }
 
     #[tokio::test]
@@ -615,19 +647,31 @@ mod tests {
             let mut svc = service.clone();
             let req = create_chat_request(&format!("test {}", i));
             let _ = svc.ready().await.unwrap().call(req).await;
-            assert_eq!(policy.state(), CircuitState::Closed, "Circuit should still be closed after {} failures post-reset", i + 1);
+            assert_eq!(
+                policy.state(),
+                CircuitState::Closed,
+                "Circuit should still be closed after {} failures post-reset",
+                i + 1
+            );
         }
 
         // Third failure should open
         let mut svc = service.clone();
         let req = create_chat_request("test 3");
         let _ = svc.ready().await.unwrap().call(req).await;
-        assert_eq!(policy.state(), CircuitState::Open, "Circuit should open after 3 failures post-reset");
+        assert_eq!(
+            policy.state(),
+            CircuitState::Open,
+            "Circuit should open after 3 failures post-reset"
+        );
     }
 
     #[tokio::test]
     async fn circuit_half_open_allows_only_one_probe() {
-        let policy = Arc::new(ExponentialBackoffCircuit::new(2, Duration::from_millis(100)));
+        let policy = Arc::new(ExponentialBackoffCircuit::new(
+            2,
+            Duration::from_millis(100),
+        ));
         let mock = MockService::new(true);
         let service = CircuitService {
             inner: mock,

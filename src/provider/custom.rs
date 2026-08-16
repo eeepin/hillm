@@ -3,9 +3,245 @@ use super::api_type::APIType;
 use crate::error::{HiLlmError, HiLlmResult};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
-use std::sync::RwLock;
+use std::sync::{OnceLock, RwLock};
 
-static CUSTOM_PROVIDERS: RwLock<Vec<CustomProviderConfig>> = RwLock::new(Vec::new());
+// ---------------------------------------------------------------------------
+// Instance-based custom provider registry
+// ---------------------------------------------------------------------------
+
+/// Per-instance registry of custom provider configurations.
+///
+/// Unlike the process-global [`register_custom_provider`] / [`unregister_custom_provider`]
+/// free functions, a `CustomProviderRegistry` is scoped to a single client or
+/// component. Different tenants or clients can maintain independent sets of
+/// custom providers without interfering with each other.
+///
+/// The global convenience API is backed by a process-global instance of this
+/// struct, so the behavior is identical — only the scope differs.
+///
+/// # Examples
+///
+/// ```
+/// use hillm::{
+///     AuthHeaderFormat, CustomProviderConfig, CustomProviderRegistry,
+/// };
+///
+/// let registry = CustomProviderRegistry::new();
+/// registry.register(CustomProviderConfig {
+///     name: "my-provider".into(),
+///     base_url: "https://api.my-provider.com/v1".into(),
+///     auth_header: AuthHeaderFormat::Bearer,
+///     models: vec!["my-model".into()],
+///     available_api_types: vec![],
+///     default_api_type: None,
+/// }).unwrap();
+/// ```
+#[derive(Debug)]
+pub struct CustomProviderRegistry {
+    providers: RwLock<Vec<CustomProviderConfig>>,
+}
+
+impl CustomProviderRegistry {
+    /// Create an empty registry.
+    pub fn new() -> Self {
+        Self {
+            providers: RwLock::new(Vec::new()),
+        }
+    }
+
+    /// Register a custom provider configuration.
+    ///
+    /// If a provider with the same name already exists, it is replaced.
+    /// Validates the configuration (non-empty name, base_url, at least one
+    /// model), API type consistency, and outbound URL policy.
+    pub fn register(&self, config: CustomProviderConfig) -> HiLlmResult<()> {
+        validate_config(&config)?;
+        config.validate_api_types()?;
+        crate::provider::validate_outbound_url_sync(&config.base_url)?;
+        let mut providers = self
+            .providers
+            .write()
+            .map_err(|e| HiLlmError::ServerError {
+                message: format!("custom provider registry lock poisoned: {e}"),
+                status: 500,
+            })?;
+        if let Some(existing) = providers.iter_mut().find(|p| p.name == config.name) {
+            *existing = config;
+        } else {
+            providers.push(config);
+        }
+        Ok(())
+    }
+
+    /// Remove a custom provider by name. Returns `true` if a provider was
+    /// removed, `false` if no provider with that name was registered.
+    pub fn unregister(&self, name: &str) -> HiLlmResult<bool> {
+        let mut providers = self
+            .providers
+            .write()
+            .map_err(|e| HiLlmError::ServerError {
+                message: format!("custom provider registry lock poisoned: {e}"),
+                status: 500,
+            })?;
+        let before = providers.len();
+        providers.retain(|p| p.name != name);
+        Ok(providers.len() < before)
+    }
+
+    /// Detect a registered custom provider by name first, then by model
+    /// match, honoring the API type filter.
+    #[allow(dead_code)] // Not yet consumed by client dispatch; part of the instance-based registry API.
+    pub(crate) fn detect(
+        &self,
+        name: &str,
+        model: &str,
+        filter: ApiTypeFilter,
+    ) -> Result<Option<Box<dyn Provider>>, HiLlmError> {
+        let providers = self.providers.read().map_err(|e| HiLlmError::ServerError {
+            message: format!("custom provider registry lock poisoned: {e}"),
+            status: 500,
+        })?;
+        detect_in_slice(&providers, name, model, filter)
+    }
+
+    /// Remove all registered custom providers.
+    pub fn clear(&self) {
+        if let Ok(mut providers) = self.providers.write() {
+            providers.clear();
+        }
+    }
+
+    /// Return the number of registered providers.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.providers.read().map(|p| p.len()).unwrap_or(0)
+    }
+
+    /// Return `true` if no providers are registered.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl Default for CustomProviderRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Process-global convenience API
+// ---------------------------------------------------------------------------
+
+static GLOBAL_REGISTRY: OnceLock<CustomProviderRegistry> = OnceLock::new();
+
+fn global_registry() -> &'static CustomProviderRegistry {
+    GLOBAL_REGISTRY.get_or_init(CustomProviderRegistry::default)
+}
+
+pub fn register_custom_provider(config: CustomProviderConfig) -> HiLlmResult<()> {
+    global_registry().register(config)
+}
+
+pub fn unregister_custom_provider(name: &str) -> HiLlmResult<bool> {
+    global_registry().unregister(name)
+}
+
+/// API type filter for custom provider detection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ApiTypeFilter {
+    /// No explicit API type constraint; fall back to the provider's
+    /// configured default API type. This preserves the legacy behavior of
+    /// `detect_custom_provider(name, model)`.
+    Any,
+    /// Only match providers that declare support for this API type.
+    Exact(APIType),
+}
+
+/// Detects a registered custom provider by explicit name first, then by
+/// model match, honoring the API type filter.
+///
+/// Returns:
+/// - `Ok(Some(provider))` when exactly one provider matches;
+/// - `Ok(None)` when nothing matches;
+/// - `Err(HiLlmError::AmbiguousProvider)` when a non-empty `model` matches
+///   several providers and no provider name was given — callers must not
+///   silently pick one by registration order.
+pub(crate) fn detect_custom_provider(
+    name: &str,
+    model: &str,
+    filter: ApiTypeFilter,
+) -> Result<Option<Box<dyn Provider>>, HiLlmError> {
+    let providers = global_registry()
+        .providers
+        .read()
+        .map_err(|e| HiLlmError::ServerError {
+            message: format!("custom provider registry lock poisoned: {e}"),
+            status: 500,
+        })?;
+    detect_in_slice(&providers, name, model, filter)
+}
+
+/// Core detection logic operating on a provider slice. Shared by both the
+/// global free function and the instance method.
+fn detect_in_slice(
+    providers: &[CustomProviderConfig],
+    name: &str,
+    model: &str,
+    filter: ApiTypeFilter,
+) -> Result<Option<Box<dyn Provider>>, HiLlmError> {
+    let supports = |cfg: &CustomProviderConfig| match filter {
+        ApiTypeFilter::Any => true,
+        ApiTypeFilter::Exact(api_type) => cfg.effective_api_types().contains(&api_type),
+    };
+
+    // First, try to match by provider name (exact match). Names are unique
+    // in the registry (registration replaces), so this cannot be ambiguous.
+    for cfg in providers.iter() {
+        if cfg.name == name && supports(cfg) {
+            return Ok(Some(Box::new(CustomProvider::from_config(
+                cfg.clone(),
+                filter,
+            ))));
+        }
+    }
+
+    // If no match by name, try to match by model.
+    if !model.is_empty() {
+        let mut candidates: Vec<&CustomProviderConfig> = Vec::new();
+        for cfg in providers.iter() {
+            if supports(cfg) && cfg.models.iter().any(|model_name| model == model_name) {
+                candidates.push(cfg);
+            }
+        }
+        match candidates.len() {
+            0 => {}
+            1 => {
+                return Ok(Some(Box::new(CustomProvider::from_config(
+                    candidates[0].clone(),
+                    filter,
+                ))));
+            }
+            _ => {
+                let mut names: Vec<String> =
+                    candidates.iter().map(|cfg| cfg.name.clone()).collect();
+                names.sort();
+                return Err(HiLlmError::AmbiguousProvider {
+                    model: model.to_string(),
+                    candidates: names,
+                });
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+#[cfg(test)]
+pub(crate) fn clear_custom_providers() {
+    global_registry().clear();
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CustomProviderConfig {
@@ -68,124 +304,6 @@ pub enum AuthHeaderFormat {
     Bearer,
     ApiKey(String),
     None,
-}
-
-pub fn register_custom_provider(config: CustomProviderConfig) -> HiLlmResult<()> {
-    validate_config(&config)?;
-    config.validate_api_types()?;
-    crate::provider::validate_outbound_url_sync(&config.base_url)?;
-    let mut providers = CUSTOM_PROVIDERS
-        .write()
-        .map_err(|e| HiLlmError::ServerError {
-            message: format!("custom provider registry lock poisoned: {e}"),
-            status: 500,
-        })?;
-    if let Some(existing) = providers.iter_mut().find(|p| p.name == config.name) {
-        *existing = config;
-    } else {
-        providers.push(config);
-    }
-
-    Ok(())
-}
-
-pub fn unregister_custom_provider(name: &str) -> HiLlmResult<bool> {
-    let mut providers = CUSTOM_PROVIDERS
-        .write()
-        .map_err(|e| HiLlmError::ServerError {
-            message: format!("custom provider registry lock poisoned: {e}"),
-            status: 500,
-        })?;
-
-    let before = providers.len();
-    providers.retain(|p| p.name != name);
-    Ok(providers.len() < before)
-}
-
-/// API type filter for custom provider detection.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum ApiTypeFilter {
-    /// No explicit API type constraint; fall back to the provider's
-    /// configured default API type. This preserves the legacy behavior of
-    /// `detect_custom_provider(name, model)`.
-    Any,
-    /// Only match providers that declare support for this API type.
-    Exact(APIType),
-}
-
-/// Detects a registered custom provider by explicit name first, then by
-/// model match, honoring the API type filter.
-///
-/// Returns:
-/// - `Ok(Some(provider))` when exactly one provider matches;
-/// - `Ok(None)` when nothing matches;
-/// - `Err(HiLlmError::AmbiguousProvider)` when a non-empty `model` matches
-///   several providers and no provider name was given — callers must not
-///   silently pick one by registration order.
-pub(crate) fn detect_custom_provider(
-    name: &str,
-    model: &str,
-    filter: ApiTypeFilter,
-) -> Result<Option<Box<dyn Provider>>, HiLlmError> {
-    let providers = CUSTOM_PROVIDERS
-        .read()
-        .map_err(|e| HiLlmError::ServerError {
-            message: format!("custom provider registry lock poisoned: {e}"),
-            status: 500,
-        })?;
-
-    let supports = |cfg: &CustomProviderConfig| match filter {
-        ApiTypeFilter::Any => true,
-        ApiTypeFilter::Exact(api_type) => cfg.effective_api_types().contains(&api_type),
-    };
-
-    // First, try to match by provider name (exact match). Names are unique
-    // in the registry (registration replaces), so this cannot be ambiguous.
-    for cfg in providers.iter() {
-        if cfg.name == name && supports(cfg) {
-            return Ok(Some(Box::new(CustomProvider::from_config(
-                cfg.clone(),
-                filter,
-            ))));
-        }
-    }
-
-    // If no match by name, try to match by model.
-    if !model.is_empty() {
-        let mut candidates: Vec<&CustomProviderConfig> = Vec::new();
-        for cfg in providers.iter() {
-            if supports(cfg) && cfg.models.iter().any(|model_name| model == model_name) {
-                candidates.push(cfg);
-            }
-        }
-        match candidates.len() {
-            0 => {}
-            1 => {
-                return Ok(Some(Box::new(CustomProvider::from_config(
-                    candidates[0].clone(),
-                    filter,
-                ))));
-            }
-            _ => {
-                let mut names: Vec<String> =
-                    candidates.iter().map(|cfg| cfg.name.clone()).collect();
-                names.sort();
-                return Err(HiLlmError::AmbiguousProvider {
-                    model: model.to_string(),
-                    candidates: names,
-                });
-            }
-        }
-    }
-
-    Ok(None)
-}
-
-#[cfg(test)]
-pub(crate) fn clear_custom_providers() {
-    if let Ok(mut providers) = CUSTOM_PROVIDERS.write() {
-        providers.clear();
-    }
 }
 
 fn validate_config(config: &CustomProviderConfig) -> HiLlmResult<()> {
@@ -741,6 +859,155 @@ mod tests {
         assert!(
             provider.codec_for(APIType::AnthropicMessages).is_none(),
             "codec for unsupported api type must be None"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // CustomProviderRegistry (instance-based API) tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn registry_instance_is_independent_of_global() {
+        let _guard = setup(); // clears global
+
+        let registry = CustomProviderRegistry::new();
+        let config = CustomProviderConfig {
+            name: "instance-only".into(),
+            base_url: "https://instance.example.com/v1".into(),
+            auth_header: AuthHeaderFormat::Bearer,
+            models: vec!["inst-model".into()],
+            available_api_types: vec![],
+            default_api_type: None,
+        };
+        registry
+            .register(config)
+            .expect("registration should succeed");
+
+        // Instance registry has it.
+        assert_eq!(registry.len(), 1);
+        let provider = registry
+            .detect("instance-only", "", ApiTypeFilter::Any)
+            .unwrap();
+        assert!(provider.is_some());
+
+        // Global registry must not see it.
+        assert!(
+            detect_ok("", "inst-model", ApiTypeFilter::Any).is_none(),
+            "global registry must not see instance-only registration"
+        );
+    }
+
+    #[test]
+    fn two_registries_are_independent() {
+        let r1 = CustomProviderRegistry::new();
+        let r2 = CustomProviderRegistry::new();
+
+        let config = CustomProviderConfig {
+            name: "scoped".into(),
+            base_url: "https://scoped.example.com/v1".into(),
+            auth_header: AuthHeaderFormat::Bearer,
+            models: vec!["scoped-model".into()],
+            available_api_types: vec![],
+            default_api_type: None,
+        };
+        r1.register(config).expect("should succeed");
+
+        assert_eq!(r1.len(), 1);
+        assert_eq!(r2.len(), 0);
+        assert!(
+            r1.detect("scoped", "", ApiTypeFilter::Any)
+                .unwrap()
+                .is_some()
+        );
+        assert!(
+            r2.detect("scoped", "", ApiTypeFilter::Any)
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn registry_unregister_and_clear() {
+        let registry = CustomProviderRegistry::new();
+
+        let config = CustomProviderConfig {
+            name: "removable".into(),
+            base_url: "https://removable.example.com/v1".into(),
+            auth_header: AuthHeaderFormat::Bearer,
+            models: vec!["rem-model".into()],
+            available_api_types: vec![],
+            default_api_type: None,
+        };
+        registry.register(config).expect("should succeed");
+        assert_eq!(registry.len(), 1);
+
+        assert!(registry.unregister("removable").unwrap());
+        assert!(registry.is_empty());
+
+        // Unregistering again returns false.
+        assert!(!registry.unregister("removable").unwrap());
+    }
+
+    #[test]
+    fn registry_rejects_invalid_config() {
+        let registry = CustomProviderRegistry::new();
+
+        let config = CustomProviderConfig {
+            name: "".into(),
+            base_url: "https://example.com/v1".into(),
+            auth_header: AuthHeaderFormat::Bearer,
+            models: vec!["model".into()],
+            available_api_types: vec![],
+            default_api_type: None,
+        };
+        assert!(
+            registry.register(config).is_err(),
+            "empty name should be rejected"
+        );
+    }
+
+    #[test]
+    fn registry_detect_by_model_with_api_type_filter() {
+        let registry = CustomProviderRegistry::new();
+
+        let config = CustomProviderConfig {
+            name: "multi-api".into(),
+            base_url: "https://multi.example.com/v1".into(),
+            auth_header: AuthHeaderFormat::Bearer,
+            models: vec!["flex-model".into()],
+            available_api_types: vec![APIType::OpenAIChatCompletions, APIType::OpenAIResponses],
+            default_api_type: Some(APIType::OpenAIResponses),
+        };
+        registry.register(config).expect("should succeed");
+
+        // Any filter: binds to configured default.
+        let provider = registry
+            .detect("", "flex-model", ApiTypeFilter::Any)
+            .unwrap()
+            .expect("should match");
+        assert_eq!(provider.api_type(), APIType::OpenAIResponses);
+
+        // Exact filter for supported type.
+        let provider = registry
+            .detect(
+                "",
+                "flex-model",
+                ApiTypeFilter::Exact(APIType::OpenAIChatCompletions),
+            )
+            .unwrap()
+            .expect("should match");
+        assert_eq!(provider.api_type(), APIType::OpenAIChatCompletions);
+
+        // Exact filter for unsupported type.
+        assert!(
+            registry
+                .detect(
+                    "",
+                    "flex-model",
+                    ApiTypeFilter::Exact(APIType::AnthropicMessages)
+                )
+                .unwrap()
+                .is_none()
         );
     }
 }

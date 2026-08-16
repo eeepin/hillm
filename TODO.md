@@ -285,21 +285,21 @@ pub trait APITypeCodec: Send + Sync {
 - [x] 在 CI 提供 `protoc`，验证 etcd feature。
 - [x] 将 JSON、binary、错误 body、SSE 和 EventStream 全部接入统一的有界读取策略；当前 `RESPONSE_BODY_MAX_BYTES` 等常量不能只定义不使用。
 - [x] 即使 `OutboundPolicy::Off`，也始终解析 URL 并限制为 http/https；策略只控制 DNS 和地址范围。
-- [ ] 对服务端场景提供安全默认配置 `DenyPrivate`。
-- [ ] 将进程级全局 outbound policy 和 custom provider registry 演进为 client/registry 实例，避免不同租户互相影响。
-- [ ] provider registry 内置版本化快照，远端数据只作为显式刷新来源；离线时仍可查询能力和成本。
+- [x] 对服务端场景提供安全默认配置 `DenyPrivate`。新增 `OutboundPolicy::server_default()` 返回 `DenyPrivate`；支持 `HILLM_OUTBOUND_POLICY` 环境变量在启动时选择默认策略。
+- [x] 将进程级全局 outbound policy 和 custom provider registry 演进为 client/registry 实例，避免不同租户互相影响。新增 `OutboundPolicyValidator`（per-instance policy validator，替代 `GLOBAL_POLICY` OnceLock）和 `CustomProviderRegistry`（per-instance registry，替代 `CUSTOM_PROVIDERS` RwLock）。原有全局函数保留为便捷入口，底层委托给全局实例。`ClientConfig` 增加 `outbound_policy: Option<Arc<OutboundPolicyValidator>>` 字段，`ClientBuilder` 增加 `.outbound_policy()` 方法；`GuardedResolver` 支持绑定实例 validator。
+- [x] provider registry 内置版本化快照，远端数据只作为显式刷新来源；离线时仍可查询能力和成本。`ProviderRegistry` 由 `OnceCell`/`OnceLock` 演进为 `RwLock<Option<ProviderRegistrySnapshot>>`，`ProviderRegistrySnapshot` 包含 `data: Arc<ProviderRegistry>`、`fetched_at: u64`（unix timestamp）和 `source: RegistrySource`（`Remote`/`Offline`）。新增 `refresh_registry()`、`registry_snapshot()`、`registry_fetched_at()`、`registry_source()` 公共函数。
 - [x] 为配置文件增加 `api_key_env`，文档中不再推荐明文 `api_key`。
 
 ## P1：关键基础设施测试
 
-- [ ] cache：过期、驱逐、哈希碰撞、错误缓存和 TTL override。
-- [ ] singleflight：leader 取消/panic、follower lag、关闭通道和多并发一致性。
-- [ ] circuit/fallback/hedge/timeout：状态迁移和中间件顺序。
-- [ ] budget/rate limit：并发请求是否超卖、窗口切换和精度。
-- [ ] router/health：ready 状态、动态 discover、健康状态切换和无可用上游。
-- [ ] idempotency：并发重复请求、失败结果和过期。
-- [ ] guardrail：输入/输出阶段顺序和全局 registry 隔离。
-- [ ] realtime、tenant、vectorstore 的错误和并发行为。
+- [x] cache：过期、驱逐、哈希碰撞、错误缓存和 TTL override。（已有 9 个 store 级测试）
+- [x] singleflight：leader 取消/panic、follower lag、关闭通道和多并发一致性。（已有 7 个测试）
+- [x] circuit/fallback/hedge/timeout：状态迁移和中间件顺序。（circuit 8 个；新增 fallback 4 个、fallback_chain 7 个、hedge 5 个、cooldown 4 个）
+- [x] budget/rate limit：并发请求是否超卖、窗口切换和精度。（budget 11 个，rate_limit 13 个）
+- [ ] router/health：ready 状态、动态 discover、健康状态切换和无可用上游。（router 11 个 unit、health 8 个 unit，但缺少 routing strategy call() 路径和 health checker service 集成测试）
+- [x] idempotency：并发重复请求、失败结果和过期。（已有 20 个 store 级测试）
+- [ ] guardrail：输入/输出阶段顺序和全局 registry 隔离。（已有 15 个 registry 测试，缺少跨 tenant 隔离测试）
+- [ ] realtime、tenant、vectorstore 的错误和并发行为。（realtime 零测试；tenant 9 个缺并发；vectorstore 16 个缺 OpenDAL）
 
 测试应优先使用暂停的 Tokio 时间、可注入时钟、mock `Service` 和本地 HTTP service，不依赖 sleep 或公网。
 

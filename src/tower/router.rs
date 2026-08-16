@@ -657,7 +657,7 @@ mod tests {
     #[test]
     fn deployment_metrics_record_latency() {
         let mut metrics = DeploymentMetrics::default();
-        
+
         metrics.record_latency(1.0);
         assert_eq!(metrics.request_count, 1);
         assert!((metrics.latency_ema - 1.0).abs() < 0.01);

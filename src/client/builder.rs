@@ -8,6 +8,7 @@ use crate::auth::CredentialProvider;
 use crate::error::HiLlmResult;
 use crate::http::transport::TransportConfig;
 use crate::provider::APIType;
+use crate::provider::outbound_policy::OutboundPolicyValidator;
 #[cfg(feature = "tower")]
 use crate::tower::{BudgetConfig, CacheConfig, CacheStore, LlmHook, RateLimitConfig};
 
@@ -27,6 +28,7 @@ pub struct ClientBuilder<K = NoApiKey, P = NoProvider> {
     transport: TransportConfig,
     load_env: bool,
     credential_provider: Option<Arc<dyn CredentialProvider>>,
+    outbound_policy: Option<Arc<OutboundPolicyValidator>>,
     #[cfg(feature = "tower")]
     cache_config: Option<CacheConfig>,
     #[cfg(feature = "tower")]
@@ -61,6 +63,7 @@ impl ClientBuilder<NoApiKey, NoProvider> {
             transport: TransportConfig::default(),
             load_env: false,
             credential_provider: None,
+            outbound_policy: None,
             #[cfg(feature = "tower")]
             cache_config: None,
             #[cfg(feature = "tower")]
@@ -103,6 +106,7 @@ impl<K, P> ClientBuilder<K, P> {
             transport: self.transport,
             load_env: self.load_env,
             credential_provider: self.credential_provider,
+            outbound_policy: self.outbound_policy,
             #[cfg(feature = "tower")]
             cache_config: self.cache_config,
             #[cfg(feature = "tower")]
@@ -137,6 +141,7 @@ impl<K, P> ClientBuilder<K, P> {
             transport: self.transport,
             load_env: self.load_env,
             credential_provider: self.credential_provider,
+            outbound_policy: self.outbound_policy,
             #[cfg(feature = "tower")]
             cache_config: self.cache_config,
             #[cfg(feature = "tower")]
@@ -199,6 +204,15 @@ impl<K, P> ClientBuilder<K, P> {
 
     pub fn credential_provider(mut self, provider: Arc<dyn CredentialProvider>) -> Self {
         self.credential_provider = Some(provider);
+        self
+    }
+
+    /// Set a per-client outbound policy validator.
+    ///
+    /// When set, this validator replaces the process-global policy for URL
+    /// and DNS checks made by this client.
+    pub fn outbound_policy(mut self, validator: Arc<OutboundPolicyValidator>) -> Self {
+        self.outbound_policy = Some(validator);
         self
     }
 
@@ -278,6 +292,7 @@ impl ClientBuilder<WithApiKey, WithProvider> {
             credential_provider: self.credential_provider,
             load_env: self.load_env,
             transport: self.transport,
+            outbound_policy: self.outbound_policy,
             #[cfg(feature = "tower")]
             cache_config: self.cache_config,
             #[cfg(feature = "tower")]

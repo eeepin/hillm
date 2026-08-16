@@ -345,7 +345,9 @@ where
                     if this.buffer.len() + bytes.len() > EVENT_STREAM_BUFFER_MAX_BYTES {
                         *this.done = true;
                         return Poll::Ready(Some(Err(HiLlmError::Streaming {
-                            message: format!("EventStream buffer exceeded {EVENT_STREAM_BUFFER_MAX_BYTES} bytes"),
+                            message: format!(
+                                "EventStream buffer exceeded {EVENT_STREAM_BUFFER_MAX_BYTES} bytes"
+                            ),
                         })));
                     }
                     this.buffer.extend_from_slice(&bytes);

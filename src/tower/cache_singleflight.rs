@@ -245,9 +245,9 @@ mod tests {
     use super::*;
     use crate::tower::types::{LlmRequest, LlmRequestKind, LlmResponse};
     use crate::types::{ChatCompletionRequest, ChatCompletionResponse, Message, Usage};
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
-    use tokio::time::{sleep, Duration};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use tokio::time::{Duration, sleep};
     use tower::ServiceExt;
 
     fn create_chat_request(content: &str) -> LlmRequest {
@@ -342,7 +342,9 @@ mod tests {
         for _ in 0..5 {
             let mut svc = service.clone();
             let req = create_chat_request("test");
-            handles.push(tokio::spawn(async move { svc.ready().await.unwrap().call(req).await }));
+            handles.push(tokio::spawn(async move {
+                svc.ready().await.unwrap().call(req).await
+            }));
         }
 
         // 等待所有请求完成
@@ -352,7 +354,11 @@ mod tests {
         }
 
         // 验证底层服务只被调用一次
-        assert_eq!(mock.get_call_count(), 1, "Service should only be called once for identical requests");
+        assert_eq!(
+            mock.get_call_count(),
+            1,
+            "Service should only be called once for identical requests"
+        );
     }
 
     #[tokio::test]
@@ -369,7 +375,9 @@ mod tests {
         for i in 0..3 {
             let mut svc = service.clone();
             let req = create_chat_request(&format!("test {}", i));
-            handles.push(tokio::spawn(async move { svc.ready().await.unwrap().call(req).await }));
+            handles.push(tokio::spawn(async move {
+                svc.ready().await.unwrap().call(req).await
+            }));
         }
 
         for handle in handles {
@@ -378,7 +386,11 @@ mod tests {
         }
 
         // 验证底层服务被调用 3 次（每个不同的请求一次）
-        assert_eq!(mock.get_call_count(), 3, "Service should be called once per unique request");
+        assert_eq!(
+            mock.get_call_count(),
+            3,
+            "Service should be called once per unique request"
+        );
     }
 
     #[tokio::test]
@@ -393,9 +405,8 @@ mod tests {
         // 启动 leader 请求
         let mut leader_svc = service.clone();
         let leader_req = create_chat_request("test");
-        let leader_handle = tokio::spawn(async move {
-            leader_svc.ready().await.unwrap().call(leader_req).await
-        });
+        let leader_handle =
+            tokio::spawn(async move { leader_svc.ready().await.unwrap().call(leader_req).await });
 
         // 等待一小段时间让 leader 开始
         sleep(Duration::from_millis(50)).await;
@@ -403,9 +414,10 @@ mod tests {
         // 启动 follower 请求
         let mut follower_svc = service.clone();
         let follower_req = create_chat_request("test");
-        let follower_handle = tokio::spawn(async move {
-            follower_svc.ready().await.unwrap().call(follower_req).await
-        });
+        let follower_handle =
+            tokio::spawn(
+                async move { follower_svc.ready().await.unwrap().call(follower_req).await },
+            );
 
         // 取消 leader
         leader_handle.abort();
@@ -430,9 +442,8 @@ mod tests {
         // 启动 leader
         let mut leader_svc = service.clone();
         let leader_req = create_chat_request("test");
-        let leader_handle = tokio::spawn(async move {
-            leader_svc.ready().await.unwrap().call(leader_req).await
-        });
+        let leader_handle =
+            tokio::spawn(async move { leader_svc.ready().await.unwrap().call(leader_req).await });
 
         // 等待 leader 开始执行
         sleep(Duration::from_millis(20)).await;
@@ -440,9 +451,10 @@ mod tests {
         // 启动 follower
         let mut follower_svc = service.clone();
         let follower_req = create_chat_request("test");
-        let follower_handle = tokio::spawn(async move {
-            follower_svc.ready().await.unwrap().call(follower_req).await
-        });
+        let follower_handle =
+            tokio::spawn(
+                async move { follower_svc.ready().await.unwrap().call(follower_req).await },
+            );
 
         // 等待两个请求完成
         let leader_result = leader_handle.await.unwrap().unwrap();
@@ -494,7 +506,9 @@ mod tests {
         for _ in 0..2 {
             let mut svc = service.clone();
             let req = create_chat_request("test");
-            handles.push(tokio::spawn(async move { svc.ready().await.unwrap().call(req).await }));
+            handles.push(tokio::spawn(async move {
+                svc.ready().await.unwrap().call(req).await
+            }));
         }
 
         // 验证两个请求都收到错误
@@ -546,7 +560,9 @@ mod tests {
         for _ in 0..2 {
             let mut svc = service.clone();
             let req = req.clone();
-            handles.push(tokio::spawn(async move { svc.ready().await.unwrap().call(req).await }));
+            handles.push(tokio::spawn(async move {
+                svc.ready().await.unwrap().call(req).await
+            }));
         }
 
         for handle in handles {
@@ -556,6 +572,10 @@ mod tests {
         }
 
         // 验证服务被调用两次（没有去重）
-        assert_eq!(mock.get_call_count(), 2, "Non-cacheable requests should not be deduplicated");
+        assert_eq!(
+            mock.get_call_count(),
+            2,
+            "Non-cacheable requests should not be deduplicated"
+        );
     }
 }

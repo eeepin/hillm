@@ -1,7 +1,7 @@
-use super::{ModelPrice, PROVIDER_REGISTRY, ProviderError};
+use super::{ModelPrice, ProviderError, registry_get};
 
 pub fn model_price(provider: &str, model: &str) -> Result<Option<ModelPrice>, ProviderError> {
-    let Some(registry) = PROVIDER_REGISTRY.get() else {
+    let Some(registry) = registry_get() else {
         return Ok(None);
     };
     Ok(registry

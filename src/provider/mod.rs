@@ -30,8 +30,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
-#[cfg(any(feature = "default-http", feature = "wasm-http"))]
-use tokio::sync::OnceCell;
 
 // Fetch Providers and models info from models.dev
 
@@ -46,11 +44,44 @@ pub enum ProviderError {
 
 type ProviderRegistry = HashMap<String, ProviderEntry>;
 
+// ---------------------------------------------------------------------------
+// Versioned provider registry snapshots
+// ---------------------------------------------------------------------------
+
+/// Source of a [`ProviderRegistrySnapshot`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RegistrySource {
+    /// Fetched from the remote `models.dev` endpoint.
+    Remote,
+    /// No network available; the snapshot is empty or derived from local data.
+    Offline,
+}
+
+/// A versioned snapshot of the provider registry.
+///
+/// Holds the registry data together with metadata about when it was fetched
+/// and where it came from. Supports explicit refresh — calling
+/// [`refresh_registry`] replaces the current snapshot with a freshly fetched
+/// one while preserving the old data until the new one is fully parsed.
+#[derive(Debug, Clone)]
+pub struct ProviderRegistrySnapshot {
+    /// The actual registry data.
+    pub data: Arc<ProviderRegistry>,
+    /// Unix epoch timestamp (seconds) when this snapshot was created.
+    pub fetched_at: u64,
+    /// Where this snapshot's data came from.
+    pub source: RegistrySource,
+}
+
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
-static PROVIDER_REGISTRY: OnceCell<Arc<ProviderRegistry>> = OnceCell::const_new();
+static PROVIDER_REGISTRY: std::sync::RwLock<Option<ProviderRegistrySnapshot>> =
+    std::sync::RwLock::new(None);
 
 #[cfg(not(any(feature = "default-http", feature = "wasm-http")))]
-static PROVIDER_REGISTRY: std::sync::OnceLock<Arc<ProviderRegistry>> = std::sync::OnceLock::new();
+static PROVIDER_REGISTRY: std::sync::RwLock<Option<ProviderRegistrySnapshot>> =
+    std::sync::RwLock::new(None);
+
 const PROVIDER_API_URL: &str = "https://models.dev/api.json";
 pub(crate) const TOKENS_PER_MILLION: f64 = 1_000_000.0;
 
@@ -123,10 +154,14 @@ pub struct ModelCapabilities {
 }
 
 pub fn capabilities(provider_name: &str, model_name: &str) -> ModelCapabilities {
-    let Some(reg) = PROVIDER_REGISTRY.get() else {
+    let Ok(guard) = PROVIDER_REGISTRY.read() else {
         return ModelCapabilities::default();
     };
-    if let Some(model_entry) = reg
+    let Some(snapshot) = guard.as_ref() else {
+        return ModelCapabilities::default();
+    };
+    if let Some(model_entry) = snapshot
+        .data
         .get(provider_name)
         .and_then(|provider_entry| provider_entry.models.get(model_name))
     {
@@ -246,27 +281,115 @@ fn parse_provider(json: &str) -> Result<ProviderRegistry, ProviderError> {
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 pub async fn registry() -> Result<Arc<ProviderRegistry>, ProviderError> {
-    PROVIDER_REGISTRY
-        .get_or_try_init(|| async {
-            let registry = fetch_provider().await?;
-            Ok(Arc::new(registry))
-        })
-        .await
-        .map(Arc::clone)
+    // Fast path: return existing snapshot if present.
+    {
+        let guard = PROVIDER_REGISTRY
+            .read()
+            .map_err(|e| ProviderError::ParseError(format!("registry lock poisoned: {e}")))?;
+        if let Some(snapshot) = guard.as_ref() {
+            return Ok(Arc::clone(&snapshot.data));
+        }
+    }
+
+    // Slow path: fetch and install a new snapshot.
+    let fetched = fetch_provider().await?;
+    let snapshot = ProviderRegistrySnapshot {
+        data: Arc::new(fetched),
+        fetched_at: unix_timestamp_secs(),
+        source: RegistrySource::Remote,
+    };
+
+    let mut guard = PROVIDER_REGISTRY
+        .write()
+        .map_err(|e| ProviderError::ParseError(format!("registry lock poisoned: {e}")))?;
+    // Double-check: another task may have initialized while we were fetching.
+    if guard.is_none() {
+        *guard = Some(snapshot.clone());
+    } else if let Some(existing) = guard.as_ref() {
+        // Use whichever is newer (should not normally happen, but be safe).
+        if snapshot.fetched_at >= existing.fetched_at {
+            *guard = Some(snapshot.clone());
+        }
+    }
+    Ok(Arc::clone(&guard.as_ref().expect("just initialized").data))
 }
 
 #[cfg(not(any(feature = "default-http", feature = "wasm-http")))]
 pub fn registry() -> Result<Arc<ProviderRegistry>, ProviderError> {
     // Without HTTP features, we can't fetch from remote; return an empty
     // registry so capability lookups degrade to defaults.
-    Ok(PROVIDER_REGISTRY
-        .get_or_init(|| Arc::new(HashMap::new()))
-        .clone())
+    let mut guard = PROVIDER_REGISTRY
+        .write()
+        .map_err(|e| ProviderError::ParseError(format!("registry lock poisoned: {e}")))?;
+    if guard.is_none() {
+        *guard = Some(ProviderRegistrySnapshot {
+            data: Arc::new(HashMap::new()),
+            fetched_at: unix_timestamp_secs(),
+            source: RegistrySource::Offline,
+        });
+    }
+    Ok(Arc::clone(&guard.as_ref().expect("just initialized").data))
 }
 
-/// Synchronously check if the registry has been initialized.
-pub(crate) fn registry_get() -> Option<&'static Arc<ProviderRegistry>> {
-    PROVIDER_REGISTRY.get()
+/// Refresh the provider registry by re-fetching from the remote source.
+///
+/// Returns the new snapshot on success. The old snapshot is replaced
+/// atomically — concurrent readers see either the old or the new data,
+/// never a partially-updated state.
+///
+/// Without HTTP features, this is a no-op that returns the current
+/// snapshot (or an empty offline snapshot if none exists).
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
+pub async fn refresh_registry() -> Result<ProviderRegistrySnapshot, ProviderError> {
+    let fetched = fetch_provider().await?;
+    let snapshot = ProviderRegistrySnapshot {
+        data: Arc::new(fetched),
+        fetched_at: unix_timestamp_secs(),
+        source: RegistrySource::Remote,
+    };
+
+    let mut guard = PROVIDER_REGISTRY
+        .write()
+        .map_err(|e| ProviderError::ParseError(format!("registry lock poisoned: {e}")))?;
+    *guard = Some(snapshot.clone());
+    Ok(snapshot)
+}
+
+/// Return the current registry snapshot, if one has been loaded.
+///
+/// Returns `None` if [`registry`] has not been called yet.
+#[must_use]
+pub fn registry_snapshot() -> Option<ProviderRegistrySnapshot> {
+    PROVIDER_REGISTRY
+        .read()
+        .ok()
+        .and_then(|guard| guard.as_ref().cloned())
+}
+
+/// Return the unix timestamp (seconds) when the registry was last loaded,
+/// or `None` if it has not been loaded yet.
+#[must_use]
+pub fn registry_fetched_at() -> Option<u64> {
+    registry_snapshot().map(|s| s.fetched_at)
+}
+
+/// Return the source of the current registry snapshot, or `None` if the
+/// registry has not been loaded yet.
+#[must_use]
+pub fn registry_source() -> Option<RegistrySource> {
+    registry_snapshot().map(|s| s.source)
+}
+
+/// Synchronously check if the registry has been initialized and return a
+/// clone of its data.
+///
+/// Returns `None` if the registry has not been loaded yet (i.e. [`registry`]
+/// has not been called).
+pub(crate) fn registry_get() -> Option<Arc<ProviderRegistry>> {
+    PROVIDER_REGISTRY
+        .read()
+        .ok()
+        .and_then(|guard| guard.as_ref().map(|s| Arc::clone(&s.data)))
 }
 
 /// Return the current Unix epoch timestamp in seconds.
@@ -525,8 +648,8 @@ pub(crate) fn get_provider(name: &str) -> Option<Box<dyn Provider>> {
         }
         "bedrock" => return Some(Box::new(BedrockProvider::from_env())),
         _ => {
-            let reg = PROVIDER_REGISTRY.get()?;
-            if let Some(entry) = reg
+            let snapshot = registry_get()?;
+            if let Some(entry) = snapshot
                 .values()
                 .collect::<Vec<&ProviderEntry>>()
                 .iter()

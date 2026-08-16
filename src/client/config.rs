@@ -8,6 +8,7 @@ use crate::auth::CredentialProvider;
 use crate::error::{HiLlmError, HiLlmResult};
 use crate::http::transport::TransportConfig;
 use crate::provider::APIType;
+use crate::provider::outbound_policy::OutboundPolicyValidator;
 #[cfg(feature = "tower")]
 use crate::tower::{BudgetConfig, CacheConfig, CacheStore, LlmHook, RateLimitConfig};
 
@@ -25,6 +26,12 @@ pub struct ClientConfig {
     pub credential_provider: Option<Arc<dyn CredentialProvider>>,
     pub load_env: bool,
     pub transport: TransportConfig,
+    /// Per-client outbound policy validator.
+    ///
+    /// When `Some`, this validator is used for URL and DNS checks instead
+    /// of the process-global policy. Enables per-tenant isolation in
+    /// server-side deployments.
+    pub outbound_policy: Option<Arc<OutboundPolicyValidator>>,
     #[cfg(feature = "tower")]
     pub cache_config: Option<CacheConfig>,
     #[cfg(feature = "tower")]
@@ -57,6 +64,7 @@ impl ClientConfig {
             credential_provider: None,
             load_env: true,
             transport: TransportConfig::default(),
+            outbound_policy: None,
             #[cfg(feature = "tower")]
             cache_config: None,
             #[cfg(feature = "tower")]
@@ -200,6 +208,17 @@ impl ClientConfigBuilder {
 
     pub fn transport(mut self, config: TransportConfig) -> Self {
         self.config.transport = config;
+        self
+    }
+
+    /// Set a per-client outbound policy validator.
+    ///
+    /// When set, this validator replaces the process-global policy for URL
+    /// and DNS checks made by this client. Useful for multi-tenant servers
+    /// that need different policies per client (e.g. some tenants may be
+    /// restricted to an allowlist, others to `DenyPrivate`).
+    pub fn outbound_policy(mut self, validator: Arc<OutboundPolicyValidator>) -> Self {
+        self.config.outbound_policy = Some(validator);
         self
     }
 

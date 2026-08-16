@@ -725,7 +725,7 @@ mod tests {
         store.put(key, body.clone(), response).await;
 
         // Key 0 should be evicted
-        let result = store.get(0, &"request 0".to_string()).await;
+        let result = store.get(0, "request 0").await;
         assert!(result.is_none(), "Oldest entry should be evicted");
 
         // Keys 1, 2, 3 should still be present
@@ -767,7 +767,10 @@ mod tests {
 
         // Should NOT get response A for body2 (different body, same key)
         let result = store.get(key, &body2).await;
-        assert!(result.is_none(), "Should not find entry for body2 with different body");
+        assert!(
+            result.is_none(),
+            "Should not find entry for body2 with different body"
+        );
 
         // Put second request with same key but different body
         store.put(key, body2.clone(), response2).await;
@@ -802,10 +805,7 @@ mod tests {
         });
         let expires_at = Instant::now() + Duration::from_secs(60);
 
-        let error_response = CachedResponse::Error {
-            error,
-            expires_at,
-        };
+        let error_response = CachedResponse::Error { error, expires_at };
 
         // Put error in cache
         store.put(key, body.clone(), error_response).await;
@@ -833,10 +833,7 @@ mod tests {
         });
         let expires_at = Instant::now() + Duration::from_secs(1);
 
-        let error_response = CachedResponse::Error {
-            error,
-            expires_at,
-        };
+        let error_response = CachedResponse::Error { error, expires_at };
 
         // Put error in cache with short expiration
         store.put(key, body.clone(), error_response).await;

@@ -129,7 +129,10 @@ mod tests {
         let a = vec![1.0, 2.0, 3.0];
         let b = vec![1.0, 2.0, 3.0];
         let sim = cosine_similarity(&a, &b);
-        assert!((sim - 1.0).abs() < 0.001, "Identical vectors should have similarity 1.0");
+        assert!(
+            (sim - 1.0).abs() < 0.001,
+            "Identical vectors should have similarity 1.0"
+        );
     }
 
     #[test]
@@ -137,7 +140,10 @@ mod tests {
         let a = vec![1.0, 0.0, 0.0];
         let b = vec![0.0, 1.0, 0.0];
         let sim = cosine_similarity(&a, &b);
-        assert!(sim.abs() < 0.001, "Orthogonal vectors should have similarity 0.0");
+        assert!(
+            sim.abs() < 0.001,
+            "Orthogonal vectors should have similarity 0.0"
+        );
     }
 
     #[test]
@@ -145,7 +151,10 @@ mod tests {
         let a = vec![1.0, 2.0, 3.0];
         let b = vec![-1.0, -2.0, -3.0];
         let sim = cosine_similarity(&a, &b);
-        assert!((sim + 1.0).abs() < 0.001, "Opposite vectors should have similarity -1.0");
+        assert!(
+            (sim + 1.0).abs() < 0.001,
+            "Opposite vectors should have similarity -1.0"
+        );
     }
 
     #[test]
@@ -185,7 +194,9 @@ mod tests {
         let vec = vec![1.0, 2.0, 3.0];
         let metadata = create_test_metadata();
 
-        let result = store.update("key1".to_string(), vec.clone(), metadata.clone()).await;
+        let result = store
+            .update("key1".to_string(), vec.clone(), metadata.clone())
+            .await;
         assert!(result.is_ok());
         assert_eq!(store.entries.len(), 1);
     }
@@ -206,7 +217,10 @@ mod tests {
         let vec = vec![1.0, 2.0, 3.0];
         let metadata = create_test_metadata();
 
-        store.update("key1".to_string(), vec, metadata).await.unwrap();
+        store
+            .update("key1".to_string(), vec, metadata)
+            .await
+            .unwrap();
         assert_eq!(store.entries.len(), 1);
 
         let result = store.delete("key1").await;
@@ -227,7 +241,11 @@ mod tests {
         let query = vec![1.0, 2.0, 3.0];
 
         let matches = store.search(&query, 10, 0.0).await;
-        assert_eq!(matches.len(), 0, "Search on empty store should return no matches");
+        assert_eq!(
+            matches.len(),
+            0,
+            "Search on empty store should return no matches"
+        );
     }
 
     #[tokio::test]
@@ -236,7 +254,10 @@ mod tests {
         let vec = vec![1.0, 2.0, 3.0];
         let metadata = create_test_metadata();
 
-        store.update("key1".to_string(), vec.clone(), metadata).await.unwrap();
+        store
+            .update("key1".to_string(), vec.clone(), metadata)
+            .await
+            .unwrap();
 
         let matches = store.search(&vec, 10, 0.99).await;
         assert_eq!(matches.len(), 1, "Should find exact match");
@@ -252,9 +273,18 @@ mod tests {
         let vec2 = vec![0.9, 0.1, 0.0];
         let vec3 = vec![0.0, 1.0, 0.0];
 
-        store.update("key1".to_string(), vec1, create_test_metadata()).await.unwrap();
-        store.update("key2".to_string(), vec2, create_test_metadata()).await.unwrap();
-        store.update("key3".to_string(), vec3, create_test_metadata()).await.unwrap();
+        store
+            .update("key1".to_string(), vec1, create_test_metadata())
+            .await
+            .unwrap();
+        store
+            .update("key2".to_string(), vec2, create_test_metadata())
+            .await
+            .unwrap();
+        store
+            .update("key3".to_string(), vec3, create_test_metadata())
+            .await
+            .unwrap();
 
         let query = vec![1.0, 0.0, 0.0];
         let matches = store.search(&query, 10, 0.0).await;
@@ -271,8 +301,14 @@ mod tests {
         let vec1 = vec![1.0, 0.0, 0.0];
         let vec2 = vec![0.0, 1.0, 0.0];
 
-        store.update("key1".to_string(), vec1, create_test_metadata()).await.unwrap();
-        store.update("key2".to_string(), vec2, create_test_metadata()).await.unwrap();
+        store
+            .update("key1".to_string(), vec1, create_test_metadata())
+            .await
+            .unwrap();
+        store
+            .update("key2".to_string(), vec2, create_test_metadata())
+            .await
+            .unwrap();
 
         let query = vec![1.0, 0.0, 0.0];
         let matches = store.search(&query, 10, 0.5).await;
@@ -287,7 +323,10 @@ mod tests {
 
         for i in 0..5 {
             let vec = vec![1.0, i as f32 * 0.1, 0.0];
-            store.update(format!("key{}", i), vec, create_test_metadata()).await.unwrap();
+            store
+                .update(format!("key{}", i), vec, create_test_metadata())
+                .await
+                .unwrap();
         }
 
         let query = vec![1.0, 0.0, 0.0];

@@ -437,11 +437,20 @@ impl DefaultClient {
             let builder = reqwest::Client::builder().default_headers(header_map);
             #[cfg(all(feature = "default-http", not(target_arch = "wasm32")))]
             let builder = {
-                if !matches!(
-                    crate::provider::current_policy(),
-                    crate::provider::OutboundPolicy::Off
-                ) {
-                    builder.dns_resolver(crate::provider::outbound_policy::guarded_resolver())
+                // Use the per-client outbound policy if set, otherwise fall
+                // back to the process-global policy.
+                let is_off = match &config.outbound_policy {
+                    Some(validator) => validator.current_policy().is_off(),
+                    None => crate::provider::current_policy().is_off(),
+                };
+                if !is_off {
+                    let resolver = match &config.outbound_policy {
+                        Some(validator) => crate::provider::outbound_policy::GuardedResolver::new(
+                            Arc::clone(validator),
+                        ),
+                        None => crate::provider::outbound_policy::GuardedResolver::from_global(),
+                    };
+                    builder.dns_resolver(Arc::new(resolver))
                 } else {
                     builder
                 }

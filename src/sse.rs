@@ -885,7 +885,7 @@ mod tests {
         assert_eq!(event.data, "test");
 
         // Drop the stream
-        drop(sse_stream);
+        let _ = sse_stream;
 
         // Record the poll count after drop
         let final_count = poll_count.load(Ordering::SeqCst);

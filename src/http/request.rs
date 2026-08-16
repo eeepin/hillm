@@ -4,7 +4,7 @@ use bytes::Bytes;
 
 use crate::error::{HiLlmError, HiLlmResult};
 use crate::http::retry;
-use crate::util::bound::{check_bound, RESPONSE_BODY_MAX_BYTES};
+use crate::util::bound::{RESPONSE_BODY_MAX_BYTES, check_bound};
 
 pub(crate) fn retry_after_from_response(resp: &reqwest::Response) -> Option<std::time::Duration> {
     let value = resp
@@ -18,24 +18,14 @@ pub(crate) fn retry_after_from_response(resp: &reqwest::Response) -> Option<std:
 /// Read a JSON response body with a size bound to prevent OOM attacks.
 async fn read_bounded_json(resp: reqwest::Response) -> HiLlmResult<serde_json::Value> {
     let text = resp.text().await.map_err(HiLlmError::from)?;
-    check_bound(
-        "response body",
-        0,
-        text.len(),
-        RESPONSE_BODY_MAX_BYTES,
-    )?;
+    check_bound("response body", 0, text.len(), RESPONSE_BODY_MAX_BYTES)?;
     serde_json::from_str(&text).map_err(HiLlmError::from)
 }
 
 /// Read a binary response body with a size bound to prevent OOM attacks.
 async fn read_bounded_bytes(resp: reqwest::Response) -> HiLlmResult<Bytes> {
     let bytes = resp.bytes().await.map_err(HiLlmError::from)?;
-    check_bound(
-        "response body",
-        0,
-        bytes.len(),
-        RESPONSE_BODY_MAX_BYTES,
-    )?;
+    check_bound("response body", 0, bytes.len(), RESPONSE_BODY_MAX_BYTES)?;
     Ok(bytes)
 }
 

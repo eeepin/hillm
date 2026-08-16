@@ -140,7 +140,11 @@ mod tests {
     }
 
     impl MockGuardrail {
-        fn new(name: &'static str, stages: Vec<GuardrailStage>, decision: GuardrailDecision) -> Self {
+        fn new(
+            name: &'static str,
+            stages: Vec<GuardrailStage>,
+            decision: GuardrailDecision,
+        ) -> Self {
             Self {
                 name,
                 stages,
@@ -192,10 +196,10 @@ mod tests {
     fn create_test_context() -> GuardrailContext<'static> {
         static REQUEST: std::sync::OnceLock<serde_json::Value> = std::sync::OnceLock::new();
         static METADATA: std::sync::OnceLock<HashMap<String, String>> = std::sync::OnceLock::new();
-        
+
         let request = REQUEST.get_or_init(|| serde_json::json!({"test": "request"}));
-        let metadata = METADATA.get_or_init(|| HashMap::new());
-        
+        let metadata = METADATA.get_or_init(HashMap::new);
+
         GuardrailContext {
             request,
             response: None,
@@ -240,7 +244,7 @@ mod tests {
         ));
         registry.register(guardrail);
         assert_eq!(registry.len(), 1);
-        
+
         registry.clear();
         assert_eq!(registry.len(), 0);
     }
@@ -248,11 +252,19 @@ mod tests {
     #[test]
     fn guardrail_registry_iter() {
         let mut registry = GuardrailRegistry::new();
-        let g1 = Arc::new(MockGuardrail::new("test1", vec![GuardrailStage::Input], GuardrailDecision::Allow));
-        let g2 = Arc::new(MockGuardrail::new("test2", vec![GuardrailStage::Output], GuardrailDecision::Allow));
+        let g1 = Arc::new(MockGuardrail::new(
+            "test1",
+            vec![GuardrailStage::Input],
+            GuardrailDecision::Allow,
+        ));
+        let g2 = Arc::new(MockGuardrail::new(
+            "test2",
+            vec![GuardrailStage::Output],
+            GuardrailDecision::Allow,
+        ));
         registry.register(g1);
         registry.register(g2);
-        
+
         let names: Vec<&str> = registry.iter().map(|g| g.name()).collect();
         assert_eq!(names, vec!["test1", "test2"]);
     }
@@ -266,10 +278,10 @@ mod tests {
             GuardrailDecision::Allow,
         ));
         registry.register(guardrail.clone());
-        
+
         let ctx = create_test_context();
         let decision = registry.run_stage(GuardrailStage::Input, &ctx).await;
-        
+
         assert!(decision.is_allow());
         assert_eq!(guardrail.get_call_count(), 1);
     }
@@ -286,10 +298,10 @@ mod tests {
             },
         ));
         registry.register(guardrail.clone());
-        
+
         let ctx = create_test_context();
         let decision = registry.run_stage(GuardrailStage::Input, &ctx).await;
-        
+
         assert!(decision.is_block());
         assert_eq!(guardrail.get_call_count(), 1);
     }
@@ -306,10 +318,10 @@ mod tests {
             },
         ));
         registry.register(guardrail.clone());
-        
+
         let ctx = create_test_context();
         let decision = registry.run_stage(GuardrailStage::Input, &ctx).await;
-        
+
         match decision {
             GuardrailDecision::Mutate { new_payload } => {
                 assert_eq!(new_payload, mutated_payload);
@@ -328,10 +340,10 @@ mod tests {
             GuardrailDecision::Allow,
         ));
         registry.register(guardrail.clone());
-        
+
         let ctx = create_test_context();
         let decision = registry.run_stage(GuardrailStage::Input, &ctx).await;
-        
+
         assert!(decision.is_allow());
         assert_eq!(guardrail.get_call_count(), 0); // Should not be called
     }
@@ -339,14 +351,22 @@ mod tests {
     #[tokio::test]
     async fn guardrail_registry_run_stage_multiple_guardrails() {
         let mut registry = GuardrailRegistry::new();
-        let g1 = Arc::new(MockGuardrail::new("test1", vec![GuardrailStage::Input], GuardrailDecision::Allow));
-        let g2 = Arc::new(MockGuardrail::new("test2", vec![GuardrailStage::Input], GuardrailDecision::Allow));
+        let g1 = Arc::new(MockGuardrail::new(
+            "test1",
+            vec![GuardrailStage::Input],
+            GuardrailDecision::Allow,
+        ));
+        let g2 = Arc::new(MockGuardrail::new(
+            "test2",
+            vec![GuardrailStage::Input],
+            GuardrailDecision::Allow,
+        ));
         registry.register(g1.clone());
         registry.register(g2.clone());
-        
+
         let ctx = create_test_context();
         let decision = registry.run_stage(GuardrailStage::Input, &ctx).await;
-        
+
         assert!(decision.is_allow());
         assert_eq!(g1.get_call_count(), 1);
         assert_eq!(g2.get_call_count(), 1);
@@ -363,13 +383,17 @@ mod tests {
                 code: 403,
             },
         ));
-        let g2 = Arc::new(MockGuardrail::new("test2", vec![GuardrailStage::Input], GuardrailDecision::Allow));
+        let g2 = Arc::new(MockGuardrail::new(
+            "test2",
+            vec![GuardrailStage::Input],
+            GuardrailDecision::Allow,
+        ));
         registry.register(g1.clone());
         registry.register(g2.clone());
-        
+
         let ctx = create_test_context();
         let decision = registry.run_stage(GuardrailStage::Input, &ctx).await;
-        
+
         assert!(decision.is_block());
         assert_eq!(g1.get_call_count(), 1);
         assert_eq!(g2.get_call_count(), 0); // Should not be called after block
@@ -380,7 +404,7 @@ mod tests {
         let input = GuardrailStage::Input;
         let output = GuardrailStage::Output;
         let chunk = GuardrailStage::OutputChunk;
-        
+
         assert_ne!(input, output);
         assert_ne!(input, chunk);
         assert_ne!(output, chunk);
@@ -396,7 +420,7 @@ mod tests {
         let mutate = GuardrailDecision::Mutate {
             new_payload: serde_json::json!({}),
         };
-        
+
         assert!(!allow.is_block());
         assert!(block.is_block());
         assert!(!mutate.is_block());
@@ -412,7 +436,7 @@ mod tests {
         let mutate = GuardrailDecision::Mutate {
             new_payload: serde_json::json!({}),
         };
-        
+
         assert!(allow.is_allow());
         assert!(!block.is_allow());
         assert!(!mutate.is_allow());

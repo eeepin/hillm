@@ -43,7 +43,7 @@ pub use provider::{
     capabilities,
     cost::{completion_cost, completion_cost_with_cache},
     custom::{
-        AuthHeaderFormat, CustomProviderConfig, register_custom_provider,
+        AuthHeaderFormat, CustomProviderConfig, CustomProviderRegistry, register_custom_provider,
         unregister_custom_provider,
     },
 };

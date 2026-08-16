@@ -304,12 +304,14 @@ where
                 .map_err(store_err)?;
 
             if !inserted {
+                if let Some(entry) = store.get(&key).await.map_err(store_err)?
+                    && entry.body_hash != body_hash
+                {
+                    return Err(HiLlmError::IdempotencyConflict {
+                        key: raw_key.clone(),
+                    });
+                }
                 if let Some(entry) = store.get(&key).await.map_err(store_err)? {
-                    if entry.body_hash != body_hash {
-                        return Err(HiLlmError::IdempotencyConflict {
-                            key: raw_key.clone(),
-                        });
-                    }
                     if let Some(cached) = entry.response {
                         return cached.into_llm_response();
                     }
@@ -362,7 +364,10 @@ pub(crate) fn is_cacheable_kind(kind: &LlmRequestKind) -> bool {
 mod tests {
     use super::*;
     use crate::tower::cache::CachedResponse;
-    use crate::types::{AssistantMessage, ChatCompletionRequest, ChatCompletionResponse, Choice, Message, MessageContent, Usage};
+    use crate::types::{
+        AssistantMessage, ChatCompletionRequest, ChatCompletionResponse, Choice, Message,
+        MessageContent, Usage,
+    };
     use std::time::{Duration, Instant};
 
     fn create_test_chat_response(content: &str) -> CachedResponse {
@@ -455,7 +460,10 @@ mod tests {
     #[tokio::test]
     async fn in_memory_store_try_insert() {
         let store = InMemoryIdempotencyStore::new();
-        let inserted = store.try_insert("key1", "hash1", Duration::from_secs(300)).await.unwrap();
+        let inserted = store
+            .try_insert("key1", "hash1", Duration::from_secs(300))
+            .await
+            .unwrap();
         assert!(inserted, "Should insert new entry");
         assert_eq!(store.map.len(), 1);
     }
@@ -463,33 +471,48 @@ mod tests {
     #[tokio::test]
     async fn in_memory_store_try_insert_duplicate() {
         let store = InMemoryIdempotencyStore::new();
-        store.try_insert("key1", "hash1", Duration::from_secs(300)).await.unwrap();
-        
+        store
+            .try_insert("key1", "hash1", Duration::from_secs(300))
+            .await
+            .unwrap();
+
         // Try to insert again with same key
-        let inserted = store.try_insert("key1", "hash2", Duration::from_secs(300)).await.unwrap();
+        let inserted = store
+            .try_insert("key1", "hash2", Duration::from_secs(300))
+            .await
+            .unwrap();
         assert!(!inserted, "Should not insert duplicate key");
     }
 
     #[tokio::test]
     async fn in_memory_store_try_insert_expired() {
         let store = InMemoryIdempotencyStore::new();
-        
+
         // Insert with very short TTL
-        store.try_insert("key1", "hash1", Duration::from_millis(1)).await.unwrap();
-        
+        store
+            .try_insert("key1", "hash1", Duration::from_millis(1))
+            .await
+            .unwrap();
+
         // Wait for expiration
         tokio::time::sleep(Duration::from_millis(10)).await;
-        
+
         // Should be able to insert again since entry is expired
-        let inserted = store.try_insert("key1", "hash2", Duration::from_secs(300)).await.unwrap();
+        let inserted = store
+            .try_insert("key1", "hash2", Duration::from_secs(300))
+            .await
+            .unwrap();
         assert!(inserted, "Should insert after expiration");
     }
 
     #[tokio::test]
     async fn in_memory_store_get_existing() {
         let store = InMemoryIdempotencyStore::new();
-        store.try_insert("key1", "hash1", Duration::from_secs(300)).await.unwrap();
-        
+        store
+            .try_insert("key1", "hash1", Duration::from_secs(300))
+            .await
+            .unwrap();
+
         let entry = store.get("key1").await.unwrap();
         assert!(entry.is_some());
         assert_eq!(entry.unwrap().body_hash, "hash1");
@@ -498,11 +521,14 @@ mod tests {
     #[tokio::test]
     async fn in_memory_store_get_expired() {
         let store = InMemoryIdempotencyStore::new();
-        store.try_insert("key1", "hash1", Duration::from_millis(1)).await.unwrap();
-        
+        store
+            .try_insert("key1", "hash1", Duration::from_millis(1))
+            .await
+            .unwrap();
+
         // Wait for expiration
         tokio::time::sleep(Duration::from_millis(10)).await;
-        
+
         let entry = store.get("key1").await.unwrap();
         assert!(entry.is_none(), "Expired entry should not be returned");
     }
@@ -510,11 +536,14 @@ mod tests {
     #[tokio::test]
     async fn in_memory_store_store_response() {
         let store = InMemoryIdempotencyStore::new();
-        store.try_insert("key1", "hash1", Duration::from_secs(300)).await.unwrap();
-        
+        store
+            .try_insert("key1", "hash1", Duration::from_secs(300))
+            .await
+            .unwrap();
+
         let response = create_test_chat_response("test response");
         store.store_response("key1", response).await.unwrap();
-        
+
         let entry = store.get("key1").await.unwrap().unwrap();
         assert!(entry.response.is_some());
     }
@@ -522,9 +551,12 @@ mod tests {
     #[tokio::test]
     async fn in_memory_store_remove() {
         let store = InMemoryIdempotencyStore::new();
-        store.try_insert("key1", "hash1", Duration::from_secs(300)).await.unwrap();
+        store
+            .try_insert("key1", "hash1", Duration::from_secs(300))
+            .await
+            .unwrap();
         assert_eq!(store.map.len(), 1);
-        
+
         store.remove("key1").await.unwrap();
         assert_eq!(store.map.len(), 0);
     }
@@ -533,26 +565,34 @@ mod tests {
     fn compute_body_hash_deterministic() {
         let req1 = create_test_chat_request("test");
         let req2 = create_test_chat_request("test");
-        
+
         let hash1 = compute_body_hash(&req1);
         let hash2 = compute_body_hash(&req2);
-        
+
         assert!(hash1.is_some());
         assert!(hash2.is_some());
-        assert_eq!(hash1.unwrap(), hash2.unwrap(), "Same request should produce same hash");
+        assert_eq!(
+            hash1.unwrap(),
+            hash2.unwrap(),
+            "Same request should produce same hash"
+        );
     }
 
     #[test]
     fn compute_body_hash_different_requests() {
         let req1 = create_test_chat_request("test1");
         let req2 = create_test_chat_request("test2");
-        
+
         let hash1 = compute_body_hash(&req1);
         let hash2 = compute_body_hash(&req2);
-        
+
         assert!(hash1.is_some());
         assert!(hash2.is_some());
-        assert_ne!(hash1.unwrap(), hash2.unwrap(), "Different requests should produce different hashes");
+        assert_ne!(
+            hash1.unwrap(),
+            hash2.unwrap(),
+            "Different requests should produce different hashes"
+        );
     }
 
     #[test]

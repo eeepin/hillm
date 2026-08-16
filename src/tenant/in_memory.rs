@@ -102,8 +102,14 @@ mod tests {
     #[tokio::test]
     async fn in_memory_key_resolver_with_entries() {
         let entries = vec![
-            ("key1".to_string(), create_test_resolved_key("tenant1", true)),
-            ("key2".to_string(), create_test_resolved_key("tenant2", true)),
+            (
+                "key1".to_string(),
+                create_test_resolved_key("tenant1", true),
+            ),
+            (
+                "key2".to_string(),
+                create_test_resolved_key("tenant2", true),
+            ),
         ];
         let resolver = InMemoryKeyResolver::with_entries(entries);
         assert_eq!(resolver.keys.len(), 2);

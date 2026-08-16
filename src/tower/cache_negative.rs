@@ -144,3 +144,174 @@ where
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tower::types::{LlmRequest, LlmResponse};
+    use crate::types::{
+        AssistantMessage, ChatCompletionRequest, ChatCompletionResponse, Choice, Message,
+        MessageContent, Usage,
+    };
+    use std::sync::atomic::{AtomicU32, Ordering};
+    use std::task::{Context, Poll};
+    use tokio::time::Duration;
+    use tower::{Service, ServiceExt};
+
+    fn create_chat_request(content: &str) -> LlmRequest {
+        LlmRequest {
+            kind: crate::tower::types::LlmRequestKind::Chat(ChatCompletionRequest {
+                model: "test-model".to_string(),
+                messages: vec![Message::User(crate::types::UserMessage {
+                    content: MessageContent::Text(content.to_string()),
+                    name: None,
+                })],
+                ..Default::default()
+            }),
+            tenant_id: None,
+            idempotency_key: None,
+        }
+    }
+
+    fn create_chat_response() -> LlmResponse {
+        LlmResponse::Chat(ChatCompletionResponse {
+            id: "test-id".to_string(),
+            object: "chat.completion".to_string(),
+            created: 1234567890,
+            model: "test-model".to_string(),
+            choices: vec![Choice {
+                index: 0,
+                message: AssistantMessage {
+                    content: Some(MessageContent::Text("ok".to_string())),
+                    ..Default::default()
+                },
+                finish_reason: None,
+            }],
+            usage: Some(Usage {
+                prompt_tokens: 10,
+                completion_tokens: 20,
+                total_tokens: 30,
+                ..Default::default()
+            }),
+            ..Default::default()
+        })
+    }
+
+    #[derive(Clone)]
+    struct MockService {
+        should_fail: bool,
+        call_count: Arc<AtomicU32>,
+    }
+
+    impl MockService {
+        fn new(should_fail: bool) -> Self {
+            Self {
+                should_fail,
+                call_count: Arc::new(AtomicU32::new(0)),
+            }
+        }
+
+        fn call_count(&self) -> u32 {
+            self.call_count.load(Ordering::SeqCst)
+        }
+    }
+
+    impl Service<LlmRequest> for MockService {
+        type Response = LlmResponse;
+        type Error = HiLlmError;
+        type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+
+        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn call(&mut self, _req: LlmRequest) -> Self::Future {
+            self.call_count.fetch_add(1, Ordering::SeqCst);
+            let should_fail = self.should_fail;
+            Box::pin(async move {
+                if should_fail {
+                    Err(HiLlmError::ServiceUnavailable {
+                        message: "transient".to_string(),
+                        status: 503,
+                    })
+                } else {
+                    Ok(create_chat_response())
+                }
+            })
+        }
+    }
+
+    #[test]
+    fn fixed_window_policy_caches_transient_errors() {
+        let policy = FixedWindowNegativeCache::new(Duration::from_secs(10), true);
+        let transient = HiLlmError::ServiceUnavailable {
+            message: "t".into(),
+            status: 503,
+        };
+        assert_eq!(policy.cache_for(&transient), Some(Duration::from_secs(10)));
+    }
+
+    #[test]
+    fn fixed_window_policy_skips_terminal_when_retryable_only() {
+        let policy = FixedWindowNegativeCache::new(Duration::from_secs(10), true);
+        let terminal = HiLlmError::BadRequest {
+            message: "t".into(),
+            status: 400,
+        };
+        assert_eq!(policy.cache_for(&terminal), None);
+    }
+
+    #[test]
+    fn fixed_window_policy_caches_all_when_not_retryable_only() {
+        let policy = FixedWindowNegativeCache::new(Duration::from_secs(10), false);
+        let terminal = HiLlmError::BadRequest {
+            message: "t".into(),
+            status: 400,
+        };
+        assert_eq!(policy.cache_for(&terminal), Some(Duration::from_secs(10)));
+    }
+
+    #[test]
+    fn default_policy_is_retryable_only_with_five_second_window() {
+        let policy = FixedWindowNegativeCache::default();
+        assert_eq!(policy.window, Duration::from_secs(5));
+        assert!(policy.retryable_only);
+    }
+
+    #[tokio::test]
+    async fn negative_cache_does_not_affect_success() {
+        let mock = MockService::new(false);
+        let layer = NegativeCacheLayer::default_in_memory();
+        let mut service = layer.layer(mock.clone());
+
+        let req = create_chat_request("hello");
+        let result = ServiceExt::ready(&mut service)
+            .await
+            .unwrap()
+            .call(req)
+            .await;
+        assert!(result.is_ok());
+        assert_eq!(mock.call_count(), 1);
+    }
+
+    #[tokio::test]
+    async fn negative_cache_stores_transient_error() {
+        let mock = MockService::new(true);
+        let layer = NegativeCacheLayer::default_in_memory();
+        let store = Arc::clone(&layer.store);
+        let mut service = layer.layer(mock.clone());
+
+        let req = create_chat_request("will fail");
+        let result = ServiceExt::ready(&mut service)
+            .await
+            .unwrap()
+            .call(req)
+            .await;
+        assert!(result.is_err());
+
+        // The error should have been cached.
+        let (key, body) = hash_key(&create_chat_request("will fail")).unwrap();
+        let cached = store.get(key, &body).await;
+        assert!(cached.is_some(), "transient error should be cached");
+    }
+}

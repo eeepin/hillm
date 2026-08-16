@@ -203,3 +203,271 @@ where
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tower::types::{LlmRequest, LlmResponse};
+    use crate::types::{
+        AssistantMessage, ChatCompletionRequest, ChatCompletionResponse, Choice, Message,
+        MessageContent, Usage,
+    };
+    use std::sync::atomic::{AtomicU32, Ordering};
+    use std::task::{Context, Poll};
+    use tower::{Service, ServiceExt};
+
+    fn create_chat_request(content: &str) -> LlmRequest {
+        LlmRequest {
+            kind: crate::tower::types::LlmRequestKind::Chat(ChatCompletionRequest {
+                model: "test-model".to_string(),
+                messages: vec![Message::User(crate::types::UserMessage {
+                    content: MessageContent::Text(content.to_string()),
+                    name: None,
+                })],
+                ..Default::default()
+            }),
+            tenant_id: None,
+            idempotency_key: None,
+        }
+    }
+
+    fn create_chat_response(content: &str) -> LlmResponse {
+        LlmResponse::Chat(ChatCompletionResponse {
+            id: "test-id".to_string(),
+            object: "chat.completion".to_string(),
+            created: 1234567890,
+            model: "test-model".to_string(),
+            choices: vec![Choice {
+                index: 0,
+                message: AssistantMessage {
+                    content: Some(MessageContent::Text(content.to_string())),
+                    ..Default::default()
+                },
+                finish_reason: None,
+            }],
+            usage: Some(Usage {
+                prompt_tokens: 10,
+                completion_tokens: 20,
+                total_tokens: 30,
+                ..Default::default()
+            }),
+            ..Default::default()
+        })
+    }
+
+    /// Mock service that tracks calls and can be configured to succeed or fail
+    /// with transient or terminal errors.
+    #[derive(Clone)]
+    struct MockService {
+        behavior: MockBehavior,
+        call_count: Arc<AtomicU32>,
+        label: String,
+    }
+
+    #[derive(Clone)]
+    enum MockBehavior {
+        Success,
+        TransientFail,
+        TerminalFail,
+    }
+
+    impl MockService {
+        fn success(label: &str) -> Self {
+            Self {
+                behavior: MockBehavior::Success,
+                call_count: Arc::new(AtomicU32::new(0)),
+                label: label.to_string(),
+            }
+        }
+
+        fn transient_fail(label: &str) -> Self {
+            Self {
+                behavior: MockBehavior::TransientFail,
+                call_count: Arc::new(AtomicU32::new(0)),
+                label: label.to_string(),
+            }
+        }
+
+        fn terminal_fail(label: &str) -> Self {
+            Self {
+                behavior: MockBehavior::TerminalFail,
+                call_count: Arc::new(AtomicU32::new(0)),
+                label: label.to_string(),
+            }
+        }
+
+        fn call_count(&self) -> u32 {
+            self.call_count.load(Ordering::SeqCst)
+        }
+    }
+
+    impl Service<LlmRequest> for MockService {
+        type Response = LlmResponse;
+        type Error = HiLlmError;
+        type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+
+        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn call(&mut self, _req: LlmRequest) -> Self::Future {
+            self.call_count.fetch_add(1, Ordering::SeqCst);
+            let behavior = self.behavior.clone();
+            let label = self.label.clone();
+            Box::pin(async move {
+                match behavior {
+                    MockBehavior::Success => Ok(create_chat_response(&format!("{label} ok"))),
+                    MockBehavior::TransientFail => Err(HiLlmError::ServiceUnavailable {
+                        message: format!("{label} transient"),
+                        status: 503,
+                    }),
+                    MockBehavior::TerminalFail => Err(HiLlmError::BadRequest {
+                        message: format!("{label} terminal"),
+                        status: 400,
+                    }),
+                }
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn chain_first_succeeds() {
+        let s1 = MockService::success("s1");
+        let s2 = MockService::success("s2");
+        let layer = FallbackChainLayer::new(vec![s1.clone(), s2.clone()]);
+        let mut service = layer.layer(());
+
+        let req = create_chat_request("hello");
+        let result = ServiceExt::ready(&mut service)
+            .await
+            .unwrap()
+            .call(req)
+            .await;
+
+        assert!(result.is_ok());
+        assert_eq!(s1.call_count(), 1, "first service should be called");
+        assert_eq!(s2.call_count(), 0, "second service should not be called");
+    }
+
+    #[tokio::test]
+    async fn chain_falls_through_transient_to_success() {
+        let s1 = MockService::transient_fail("s1");
+        let s2 = MockService::success("s2");
+        let s3 = MockService::success("s3");
+        let layer = FallbackChainLayer::new(vec![s1.clone(), s2.clone(), s3.clone()]);
+        let mut service = layer.layer(());
+
+        let req = create_chat_request("hello");
+        let result = ServiceExt::ready(&mut service)
+            .await
+            .unwrap()
+            .call(req)
+            .await;
+
+        assert!(result.is_ok());
+        assert_eq!(s1.call_count(), 1, "s1 should be tried");
+        assert_eq!(s2.call_count(), 1, "s2 should be tried after s1 transient");
+        assert_eq!(
+            s3.call_count(),
+            0,
+            "s3 should not be tried since s2 succeeded"
+        );
+    }
+
+    #[tokio::test]
+    async fn chain_terminal_error_aborts_immediately() {
+        let s1 = MockService::transient_fail("s1");
+        let s2 = MockService::terminal_fail("s2");
+        let s3 = MockService::success("s3");
+        let layer = FallbackChainLayer::new(vec![s1.clone(), s2.clone(), s3.clone()]);
+        let mut service = layer.layer(());
+
+        let req = create_chat_request("hello");
+        let result = ServiceExt::ready(&mut service)
+            .await
+            .unwrap()
+            .call(req)
+            .await;
+
+        assert!(result.is_err(), "terminal error should propagate");
+        assert_eq!(s1.call_count(), 1);
+        assert_eq!(s2.call_count(), 1, "s2 terminal error should abort chain");
+        assert_eq!(s3.call_count(), 0, "s3 should not be tried after terminal");
+    }
+
+    #[tokio::test]
+    async fn chain_all_transient_returns_last_error() {
+        let s1 = MockService::transient_fail("s1");
+        let s2 = MockService::transient_fail("s2");
+        let layer = FallbackChainLayer::new(vec![s1.clone(), s2.clone()]);
+        let mut service = layer.layer(());
+
+        let req = create_chat_request("hello");
+        let result = ServiceExt::ready(&mut service)
+            .await
+            .unwrap()
+            .call(req)
+            .await;
+
+        assert!(result.is_err(), "all failing should return error");
+        assert_eq!(s1.call_count(), 1);
+        assert_eq!(s2.call_count(), 1);
+    }
+
+    #[tokio::test]
+    async fn chain_empty_returns_server_error() {
+        let layer: FallbackChainLayer<MockService> = FallbackChainLayer::new(vec![]);
+        let mut service = layer.layer(());
+
+        let req = create_chat_request("hello");
+        let result = ServiceExt::ready(&mut service)
+            .await
+            .unwrap()
+            .call(req)
+            .await;
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("empty"));
+    }
+
+    #[tokio::test]
+    async fn chain_prepend_adds_service_to_front() {
+        let s1 = MockService::transient_fail("s1");
+        let s2 = MockService::success("s2");
+        let s0 = MockService::success("s0");
+
+        let layer = FallbackChainLayer::new(vec![s1.clone(), s2.clone()]).prepend(s0.clone());
+        let mut service = layer.layer(());
+
+        let req = create_chat_request("hello");
+        let result = ServiceExt::ready(&mut service)
+            .await
+            .unwrap()
+            .call(req)
+            .await;
+
+        assert!(result.is_ok());
+        assert_eq!(s0.call_count(), 1, "prepended s0 should be tried first");
+        assert_eq!(
+            s1.call_count(),
+            0,
+            "s1 should not be tried since s0 succeeded"
+        );
+    }
+
+    #[test]
+    fn default_retry_policy_classifies_transient() {
+        let policy = DefaultRetryPolicy;
+        let transient = HiLlmError::ServiceUnavailable {
+            message: "t".into(),
+            status: 503,
+        };
+        let terminal = HiLlmError::BadRequest {
+            message: "t".into(),
+            status: 400,
+        };
+        assert_eq!(policy.classify(&transient), RetryClass::Transient);
+        assert_eq!(policy.classify(&terminal), RetryClass::Terminal);
+    }
+}
