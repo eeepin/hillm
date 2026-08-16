@@ -10,7 +10,11 @@ use crate::provider::APIType;
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FileConfig {
+    /// API key in plaintext. Prefer `api_key_env` for security.
     pub api_key: Option<String>,
+    /// Name of an environment variable containing the API key.
+    /// Takes precedence over `api_key` when set.
+    pub api_key_env: Option<String>,
     pub base_url: Option<String>,
     pub timeout_secs: Option<u64>,
     pub max_retries: Option<u32>,
@@ -120,7 +124,19 @@ impl FileConfig {
     }
 
     pub fn into_builder(self) -> super::ClientConfigBuilder {
-        let api_key = self.api_key.unwrap_or_default();
+        // api_key_env takes precedence over api_key
+        let api_key = if let Some(env_var) = &self.api_key_env {
+            std::env::var(env_var).unwrap_or_else(|_| {
+                #[cfg(feature = "tracing")]
+                tracing::warn!(
+                    env_var = env_var.as_str(),
+                    "api_key_env specified but environment variable is not set"
+                );
+                String::new()
+            })
+        } else {
+            self.api_key.unwrap_or_default()
+        };
         let mut builder = super::ClientConfigBuilder::new(api_key);
 
         if let Some(url) = self.base_url {
@@ -224,6 +240,7 @@ impl FileConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use secrecy::ExposeSecret;
 
     #[test]
     fn parse_minimal_config() {
@@ -353,5 +370,58 @@ base_url = "https://example.com"
         assert!(config.validate_providers().is_ok());
         // Empty available_api_types defaults to [OpenAIChatCompletions]
         assert!(config.providers()[0].available_api_types.is_empty());
+    }
+
+    #[test]
+    fn api_key_env_takes_precedence_over_api_key() {
+        // Set a test environment variable
+        unsafe { std::env::set_var("HILLM_TEST_API_KEY", "sk-from-env") };
+
+        let toml = r#"
+api_key = "sk-from-file"
+api_key_env = "HILLM_TEST_API_KEY"
+"#;
+        let file_config = FileConfig::from_toml_str(toml).expect("TOML should parse");
+        assert_eq!(file_config.api_key.as_deref(), Some("sk-from-file"));
+        assert_eq!(file_config.api_key_env.as_deref(), Some("HILLM_TEST_API_KEY"));
+
+        let config = file_config.into_builder().build();
+        // api_key_env should take precedence
+        assert_eq!(config.api_key.expose_secret(), "sk-from-env");
+
+        // Clean up
+        unsafe { std::env::remove_var("HILLM_TEST_API_KEY") };
+    }
+
+    #[test]
+    fn api_key_env_missing_falls_back_to_api_key() {
+        // Ensure the env var doesn't exist
+        unsafe { std::env::remove_var("HILLM_TEST_MISSING_KEY") };
+
+        let toml = r#"
+api_key = "sk-from-file"
+api_key_env = "HILLM_TEST_MISSING_KEY"
+"#;
+        let file_config = FileConfig::from_toml_str(toml).expect("TOML should parse");
+        let config = file_config.into_builder().build();
+        // When api_key_env is set but the env var doesn't exist, it should fall back to empty string
+        assert_eq!(config.api_key.expose_secret(), "");
+    }
+
+    #[test]
+    fn api_key_env_only() {
+        unsafe { std::env::set_var("HILLM_TEST_ONLY_ENV", "sk-only-env") };
+
+        let toml = r#"
+api_key_env = "HILLM_TEST_ONLY_ENV"
+"#;
+        let file_config = FileConfig::from_toml_str(toml).expect("TOML should parse");
+        assert!(file_config.api_key.is_none());
+        assert_eq!(file_config.api_key_env.as_deref(), Some("HILLM_TEST_ONLY_ENV"));
+
+        let config = file_config.into_builder().build();
+        assert_eq!(config.api_key.expose_secret(), "sk-only-env");
+
+        unsafe { std::env::remove_var("HILLM_TEST_ONLY_ENV") };
     }
 }
