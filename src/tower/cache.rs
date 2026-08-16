@@ -634,3 +634,317 @@ where
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::{AssistantMessage, ChatCompletionResponse, Choice, MessageContent, Usage};
+    use std::sync::Arc;
+
+    fn create_test_config(max_entries: usize, ttl_secs: u64) -> CacheConfig {
+        CacheConfig {
+            max_entries,
+            ttl: Duration::from_secs(ttl_secs),
+            backend: CacheBackend::Memory,
+        }
+    }
+
+    fn create_test_response(content: &str) -> CachedResponse {
+        CachedResponse::Chat(ChatCompletionResponse {
+            id: "test-id".to_string(),
+            object: "chat.completion".to_string(),
+            created: 1234567890,
+            model: "test-model".to_string(),
+            choices: vec![Choice {
+                index: 0,
+                message: AssistantMessage {
+                    content: Some(MessageContent::Text(content.to_string())),
+                    ..Default::default()
+                },
+                finish_reason: None,
+            }],
+            usage: Some(Usage {
+                prompt_tokens: 10,
+                completion_tokens: 20,
+                total_tokens: 30,
+                ..Default::default()
+            }),
+            ..Default::default()
+        })
+    }
+
+    #[tokio::test]
+    async fn cache_expiration() {
+        let config = create_test_config(10, 1);
+        let store = InMemoryStore::new(&config);
+
+        let key = 12345u64;
+        let body = "test request".to_string();
+        let response = create_test_response("test response");
+
+        // Put the response in cache
+        store.put(key, body.clone(), response).await;
+
+        // Should be able to get it immediately
+        let result = store.get(key, &body).await;
+        assert!(result.is_some(), "Cache should contain the response");
+
+        // Wait for expiration
+        tokio::time::sleep(Duration::from_secs(2)).await;
+
+        // Should be expired now
+        let result = store.get(key, &body).await;
+        assert!(result.is_none(), "Cache should have expired");
+    }
+
+    #[tokio::test]
+    async fn cache_eviction_lru() {
+        let config = create_test_config(3, 300);
+        let store = InMemoryStore::new(&config);
+
+        // Fill cache to capacity
+        for i in 0..3 {
+            let key = i as u64;
+            let body = format!("request {}", i);
+            let response = create_test_response(&format!("response {}", i));
+            store.put(key, body.clone(), response).await;
+        }
+
+        // All three should be present
+        for i in 0..3 {
+            let key = i as u64;
+            let body = format!("request {}", i);
+            let result = store.get(key, &body).await;
+            assert!(result.is_some(), "Cache should contain entry {}", i);
+        }
+
+        // Add a fourth entry - should evict the oldest (key 0)
+        let key = 3u64;
+        let body = "request 3".to_string();
+        let response = create_test_response("response 3");
+        store.put(key, body.clone(), response).await;
+
+        // Key 0 should be evicted
+        let result = store.get(0, &"request 0".to_string()).await;
+        assert!(result.is_none(), "Oldest entry should be evicted");
+
+        // Keys 1, 2, 3 should still be present
+        for i in 1..4 {
+            let key = i as u64;
+            let body = format!("request {}", i);
+            let result = store.get(key, &body).await;
+            assert!(result.is_some(), "Entry {} should still be present", i);
+        }
+    }
+
+    #[tokio::test]
+    async fn cache_hash_collision() {
+        let config = create_test_config(10, 300);
+        let store = InMemoryStore::new(&config);
+
+        // Two different requests with the same hash key
+        let key = 99999u64;
+        let body1 = "request A".to_string();
+        let body2 = "request B".to_string();
+        let response1 = create_test_response("response A");
+        let response2 = create_test_response("response B");
+
+        // Put first request
+        store.put(key, body1.clone(), response1).await;
+
+        // Should get response A for body1
+        let result = store.get(key, &body1).await;
+        assert!(result.is_some(), "Should find entry for body1");
+        if let CachedResponse::Chat(resp) = result.unwrap() {
+            if let Some(MessageContent::Text(text)) = &resp.choices[0].message.content {
+                assert_eq!(text, "response A");
+            } else {
+                panic!("Expected Text content");
+            }
+        } else {
+            panic!("Expected Chat response");
+        }
+
+        // Should NOT get response A for body2 (different body, same key)
+        let result = store.get(key, &body2).await;
+        assert!(result.is_none(), "Should not find entry for body2 with different body");
+
+        // Put second request with same key but different body
+        store.put(key, body2.clone(), response2).await;
+
+        // Now body2 should return response B
+        let result = store.get(key, &body2).await;
+        assert!(result.is_some(), "Should find entry for body2");
+        if let CachedResponse::Chat(resp) = result.unwrap() {
+            if let Some(MessageContent::Text(text)) = &resp.choices[0].message.content {
+                assert_eq!(text, "response B");
+            } else {
+                panic!("Expected Text content");
+            }
+        } else {
+            panic!("Expected Chat response");
+        }
+
+        // body1 should no longer be found (replaced by body2)
+        let result = store.get(key, &body1).await;
+        assert!(result.is_none(), "body1 should be replaced by body2");
+    }
+
+    #[tokio::test]
+    async fn cache_error_caching() {
+        let config = create_test_config(10, 300);
+        let store = InMemoryStore::new(&config);
+
+        let key = 12345u64;
+        let body = "test request".to_string();
+        let error = Arc::new(HiLlmError::InternalError {
+            message: "test error".to_string(),
+        });
+        let expires_at = Instant::now() + Duration::from_secs(60);
+
+        let error_response = CachedResponse::Error {
+            error,
+            expires_at,
+        };
+
+        // Put error in cache
+        store.put(key, body.clone(), error_response).await;
+
+        // Should be able to retrieve it
+        let result = store.get(key, &body).await;
+        assert!(result.is_some(), "Error should be cached");
+
+        if let CachedResponse::Error { error, .. } = result.unwrap() {
+            assert!(error.to_string().contains("test error"));
+        } else {
+            panic!("Expected Error response");
+        }
+    }
+
+    #[tokio::test]
+    async fn cache_error_expiration() {
+        let config = create_test_config(10, 300);
+        let store = InMemoryStore::new(&config);
+
+        let key = 12345u64;
+        let body = "test request".to_string();
+        let error = Arc::new(HiLlmError::InternalError {
+            message: "test error".to_string(),
+        });
+        let expires_at = Instant::now() + Duration::from_secs(1);
+
+        let error_response = CachedResponse::Error {
+            error,
+            expires_at,
+        };
+
+        // Put error in cache with short expiration
+        store.put(key, body.clone(), error_response).await;
+
+        // Should be retrievable immediately
+        let result = store.get(key, &body).await;
+        assert!(result.is_some(), "Error should be cached");
+
+        // Wait for error expiration
+        tokio::time::sleep(Duration::from_secs(2)).await;
+
+        // Should be expired
+        let result = store.get(key, &body).await;
+        assert!(result.is_none(), "Error should have expired");
+    }
+
+    #[tokio::test]
+    async fn cache_ttl_override() {
+        let config = create_test_config(10, 300);
+        let store = InMemoryStore::new(&config);
+
+        let key = 12345u64;
+        let body = "test request".to_string();
+        let response = create_test_response("test response");
+
+        // Put response in cache
+        store.put(key, body.clone(), response).await;
+
+        // Set a shorter TTL override
+        store.set_ttl(key, Duration::from_secs(1)).await;
+
+        // Wait for the override TTL
+        tokio::time::sleep(Duration::from_secs(2)).await;
+
+        // Should be expired due to TTL override
+        let result = store.get(key, &body).await;
+        assert!(result.is_none(), "Should have expired due to TTL override");
+    }
+
+    #[tokio::test]
+    async fn cache_hit_count() {
+        let config = create_test_config(10, 300);
+        let store = InMemoryStore::new(&config);
+
+        let key = 12345u64;
+        let body = "test request".to_string();
+        let response = create_test_response("test response");
+
+        store.put(key, body.clone(), response).await;
+
+        // Get metadata before any hits
+        let metadata = store.metadata(key).await;
+        assert!(metadata.is_some());
+        assert_eq!(metadata.unwrap().hit_count, 0);
+
+        // Access the cache multiple times
+        for _ in 0..5 {
+            let _ = store.get(key, &body).await;
+        }
+
+        // Check hit count
+        let metadata = store.metadata(key).await;
+        assert!(metadata.is_some());
+        assert_eq!(metadata.unwrap().hit_count, 5);
+    }
+
+    #[tokio::test]
+    async fn cache_remove() {
+        let config = create_test_config(10, 300);
+        let store = InMemoryStore::new(&config);
+
+        let key = 12345u64;
+        let body = "test request".to_string();
+        let response = create_test_response("test response");
+
+        store.put(key, body.clone(), response).await;
+
+        // Verify it's there
+        let result = store.get(key, &body).await;
+        assert!(result.is_some());
+
+        // Remove it
+        store.remove(key).await;
+
+        // Should be gone
+        let result = store.get(key, &body).await;
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn cache_iter_keys() {
+        let config = create_test_config(10, 300);
+        let store = InMemoryStore::new(&config);
+
+        // Add multiple entries
+        for i in 0..5 {
+            let key = i as u64;
+            let body = format!("request {}", i);
+            let response = create_test_response(&format!("response {}", i));
+            store.put(key, body, response).await;
+        }
+
+        let keys = store.iter_keys().await;
+        assert_eq!(keys.len(), 5);
+
+        // All keys should be present
+        for i in 0..5 {
+            assert!(keys.contains(&(i as u64)));
+        }
+    }
+}
