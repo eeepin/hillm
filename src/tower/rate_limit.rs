@@ -381,3 +381,162 @@ where
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn rate_limit_config_creation() {
+        let config = RateLimitConfig::default();
+        assert_eq!(config.rpm, None);
+        assert_eq!(config.tpm, None);
+        assert_eq!(config.window, Duration::from_secs(60));
+    }
+
+    #[tokio::test]
+    async fn rate_limit_config_with_limits() {
+        let config = RateLimitConfig {
+            rpm: Some(100),
+            tpm: Some(10000),
+            window: Duration::from_secs(60),
+        };
+        assert_eq!(config.rpm, Some(100));
+        assert_eq!(config.tpm, Some(10000));
+    }
+
+    #[tokio::test]
+    async fn model_rate_state_creation() {
+        let state = ModelRateState::new();
+        assert_eq!(state.request_count, 0);
+        assert_eq!(state.token_count, 0);
+    }
+
+    #[tokio::test]
+    async fn model_rate_state_reset_after_window() {
+        let mut state = ModelRateState::new();
+        state.request_count = 10;
+        state.token_count = 100;
+
+        // Simulate window expiry by backdating window_start
+        state.window_start = Instant::now() - Duration::from_secs(120);
+
+        // Reset should clear counts
+        state.maybe_reset(Duration::from_secs(60));
+        assert_eq!(state.request_count, 0);
+        assert_eq!(state.token_count, 0);
+    }
+
+    #[tokio::test]
+    async fn model_rate_state_no_reset_within_window() {
+        let mut state = ModelRateState::new();
+        state.request_count = 10;
+        state.token_count = 100;
+
+        // Window hasn't expired yet
+        state.maybe_reset(Duration::from_secs(60));
+
+        // Counts should remain
+        assert_eq!(state.request_count, 10);
+        assert_eq!(state.token_count, 100);
+    }
+
+    #[tokio::test]
+    async fn cost_rate_limit_config_creation() {
+        let config = CostRateLimitConfig::default();
+        assert_eq!(config.max_cost_per_minute, None);
+        assert_eq!(config.max_cost_per_hour, None);
+        assert_eq!(config.max_cost_per_day, None);
+    }
+
+    #[tokio::test]
+    async fn cost_rate_limit_config_with_limits() {
+        let config = CostRateLimitConfig {
+            max_cost_per_minute: Some(1.0),
+            max_cost_per_hour: Some(50.0),
+            max_cost_per_day: Some(1000.0),
+        };
+        assert_eq!(config.max_cost_per_minute, Some(1.0));
+        assert_eq!(config.max_cost_per_hour, Some(50.0));
+        assert_eq!(config.max_cost_per_day, Some(1000.0));
+    }
+
+    #[tokio::test]
+    async fn cost_window_creation() {
+        let window = CostWindow::new(Duration::from_secs(60));
+        let now = CostRateLimitState::now_secs();
+        let spend = window.spend_cost(now);
+        assert_eq!(spend, 0.0);
+    }
+
+    #[tokio::test]
+    async fn cost_window_add_and_track() {
+        let window = CostWindow::new(Duration::from_secs(60));
+        let now = CostRateLimitState::now_secs();
+
+        window.add(1.5, now);
+        let spend = window.spend_cost(now);
+        assert!((spend - 1.5).abs() < 0.01);
+
+        window.add(2.5, now);
+        let spend = window.spend_cost(now);
+        assert!((spend - 4.0).abs() < 0.01);
+    }
+
+    #[tokio::test]
+    async fn cost_window_reset_after_expiry() {
+        let window = CostWindow::new(Duration::from_secs(60));
+        let now = CostRateLimitState::now_secs();
+
+        window.add(10.0, now);
+        let spend = window.spend_cost(now);
+        assert!((spend - 10.0).abs() < 0.01);
+
+        // Simulate window expiry
+        let future_now = now + 120;
+        let spend = window.spend_cost(future_now);
+        assert_eq!(spend, 0.0, "Window should reset after expiry");
+    }
+
+    #[tokio::test]
+    async fn cost_rate_limit_state_creation() {
+        let state = CostRateLimitState::new();
+        let now = CostRateLimitState::now_secs();
+
+        assert_eq!(state.per_minute.spend_cost(now), 0.0);
+        assert_eq!(state.per_hour.spend_cost(now), 0.0);
+        assert_eq!(state.per_day.spend_cost(now), 0.0);
+    }
+
+    #[tokio::test]
+    async fn cost_rate_limit_state_check_under_limit() {
+        let state = CostRateLimitState::new();
+        let config = CostRateLimitConfig {
+            max_cost_per_minute: Some(10.0),
+            max_cost_per_hour: Some(100.0),
+            max_cost_per_day: Some(1000.0),
+        };
+
+        let result = state.check(&config);
+        assert!(result.is_none(), "Should allow when under all limits");
+    }
+
+    #[tokio::test]
+    async fn cost_rate_limit_state_check_over_minute_limit() {
+        let state = CostRateLimitState::new();
+        let config = CostRateLimitConfig {
+            max_cost_per_minute: Some(1.0),
+            max_cost_per_hour: Some(100.0),
+            max_cost_per_day: Some(1000.0),
+        };
+
+        let now = CostRateLimitState::now_secs();
+        state.per_minute.add(2.0, now);
+
+        let result = state.check(&config);
+        assert!(result.is_some(), "Should reject when over minute limit");
+        if let Some(err) = result {
+            assert!(matches!(err, HiLlmError::RateLimited { .. }));
+        }
+    }
+}

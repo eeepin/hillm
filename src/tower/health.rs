@@ -356,3 +356,105 @@ where
         Box::pin(fut)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn health_status_variants() {
+        let healthy = HealthStatus::Healthy;
+        let unhealthy = HealthStatus::Unhealthy;
+        assert_ne!(healthy, unhealthy);
+    }
+
+    #[test]
+    fn health_check_config_default() {
+        let config = HealthCheckConfig::default();
+        assert_eq!(config.interval, Duration::from_secs(30));
+        assert_eq!(config.timeout, Duration::from_secs(5));
+        assert_eq!(config.unhealthy_threshold, 3);
+        assert_eq!(config.healthy_threshold, 2);
+    }
+
+    #[test]
+    fn health_check_config_custom() {
+        let config = HealthCheckConfig {
+            interval: Duration::from_secs(60),
+            timeout: Duration::from_secs(10),
+            unhealthy_threshold: 5,
+            healthy_threshold: 3,
+        };
+        assert_eq!(config.interval, Duration::from_secs(60));
+        assert_eq!(config.timeout, Duration::from_secs(10));
+        assert_eq!(config.unhealthy_threshold, 5);
+        assert_eq!(config.healthy_threshold, 3);
+    }
+
+    #[test]
+    fn provider_health_state_creation() {
+        let state = ProviderHealthState::new(true);
+        assert!(state.is_healthy());
+        assert_eq!(state.consecutive_failures.load(Ordering::Acquire), 0);
+        assert_eq!(state.consecutive_successes.load(Ordering::Acquire), 0);
+    }
+
+    #[test]
+    fn provider_health_state_initially_unhealthy() {
+        let state = ProviderHealthState::new(false);
+        assert!(!state.is_healthy());
+    }
+
+    #[test]
+    fn provider_health_state_record_healthy() {
+        let state = ProviderHealthState::new(false);
+        let config = HealthCheckConfig::default();
+
+        // First healthy check
+        state.record(HealthStatus::Healthy, &config);
+        assert_eq!(state.consecutive_successes.load(Ordering::Acquire), 1);
+        assert!(!state.is_healthy()); // Not yet at threshold
+
+        // Second healthy check (reaches healthy_threshold of 2)
+        state.record(HealthStatus::Healthy, &config);
+        assert_eq!(state.consecutive_successes.load(Ordering::Acquire), 2);
+        assert!(state.is_healthy()); // Now healthy
+    }
+
+    #[test]
+    fn provider_health_state_record_unhealthy() {
+        let state = ProviderHealthState::new(true);
+        let config = HealthCheckConfig::default();
+
+        // First unhealthy check
+        state.record(HealthStatus::Unhealthy, &config);
+        assert_eq!(state.consecutive_failures.load(Ordering::Acquire), 1);
+        assert!(state.is_healthy()); // Not yet at threshold
+
+        // Second unhealthy check
+        state.record(HealthStatus::Unhealthy, &config);
+        assert_eq!(state.consecutive_failures.load(Ordering::Acquire), 2);
+        assert!(state.is_healthy()); // Not yet at threshold
+
+        // Third unhealthy check (reaches unhealthy_threshold of 3)
+        state.record(HealthStatus::Unhealthy, &config);
+        assert_eq!(state.consecutive_failures.load(Ordering::Acquire), 3);
+        assert!(!state.is_healthy()); // Now unhealthy
+    }
+
+    #[test]
+    fn provider_health_state_reset_on_status_change() {
+        let state = ProviderHealthState::new(true);
+        let config = HealthCheckConfig::default();
+
+        // Record some failures
+        state.record(HealthStatus::Unhealthy, &config);
+        state.record(HealthStatus::Unhealthy, &config);
+        assert_eq!(state.consecutive_failures.load(Ordering::Acquire), 2);
+
+        // Record success should reset failure count
+        state.record(HealthStatus::Healthy, &config);
+        assert_eq!(state.consecutive_failures.load(Ordering::Acquire), 0);
+        assert_eq!(state.consecutive_successes.load(Ordering::Acquire), 1);
+    }
+}

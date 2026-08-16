@@ -239,3 +239,323 @@ where
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tower::types::{LlmRequest, LlmRequestKind, LlmResponse};
+    use crate::types::{ChatCompletionRequest, ChatCompletionResponse, Message, Usage};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+    use tokio::time::{sleep, Duration};
+    use tower::ServiceExt;
+
+    fn create_chat_request(content: &str) -> LlmRequest {
+        LlmRequest {
+            kind: LlmRequestKind::Chat(ChatCompletionRequest {
+                model: "test-model".to_string(),
+                messages: vec![Message::User(crate::types::UserMessage {
+                    content: crate::types::MessageContent::Text(content.to_string()),
+                    name: None,
+                })],
+                ..Default::default()
+            }),
+            tenant_id: None,
+            idempotency_key: None,
+        }
+    }
+
+    fn create_chat_response(content: &str) -> LlmResponse {
+        LlmResponse::Chat(ChatCompletionResponse {
+            id: "test-id".to_string(),
+            object: "chat.completion".to_string(),
+            created: 1234567890,
+            model: "test-model".to_string(),
+            choices: vec![crate::types::Choice {
+                index: 0,
+                message: crate::types::AssistantMessage {
+                    content: Some(crate::types::MessageContent::Text(content.to_string())),
+                    ..Default::default()
+                },
+                finish_reason: None,
+            }],
+            usage: Some(Usage {
+                prompt_tokens: 10,
+                completion_tokens: 20,
+                total_tokens: 30,
+                ..Default::default()
+            }),
+            ..Default::default()
+        })
+    }
+
+    #[derive(Clone)]
+    struct MockService {
+        call_count: Arc<AtomicUsize>,
+        delay: Duration,
+    }
+
+    impl MockService {
+        fn new(delay_ms: u64) -> Self {
+            Self {
+                call_count: Arc::new(AtomicUsize::new(0)),
+                delay: Duration::from_millis(delay_ms),
+            }
+        }
+
+        fn get_call_count(&self) -> usize {
+            self.call_count.load(Ordering::SeqCst)
+        }
+    }
+
+    impl Service<LlmRequest> for MockService {
+        type Response = LlmResponse;
+        type Error = HiLlmError;
+        type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+
+        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn call(&mut self, _req: LlmRequest) -> Self::Future {
+            let count = self.call_count.clone();
+            let delay = self.delay;
+            Box::pin(async move {
+                count.fetch_add(1, Ordering::SeqCst);
+                sleep(delay).await;
+                Ok(create_chat_response("test response"))
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn singleflight_deduplicates_concurrent_requests() {
+        let coordinator = Arc::new(InMemorySingleflight::new());
+        let mock = MockService::new(100);
+        let service = SingleflightService {
+            coordinator: coordinator.clone(),
+            inner: mock.clone(),
+        };
+
+        // 发送 5 个相同的并发请求
+        let mut handles = vec![];
+        for _ in 0..5 {
+            let mut svc = service.clone();
+            let req = create_chat_request("test");
+            handles.push(tokio::spawn(async move { svc.ready().await.unwrap().call(req).await }));
+        }
+
+        // 等待所有请求完成
+        for handle in handles {
+            let result = handle.await.unwrap();
+            assert!(result.is_ok(), "Request should succeed");
+        }
+
+        // 验证底层服务只被调用一次
+        assert_eq!(mock.get_call_count(), 1, "Service should only be called once for identical requests");
+    }
+
+    #[tokio::test]
+    async fn singleflight_different_requests_not_deduplicated() {
+        let coordinator = Arc::new(InMemorySingleflight::new());
+        let mock = MockService::new(50);
+        let service = SingleflightService {
+            coordinator: coordinator.clone(),
+            inner: mock.clone(),
+        };
+
+        // 发送 3 个不同的请求
+        let mut handles = vec![];
+        for i in 0..3 {
+            let mut svc = service.clone();
+            let req = create_chat_request(&format!("test {}", i));
+            handles.push(tokio::spawn(async move { svc.ready().await.unwrap().call(req).await }));
+        }
+
+        for handle in handles {
+            let result = handle.await.unwrap();
+            assert!(result.is_ok(), "Request should succeed");
+        }
+
+        // 验证底层服务被调用 3 次（每个不同的请求一次）
+        assert_eq!(mock.get_call_count(), 3, "Service should be called once per unique request");
+    }
+
+    #[tokio::test]
+    async fn singleflight_leader_cancellation() {
+        let coordinator = Arc::new(InMemorySingleflight::new());
+        let mock = MockService::new(200);
+        let service = SingleflightService {
+            coordinator: coordinator.clone(),
+            inner: mock.clone(),
+        };
+
+        // 启动 leader 请求
+        let mut leader_svc = service.clone();
+        let leader_req = create_chat_request("test");
+        let leader_handle = tokio::spawn(async move {
+            leader_svc.ready().await.unwrap().call(leader_req).await
+        });
+
+        // 等待一小段时间让 leader 开始
+        sleep(Duration::from_millis(50)).await;
+
+        // 启动 follower 请求
+        let mut follower_svc = service.clone();
+        let follower_req = create_chat_request("test");
+        let follower_handle = tokio::spawn(async move {
+            follower_svc.ready().await.unwrap().call(follower_req).await
+        });
+
+        // 取消 leader
+        leader_handle.abort();
+
+        // Follower 应该能够完成（可能收到错误）
+        let follower_result = follower_handle.await.unwrap();
+        // Follower 可能成功也可能失败，取决于 leader 取消的时机
+        // 关键是 follower 不应该永远阻塞
+        // 这里我们只验证 follower 确实完成了（无论成功还是失败）
+        let _ = follower_result;
+    }
+
+    #[tokio::test]
+    async fn singleflight_follower_receives_leader_result() {
+        let coordinator = Arc::new(InMemorySingleflight::new());
+        let mock = MockService::new(100);
+        let service = SingleflightService {
+            coordinator: coordinator.clone(),
+            inner: mock.clone(),
+        };
+
+        // 启动 leader
+        let mut leader_svc = service.clone();
+        let leader_req = create_chat_request("test");
+        let leader_handle = tokio::spawn(async move {
+            leader_svc.ready().await.unwrap().call(leader_req).await
+        });
+
+        // 等待 leader 开始执行
+        sleep(Duration::from_millis(20)).await;
+
+        // 启动 follower
+        let mut follower_svc = service.clone();
+        let follower_req = create_chat_request("test");
+        let follower_handle = tokio::spawn(async move {
+            follower_svc.ready().await.unwrap().call(follower_req).await
+        });
+
+        // 等待两个请求完成
+        let leader_result = leader_handle.await.unwrap().unwrap();
+        let follower_result = follower_handle.await.unwrap().unwrap();
+
+        // 验证两个请求都成功（LlmResponse 是枚举类型，不是 Result）
+        // 只要没有 panic 或返回错误，就说明成功了
+        let _ = leader_result;
+        let _ = follower_result;
+
+        // 验证服务只被调用一次
+        assert_eq!(mock.get_call_count(), 1);
+    }
+
+    #[tokio::test]
+    async fn singleflight_error_propagation() {
+        let coordinator = Arc::new(InMemorySingleflight::new());
+
+        // 创建一个会失败的服务
+        #[derive(Clone)]
+        struct FailingService;
+
+        impl Service<LlmRequest> for FailingService {
+            type Response = LlmResponse;
+            type Error = HiLlmError;
+            type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
+
+            fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
+                Poll::Ready(Ok(()))
+            }
+
+            fn call(&mut self, _req: LlmRequest) -> Self::Future {
+                Box::pin(async move {
+                    sleep(Duration::from_millis(50)).await;
+                    Err(HiLlmError::InternalError {
+                        message: "test error".to_string(),
+                    })
+                })
+            }
+        }
+
+        let service = SingleflightService {
+            coordinator: coordinator.clone(),
+            inner: FailingService,
+        };
+
+        // 发送两个相同的请求
+        let mut handles = vec![];
+        for _ in 0..2 {
+            let mut svc = service.clone();
+            let req = create_chat_request("test");
+            handles.push(tokio::spawn(async move { svc.ready().await.unwrap().call(req).await }));
+        }
+
+        // 验证两个请求都收到错误
+        for handle in handles {
+            let inner_result = handle.await.unwrap();
+            assert!(inner_result.is_err());
+            if let Err(e) = inner_result {
+                assert!(e.to_string().contains("test error"));
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn singleflight_key_generation() {
+        let req1 = create_chat_request("test");
+        let req2 = create_chat_request("test");
+        let req3 = create_chat_request("different");
+
+        let key1 = singleflight_key(&req1);
+        let key2 = singleflight_key(&req2);
+        let key3 = singleflight_key(&req3);
+
+        // 相同请求应该生成相同的 key
+        assert_eq!(key1, key2, "Identical requests should have the same key");
+
+        // 不同请求应该生成不同的 key
+        assert_ne!(key1, key3, "Different requests should have different keys");
+        assert_ne!(key2, key3, "Different requests should have different keys");
+    }
+
+    #[tokio::test]
+    async fn singleflight_non_cacheable_request_bypasses() {
+        let coordinator = Arc::new(InMemorySingleflight::new());
+        let mock = MockService::new(50);
+        let service = SingleflightService {
+            coordinator: coordinator.clone(),
+            inner: mock.clone(),
+        };
+
+        // 创建一个非 cacheable 的请求（例如 Image 请求）
+        let req = LlmRequest {
+            kind: LlmRequestKind::ImageGenerate(Default::default()),
+            tenant_id: None,
+            idempotency_key: None,
+        };
+
+        // 发送两个相同的非 cacheable 请求
+        let mut handles = vec![];
+        for _ in 0..2 {
+            let mut svc = service.clone();
+            let req = req.clone();
+            handles.push(tokio::spawn(async move { svc.ready().await.unwrap().call(req).await }));
+        }
+
+        for handle in handles {
+            // 非 cacheable 请求会失败（因为 MockService 返回 Chat 响应）
+            // 但这不是重点，重点是它们不会被 singleflight 去重
+            let _ = handle.await;
+        }
+
+        // 验证服务被调用两次（没有去重）
+        assert_eq!(mock.get_call_count(), 2, "Non-cacheable requests should not be deduplicated");
+    }
+}

@@ -357,3 +357,242 @@ fn store_err(e: IdempotencyStoreError) -> HiLlmError {
 pub(crate) fn is_cacheable_kind(kind: &LlmRequestKind) -> bool {
     matches!(kind, LlmRequestKind::Chat(_) | LlmRequestKind::Embed(_))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tower::cache::CachedResponse;
+    use crate::types::{AssistantMessage, ChatCompletionRequest, ChatCompletionResponse, Choice, Message, MessageContent, Usage};
+    use std::time::{Duration, Instant};
+
+    fn create_test_chat_response(content: &str) -> CachedResponse {
+        CachedResponse::Chat(ChatCompletionResponse {
+            id: "test-id".to_string(),
+            object: "chat.completion".to_string(),
+            created: 1234567890,
+            model: "test-model".to_string(),
+            choices: vec![Choice {
+                index: 0,
+                message: AssistantMessage {
+                    content: Some(MessageContent::Text(content.to_string())),
+                    ..Default::default()
+                },
+                finish_reason: None,
+            }],
+            usage: Some(Usage {
+                prompt_tokens: 10,
+                completion_tokens: 20,
+                total_tokens: 30,
+                ..Default::default()
+            }),
+            ..Default::default()
+        })
+    }
+
+    fn create_test_chat_request(content: &str) -> LlmRequest {
+        LlmRequest {
+            kind: LlmRequestKind::Chat(ChatCompletionRequest {
+                model: "test-model".to_string(),
+                messages: vec![Message::User(crate::types::UserMessage {
+                    content: MessageContent::Text(content.to_string()),
+                    name: None,
+                })],
+                ..Default::default()
+            }),
+            tenant_id: None,
+            idempotency_key: None,
+        }
+    }
+
+    #[test]
+    fn idempotency_entry_creation() {
+        let entry = IdempotencyEntry {
+            body_hash: "test-hash".to_string(),
+            response: None,
+            inserted_at: Instant::now(),
+            ttl: Duration::from_secs(300),
+        };
+        assert_eq!(entry.body_hash, "test-hash");
+        assert!(entry.response.is_none());
+        assert!(!entry.is_expired());
+    }
+
+    #[test]
+    fn idempotency_entry_expiration() {
+        let entry = IdempotencyEntry {
+            body_hash: "test-hash".to_string(),
+            response: None,
+            inserted_at: Instant::now() - Duration::from_secs(400),
+            ttl: Duration::from_secs(300),
+        };
+        assert!(entry.is_expired(), "Entry should be expired");
+    }
+
+    #[test]
+    fn idempotency_entry_not_expired() {
+        let entry = IdempotencyEntry {
+            body_hash: "test-hash".to_string(),
+            response: None,
+            inserted_at: Instant::now(),
+            ttl: Duration::from_secs(300),
+        };
+        assert!(!entry.is_expired(), "Entry should not be expired");
+    }
+
+    #[tokio::test]
+    async fn in_memory_store_creation() {
+        let store = InMemoryIdempotencyStore::new();
+        assert_eq!(store.map.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn in_memory_store_get_nonexistent() {
+        let store = InMemoryIdempotencyStore::new();
+        let result = store.get("nonexistent").await.unwrap();
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn in_memory_store_try_insert() {
+        let store = InMemoryIdempotencyStore::new();
+        let inserted = store.try_insert("key1", "hash1", Duration::from_secs(300)).await.unwrap();
+        assert!(inserted, "Should insert new entry");
+        assert_eq!(store.map.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn in_memory_store_try_insert_duplicate() {
+        let store = InMemoryIdempotencyStore::new();
+        store.try_insert("key1", "hash1", Duration::from_secs(300)).await.unwrap();
+        
+        // Try to insert again with same key
+        let inserted = store.try_insert("key1", "hash2", Duration::from_secs(300)).await.unwrap();
+        assert!(!inserted, "Should not insert duplicate key");
+    }
+
+    #[tokio::test]
+    async fn in_memory_store_try_insert_expired() {
+        let store = InMemoryIdempotencyStore::new();
+        
+        // Insert with very short TTL
+        store.try_insert("key1", "hash1", Duration::from_millis(1)).await.unwrap();
+        
+        // Wait for expiration
+        tokio::time::sleep(Duration::from_millis(10)).await;
+        
+        // Should be able to insert again since entry is expired
+        let inserted = store.try_insert("key1", "hash2", Duration::from_secs(300)).await.unwrap();
+        assert!(inserted, "Should insert after expiration");
+    }
+
+    #[tokio::test]
+    async fn in_memory_store_get_existing() {
+        let store = InMemoryIdempotencyStore::new();
+        store.try_insert("key1", "hash1", Duration::from_secs(300)).await.unwrap();
+        
+        let entry = store.get("key1").await.unwrap();
+        assert!(entry.is_some());
+        assert_eq!(entry.unwrap().body_hash, "hash1");
+    }
+
+    #[tokio::test]
+    async fn in_memory_store_get_expired() {
+        let store = InMemoryIdempotencyStore::new();
+        store.try_insert("key1", "hash1", Duration::from_millis(1)).await.unwrap();
+        
+        // Wait for expiration
+        tokio::time::sleep(Duration::from_millis(10)).await;
+        
+        let entry = store.get("key1").await.unwrap();
+        assert!(entry.is_none(), "Expired entry should not be returned");
+    }
+
+    #[tokio::test]
+    async fn in_memory_store_store_response() {
+        let store = InMemoryIdempotencyStore::new();
+        store.try_insert("key1", "hash1", Duration::from_secs(300)).await.unwrap();
+        
+        let response = create_test_chat_response("test response");
+        store.store_response("key1", response).await.unwrap();
+        
+        let entry = store.get("key1").await.unwrap().unwrap();
+        assert!(entry.response.is_some());
+    }
+
+    #[tokio::test]
+    async fn in_memory_store_remove() {
+        let store = InMemoryIdempotencyStore::new();
+        store.try_insert("key1", "hash1", Duration::from_secs(300)).await.unwrap();
+        assert_eq!(store.map.len(), 1);
+        
+        store.remove("key1").await.unwrap();
+        assert_eq!(store.map.len(), 0);
+    }
+
+    #[test]
+    fn compute_body_hash_deterministic() {
+        let req1 = create_test_chat_request("test");
+        let req2 = create_test_chat_request("test");
+        
+        let hash1 = compute_body_hash(&req1);
+        let hash2 = compute_body_hash(&req2);
+        
+        assert!(hash1.is_some());
+        assert!(hash2.is_some());
+        assert_eq!(hash1.unwrap(), hash2.unwrap(), "Same request should produce same hash");
+    }
+
+    #[test]
+    fn compute_body_hash_different_requests() {
+        let req1 = create_test_chat_request("test1");
+        let req2 = create_test_chat_request("test2");
+        
+        let hash1 = compute_body_hash(&req1);
+        let hash2 = compute_body_hash(&req2);
+        
+        assert!(hash1.is_some());
+        assert!(hash2.is_some());
+        assert_ne!(hash1.unwrap(), hash2.unwrap(), "Different requests should produce different hashes");
+    }
+
+    #[test]
+    fn is_cacheable_kind_chat() {
+        let kind = LlmRequestKind::Chat(ChatCompletionRequest::default());
+        assert!(is_cacheable_kind(&kind));
+    }
+
+    #[test]
+    fn is_cacheable_kind_embed() {
+        use crate::types::EmbeddingRequest;
+        let kind = LlmRequestKind::Embed(EmbeddingRequest::default());
+        assert!(is_cacheable_kind(&kind));
+    }
+
+    #[test]
+    fn is_cacheable_kind_list_models() {
+        let kind = LlmRequestKind::ListModels;
+        assert!(!is_cacheable_kind(&kind));
+    }
+
+    #[test]
+    fn idempotency_layer_creation() {
+        let store = InMemoryIdempotencyStore::new();
+        let layer = IdempotencyLayer::new(store);
+        assert_eq!(layer.ttl, Duration::from_secs(24 * 60 * 60));
+    }
+
+    #[test]
+    fn idempotency_layer_with_ttl() {
+        let store = InMemoryIdempotencyStore::new();
+        let layer = IdempotencyLayer::with_ttl(store, Duration::from_secs(3600));
+        assert_eq!(layer.ttl, Duration::from_secs(3600));
+    }
+
+    #[test]
+    fn idempotency_layer_clone() {
+        let store = InMemoryIdempotencyStore::new();
+        let layer1 = IdempotencyLayer::with_ttl(store, Duration::from_secs(3600));
+        let layer2 = layer1.clone();
+        assert_eq!(layer1.ttl, layer2.ttl);
+    }
+}

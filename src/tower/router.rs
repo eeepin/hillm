@@ -591,3 +591,93 @@ where
         Box::pin(fut)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn weight_creation() {
+        let w = Weight::from_f64(5.0);
+        assert_eq!(w.as_u32(), 5);
+    }
+
+    #[test]
+    fn weight_from_nan() {
+        let w = Weight::from_f64(f64::NAN);
+        assert_eq!(w, Weight::ZERO);
+    }
+
+    #[test]
+    fn weight_from_negative() {
+        let w = Weight::from_f64(-5.0);
+        assert_eq!(w, Weight::ZERO);
+    }
+
+    #[test]
+    fn weight_from_infinity() {
+        let w = Weight::from_f64(f64::INFINITY);
+        assert_eq!(w, Weight::MAX);
+    }
+
+    #[test]
+    fn weight_default() {
+        let w = Weight::default();
+        assert_eq!(w, Weight::ONE);
+    }
+
+    #[test]
+    fn weight_display() {
+        let w = Weight::from_f64(42.0);
+        assert_eq!(format!("{}", w), "42");
+    }
+
+    #[test]
+    fn routing_strategy_debug() {
+        let rr = RoutingStrategy::RoundRobin;
+        assert_eq!(format!("{:?}", rr), "RoundRobin");
+
+        let fb = RoutingStrategy::Fallback;
+        assert_eq!(format!("{:?}", fb), "Fallback");
+
+        let lb = RoutingStrategy::LatencyBased;
+        assert_eq!(format!("{:?}", lb), "LatencyBased");
+
+        let cb = RoutingStrategy::CostBased;
+        assert_eq!(format!("{:?}", cb), "CostBased");
+    }
+
+    #[test]
+    fn deployment_metrics_default() {
+        let metrics = DeploymentMetrics::default();
+        assert_eq!(metrics.latency_ema, 0.0);
+        assert_eq!(metrics.request_count, 0);
+    }
+
+    #[test]
+    fn deployment_metrics_record_latency() {
+        let mut metrics = DeploymentMetrics::default();
+        
+        metrics.record_latency(1.0);
+        assert_eq!(metrics.request_count, 1);
+        assert!((metrics.latency_ema - 1.0).abs() < 0.01);
+
+        metrics.record_latency(2.0);
+        assert_eq!(metrics.request_count, 2);
+        // EMA should be updated: 0.3 * 2.0 + 0.7 * 1.0 = 1.3
+        assert!((metrics.latency_ema - 1.3).abs() < 0.01);
+    }
+
+    #[test]
+    fn router_state_creation() {
+        let state = RouterState::new();
+        assert_eq!(state.metrics.len(), 0);
+    }
+
+    #[test]
+    fn router_state_clone() {
+        let state1 = RouterState::new();
+        let state2 = state1.clone();
+        assert_eq!(state1.metrics.len(), state2.metrics.len());
+    }
+}

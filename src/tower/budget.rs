@@ -673,3 +673,219 @@ fn emit_soft_warnings(config: &BudgetConfig, state: &BudgetState, model: &str) {
         );
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    fn create_test_record_ctx(model: &'static str, cost: f64) -> CostRecordContext<'static> {
+        CostRecordContext {
+            model,
+            provider: "test-provider",
+            tenant_id: None,
+            user_id: None,
+            api_key_id: None,
+            cost_usd: cost,
+            tokens_in: 100,
+            tokens_out: 50,
+            timestamp: SystemTime::now(),
+        }
+    }
+
+    fn create_test_check_ctx(model: &'static str) -> CostCheckContext<'static> {
+        CostCheckContext {
+            model,
+            provider: "test-provider",
+            tenant_id: None,
+            user_id: None,
+            api_key_id: None,
+            timestamp: SystemTime::now(),
+        }
+    }
+
+    #[tokio::test]
+    async fn budget_ledger_starts_at_zero() {
+        let limits = DimensionLimits {
+            global: Some(100.0),
+            ..Default::default()
+        };
+        let ledger = InMemoryBudgetLedger::new(limits, Duration::from_secs(3600));
+        let snapshot = ledger.snapshot();
+        assert_eq!(snapshot.global_spend_usd, 0.0);
+    }
+
+    #[tokio::test]
+    async fn budget_ledger_records_cost() {
+        let limits = DimensionLimits {
+            global: Some(100.0),
+            ..Default::default()
+        };
+        let ledger = InMemoryBudgetLedger::new(limits, Duration::from_secs(3600));
+
+        let ctx = create_test_record_ctx("gpt-4", 10.0);
+        ledger.record(&ctx).await;
+
+        let snapshot = ledger.snapshot();
+        assert!((snapshot.global_spend_usd - 10.0).abs() < 0.01);
+    }
+
+    #[tokio::test]
+    async fn budget_ledger_tracks_per_model() {
+        let mut model_limits = HashMap::new();
+        model_limits.insert("gpt-4".to_string(), 50.0);
+        model_limits.insert("gpt-3.5".to_string(), 20.0);
+
+        let limits = DimensionLimits {
+            global: Some(100.0),
+            per_model: model_limits,
+            ..Default::default()
+        };
+        let ledger = InMemoryBudgetLedger::new(limits, Duration::from_secs(3600));
+
+        let ctx1 = create_test_record_ctx("gpt-4", 30.0);
+        ledger.record(&ctx1).await;
+
+        let ctx2 = create_test_record_ctx("gpt-3.5", 15.0);
+        ledger.record(&ctx2).await;
+
+        let snapshot = ledger.snapshot();
+        assert!((snapshot.per_model.get("gpt-4").unwrap() - 30.0).abs() < 0.01);
+        assert!((snapshot.per_model.get("gpt-3.5").unwrap() - 15.0).abs() < 0.01);
+    }
+
+    #[tokio::test]
+    async fn budget_check_allows_under_limit() {
+        let limits = DimensionLimits {
+            global: Some(100.0),
+            ..Default::default()
+        };
+        let ledger = InMemoryBudgetLedger::new(limits, Duration::from_secs(3600));
+
+        let ctx = create_test_check_ctx("gpt-4");
+        let verdict = ledger.check(&ctx).await;
+
+        assert!(matches!(verdict, BudgetVerdict::Allow));
+    }
+
+    #[tokio::test]
+    async fn budget_check_rejects_over_global_limit() {
+        let limits = DimensionLimits {
+            global: Some(10.0),
+            ..Default::default()
+        };
+        let ledger = InMemoryBudgetLedger::new(limits, Duration::from_secs(3600));
+
+        // Record cost over limit
+        let record_ctx = create_test_record_ctx("gpt-4", 15.0);
+        ledger.record(&record_ctx).await;
+
+        // Check should reject
+        let check_ctx = create_test_check_ctx("gpt-4");
+        let verdict = ledger.check(&check_ctx).await;
+
+        match verdict {
+            BudgetVerdict::Reject { reason, dimension } => {
+                assert!(reason.contains("budget exceeded"));
+                assert!(matches!(dimension, BudgetDimension::Global));
+            }
+            BudgetVerdict::Allow => panic!("Should have been rejected"),
+        }
+    }
+
+    #[tokio::test]
+    async fn budget_check_rejects_over_model_limit() {
+        let mut model_limits = HashMap::new();
+        model_limits.insert("gpt-4".to_string(), 20.0);
+
+        let limits = DimensionLimits {
+            global: Some(100.0),
+            per_model: model_limits,
+            ..Default::default()
+        };
+        let ledger = InMemoryBudgetLedger::new(limits, Duration::from_secs(3600));
+
+        // Record cost over model limit
+        let record_ctx = create_test_record_ctx("gpt-4", 25.0);
+        ledger.record(&record_ctx).await;
+
+        // Check should reject
+        let check_ctx = create_test_check_ctx("gpt-4");
+        let verdict = ledger.check(&check_ctx).await;
+
+        match verdict {
+            BudgetVerdict::Reject { reason, dimension } => {
+                assert!(reason.contains("budget exceeded"));
+                assert!(matches!(dimension, BudgetDimension::Model(_)));
+            }
+            BudgetVerdict::Allow => panic!("Should have been rejected"),
+        }
+    }
+
+    #[tokio::test]
+    async fn budget_reset_clears_spending() {
+        let limits = DimensionLimits {
+            global: Some(100.0),
+            ..Default::default()
+        };
+        let ledger = InMemoryBudgetLedger::new(limits, Duration::from_secs(3600));
+
+        let ctx = create_test_record_ctx("gpt-4", 50.0);
+        ledger.record(&ctx).await;
+
+        let snapshot = ledger.snapshot();
+        assert!((snapshot.global_spend_usd - 50.0).abs() < 0.01);
+
+        // Reset
+        ledger.reset();
+
+        let snapshot = ledger.snapshot();
+        assert_eq!(snapshot.global_spend_usd, 0.0);
+    }
+
+    #[tokio::test]
+    async fn budget_concurrent_recording() {
+        let limits = DimensionLimits {
+            global: Some(1000.0),
+            ..Default::default()
+        };
+        let ledger = Arc::new(InMemoryBudgetLedger::new(limits, Duration::from_secs(3600)));
+
+        let mut handles = vec![];
+        for _ in 0..10 {
+            let ledger = ledger.clone();
+            handles.push(tokio::spawn(async move {
+                let ctx = create_test_record_ctx("gpt-4", 10.0);
+                ledger.record(&ctx).await;
+            }));
+        }
+
+        for handle in handles {
+            handle.await.unwrap();
+        }
+
+        let snapshot = ledger.snapshot();
+        assert!((snapshot.global_spend_usd - 100.0).abs() < 0.01);
+    }
+
+    #[tokio::test]
+    async fn budget_state_creation() {
+        let state = BudgetState::new();
+        assert_eq!(state.global_spend(), 0.0);
+    }
+
+    #[tokio::test]
+    async fn budget_config_creation() {
+        let config = BudgetConfig::default();
+        assert_eq!(config.global_limit, None);
+        assert!(config.model_limits.is_empty());
+        assert_eq!(config.enforcement, Enforcement::Hard);
+    }
+
+    #[tokio::test]
+    async fn budget_enforcement_modes() {
+        let hard = Enforcement::Hard;
+        let soft = Enforcement::Soft;
+        assert_ne!(hard, soft);
+    }
+}
