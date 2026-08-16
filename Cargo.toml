@@ -2,6 +2,13 @@
 name = "hillm"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
+description = "A unified Rust client abstraction for multiple LLM providers (OpenAI, Anthropic, Bedrock, and custom OpenAI-compatible endpoints) with tower middleware, caching, streaming, and multi-tenant support."
+license = "MIT"
+repository = "https://github.com/example/hillm"
+documentation = "https://docs.rs/hillm"
+keywords = ["llm", "openai", "anthropic", "ai", "streaming"]
+categories = ["api-bindings", "web-programming::http-client"]
 
 [features]
 default-http = [

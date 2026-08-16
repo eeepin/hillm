@@ -55,7 +55,32 @@ pub use tenant::{
 };
 #[cfg(feature = "tokenizer")]
 pub use tokenizer::{count_request_tokens, count_tokens};
-pub use types::*;
+// Explicit, curated root-level re-exports for the most commonly used DTOs.
+// Users should prefer `hillm::types::<submodule>::...` for the full set — the
+// wildcard `pub use types::*` was removed to avoid locking every new DTO
+// into the root public API surface.
+pub use types::{
+    AssistantMessage, Message, MessageContent, SystemMessage, ToolMessage, Usage, UserMessage,
+};
+pub use types::chat::{
+    ChatCompletionChunk, ChatCompletionRequest, ChatCompletionResponse, Choice, FinishReason,
+};
+pub use types::response::{CreateResponseRequest, ResponseObject, ResponsesStreamEvent};
+pub use types::embedding::{EmbeddingRequest, EmbeddingResponse};
+pub use types::model::ModelsListResponse;
+pub use types::image::{CreateImageRequest, ImagesResponse};
+pub use types::audio::{
+    CreateSpeechRequest, CreateTranscriptionRequest, TranscriptionResponse,
+};
+pub use types::file::{CreateFileRequest, DeleteResponse, FileListQuery, FileListResponse, FileObject};
+pub use types::batch::{
+    BatchListQuery, BatchListResponse, BatchObject, BatchStatus, CreateBatchRequest,
+};
+pub use types::moderation::{ModerationRequest, ModerationResponse};
+pub use types::rerank::{RerankRequest, RerankResponse};
+pub use types::search::{SearchRequest, SearchResponse};
+pub use types::ocr::{OcrRequest, OcrResponse};
+pub use types::raw::{RawExchange, RawStreamExchange};
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 pub fn ensure_crypto_provider() {
