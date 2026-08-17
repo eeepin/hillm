@@ -12,6 +12,7 @@ pub mod codec;
 /// Default AWS region for Bedrock when none is specified.
 const DEFAULT_REGION: &str = "us-east-1";
 
+#[allow(dead_code)]
 fn reasoning_effort_to_budget_tokens(effort: &str) -> u64 {
     match effort {
         "low" => 1024,
@@ -21,6 +22,7 @@ fn reasoning_effort_to_budget_tokens(effort: &str) -> u64 {
     }
 }
 
+#[allow(dead_code)]
 fn format_from_media_type(media_type: &str) -> &str {
     media_type.split('/').nth(1).unwrap_or("pdf")
 }
@@ -35,6 +37,7 @@ fn dns_suffix_for_region(region: &str) -> &'static str {
     }
 }
 
+#[allow(dead_code)]
 fn percent_encode_model(model: &str) -> String {
     let mut encoded = String::with_capacity(model.len());
     for byte in model.bytes() {
@@ -54,6 +57,7 @@ fn percent_encode_model(model: &str) -> String {
     encoded
 }
 
+#[allow(dead_code)]
 pub struct BedrockProvider {
     region: String,
     base_url: String,
@@ -547,6 +551,7 @@ impl Provider for BedrockProvider {
     }
 }
 
+#[allow(dead_code)]
 pub(crate) fn parse_bedrock_stream_event(
     event_type: &str,
     payload: &str,
@@ -722,6 +727,7 @@ pub(crate) fn parse_bedrock_stream_event(
 }
 
 impl BedrockProvider {
+    #[allow(dead_code)]
     fn apply_cross_region_prefix(&self, model: &str) -> String {
         match &self.cross_region_prefix {
             Some(prefix) => {

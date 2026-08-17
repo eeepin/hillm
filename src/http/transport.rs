@@ -46,10 +46,14 @@ impl TransportConfig {
 
     #[cfg(any(feature = "default-http", feature = "wasm-http"))]
     pub fn apply_to_builder(&self, builder: reqwest::ClientBuilder) -> reqwest::ClientBuilder {
+        #[cfg(not(target_arch = "wasm32"))]
         let builder = builder
             .pool_max_idle_per_host(self.pool_max_idle_per_host)
             .pool_idle_timeout(self.pool_idle_timeout)
             .tcp_keepalive(self.tcp_keepalive);
+
+        #[cfg(target_arch = "wasm32")]
+        let builder = builder;
 
         // dns_cache_ttl: deferred — reqwest 0.13 has no DNS-cache TTL setter on
         // ClientBuilder.  The field is stored for future use.

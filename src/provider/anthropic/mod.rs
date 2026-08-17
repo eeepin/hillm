@@ -4,18 +4,26 @@ use crate::provider::anthropic::codec::AnthropicMessagesCodec;
 use crate::provider::{APIType, Provider, codec::APITypeCodec, registry_get};
 use std::borrow::Cow;
 
+#[allow(dead_code)]
 static ANTHROPIC_EXTRA_HEADERS: &[(&str, &str)] = &[("anthropic-version", "2023-06-01")];
+#[allow(dead_code)]
 const BETA_COMPUTER_USE: &str = "computer-use-2025-01-24";
+#[allow(dead_code)]
 const BETA_WEB_SEARCH: &str = "web-search-2025-03-05";
+#[allow(dead_code)]
 const BETA_CODE_EXECUTION: &str = "code-execution-2025-05-22";
+#[allow(dead_code)]
 const BETA_THINKING: &str = "thinking-2025-04-14";
+#[allow(dead_code)]
 const BETA_PROMPT_CACHING: &str = "prompt-caching-2024-07-31";
+#[allow(dead_code)]
 const BETA_PDFS: &str = "pdfs-2024-09-25";
 
 pub mod codec;
 pub mod compat;
 
 /// Recursively check if any value in the JSON body contains a `cache_control` field.
+#[allow(dead_code)]
 fn body_contains_cache_control(value: &serde_json::Value) -> bool {
     match value {
         serde_json::Value::Object(map) => {
@@ -30,6 +38,7 @@ fn body_contains_cache_control(value: &serde_json::Value) -> bool {
 }
 
 /// Recursively check if any value in the JSON body contains a document content block.
+#[allow(dead_code)]
 fn body_contains_document_block(value: &serde_json::Value) -> bool {
     match value {
         serde_json::Value::Object(map) => {
@@ -44,6 +53,7 @@ fn body_contains_document_block(value: &serde_json::Value) -> bool {
 }
 
 /// Anthropic provider
+#[allow(dead_code)]
 pub struct AnthropicProvider {
     base_url: String,
 }

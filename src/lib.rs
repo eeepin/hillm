@@ -85,7 +85,7 @@ pub use types::{
     AssistantMessage, Message, MessageContent, SystemMessage, ToolMessage, Usage, UserMessage,
 };
 
-#[cfg(any(feature = "default-http", feature = "wasm-http"))]
+#[cfg(feature = "default-http")]
 pub fn ensure_crypto_provider() {
     use std::sync::Once;
     static INIT: Once = Once::new();

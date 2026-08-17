@@ -2,11 +2,13 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub(crate) struct ErrorResponse {
     error: ApiError,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub(crate) struct ApiError {
     message: String,
     #[serde(default)]
@@ -268,6 +270,7 @@ impl HiLLMError {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn from_status(status: u16, body: &str, retry_after: Option<Duration>) -> Self {
         let parsed = serde_json::from_str::<ErrorResponse>(body).ok();
         let code = parsed.as_ref().and_then(|r| r.error.code.clone());

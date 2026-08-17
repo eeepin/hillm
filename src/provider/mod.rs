@@ -11,7 +11,10 @@ pub mod outbound_policy;
 
 pub use api_type::APIType;
 pub use codec::APITypeCodec;
-#[cfg(any(feature = "default-http", feature = "wasm-http"))]
+#[cfg(all(
+    any(feature = "default-http", feature = "wasm-http"),
+    not(target_arch = "wasm32")
+))]
 pub use outbound_policy::validate_outbound_url;
 pub use outbound_policy::{
     OutboundPolicy, current_policy, set_outbound_policy, validate_outbound_url_sync,
@@ -82,6 +85,7 @@ static PROVIDER_REGISTRY: std::sync::RwLock<Option<ProviderRegistrySnapshot>> =
 static PROVIDER_REGISTRY: std::sync::RwLock<Option<ProviderRegistrySnapshot>> =
     std::sync::RwLock::new(None);
 
+#[allow(dead_code)]
 const PROVIDER_API_URL: &str = "https://models.dev/api.json";
 pub(crate) const TOKENS_PER_MILLION: f64 = 1_000_000.0;
 
@@ -273,6 +277,7 @@ async fn fetch_provider() -> Result<ProviderRegistry, ProviderError> {
     parse_provider(&text)
 }
 
+#[allow(dead_code)]
 fn parse_provider(json: &str) -> Result<ProviderRegistry, ProviderError> {
     let providers: ProviderRegistry =
         serde_json::from_str(json).map_err(|e| ProviderError::ParseError(e.to_string()))?;
@@ -484,6 +489,7 @@ pub struct AuthConfig {
 
 // Provider trait
 
+#[allow(dead_code)]
 pub(crate) trait Provider: Send + Sync {
     fn name(&self) -> &str;
 

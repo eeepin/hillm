@@ -8,6 +8,7 @@ use std::borrow::Cow;
 /// every instance declares which API type it speaks (e.g.
 /// [`APIType::OpenAIChatCompletions`]) and that choice is fixed for the
 /// lifetime of the instance.
+#[allow(dead_code)]
 pub(crate) struct OpenAiCompatibleProvider {
     pub name: String,
     pub base_url: String,

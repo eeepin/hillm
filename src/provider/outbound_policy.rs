@@ -1,8 +1,14 @@
 use crate::error::HiLLMError;
-#[cfg(any(feature = "default-http", feature = "wasm-http"))]
+#[cfg(all(
+    any(feature = "default-http", feature = "wasm-http"),
+    not(target_arch = "wasm32")
+))]
 use reqwest::dns::{Addrs, Name, Resolve, Resolving};
 use std::net::IpAddr;
-#[cfg(any(feature = "default-http", feature = "wasm-http"))]
+#[cfg(all(
+    any(feature = "default-http", feature = "wasm-http"),
+    not(target_arch = "wasm32")
+))]
 use std::sync::Arc;
 use std::sync::{OnceLock, RwLock};
 use url::Url;
@@ -118,7 +124,10 @@ impl OutboundPolicyValidator {
     ///
     /// In addition to the sync checks, `DenyPrivate` performs DNS resolution
     /// and rejects URLs whose host resolves to a forbidden address.
-    #[cfg(any(feature = "default-http", feature = "wasm-http"))]
+    #[cfg(all(
+        any(feature = "default-http", feature = "wasm-http"),
+        not(target_arch = "wasm32")
+    ))]
     pub async fn validate_url(&self, raw_url: &str) -> Result<(), HiLLMError> {
         let policy = self.current_policy();
         validate_url_with_policy_async(&policy, raw_url).await
@@ -157,7 +166,10 @@ pub fn current_policy() -> OutboundPolicy {
     global_validator().current_policy()
 }
 
-#[cfg(any(feature = "default-http", feature = "wasm-http"))]
+#[cfg(all(
+    any(feature = "default-http", feature = "wasm-http"),
+    not(target_arch = "wasm32")
+))]
 pub async fn validate_outbound_url(raw_url: &str) -> Result<(), HiLLMError> {
     global_validator().validate_url(raw_url).await
 }
@@ -170,7 +182,10 @@ pub fn validate_outbound_url_sync(raw_url: &str) -> Result<(), HiLLMError> {
 // Core validation logic (extracted for reuse by both global and instance APIs)
 // ---------------------------------------------------------------------------
 
-#[cfg(any(feature = "default-http", feature = "wasm-http"))]
+#[cfg(all(
+    any(feature = "default-http", feature = "wasm-http"),
+    not(target_arch = "wasm32")
+))]
 async fn validate_url_with_policy_async(
     policy: &OutboundPolicy,
     raw_url: &str,
@@ -244,7 +259,10 @@ fn validate_url_with_policy(policy: &OutboundPolicy, raw_url: &str) -> Result<()
     Ok(())
 }
 
-#[cfg(any(feature = "default-http", feature = "wasm-http"))]
+#[cfg(all(
+    any(feature = "default-http", feature = "wasm-http"),
+    not(target_arch = "wasm32")
+))]
 async fn check_deny_private(url: &Url, raw: &str) -> Result<(), HiLLMError> {
     let host = url
         .host_str()
@@ -338,12 +356,18 @@ fn is_link_local_v6(ip: std::net::Ipv6Addr) -> bool {
 /// the process-global policy is used. When constructed with
 /// [`GuardedResolver::new`], the given validator is used — enabling
 /// per-client isolation.
-#[cfg(any(feature = "default-http", feature = "wasm-http"))]
+#[cfg(all(
+    any(feature = "default-http", feature = "wasm-http"),
+    not(target_arch = "wasm32")
+))]
 pub struct GuardedResolver {
     validator: Option<Arc<OutboundPolicyValidator>>,
 }
 
-#[cfg(any(feature = "default-http", feature = "wasm-http"))]
+#[cfg(all(
+    any(feature = "default-http", feature = "wasm-http"),
+    not(target_arch = "wasm32")
+))]
 impl GuardedResolver {
     /// Create a resolver bound to a specific validator instance.
     ///
@@ -365,7 +389,10 @@ impl GuardedResolver {
     }
 }
 
-#[cfg(any(feature = "default-http", feature = "wasm-http"))]
+#[cfg(all(
+    any(feature = "default-http", feature = "wasm-http"),
+    not(target_arch = "wasm32")
+))]
 impl Resolve for GuardedResolver {
     fn resolve(&self, name: Name) -> Resolving {
         // Snapshot the validator reference so the future is 'static.
@@ -405,7 +432,10 @@ impl Resolve for GuardedResolver {
     }
 }
 
-#[cfg(any(feature = "default-http", feature = "wasm-http"))]
+#[cfg(all(
+    any(feature = "default-http", feature = "wasm-http"),
+    not(target_arch = "wasm32")
+))]
 pub fn guarded_resolver() -> Arc<GuardedResolver> {
     Arc::new(GuardedResolver::from_global())
 }
