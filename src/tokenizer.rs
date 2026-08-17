@@ -16,24 +16,23 @@ async fn detect_tokenizer(model: &str) -> HiLLMResult<String> {
         let repo = api.model(model.to_string());
         // tokenizer_config.json is a small metadata file; if it exists the model
         // either has its own tokenizer or references one via tokenizer_name.
-        if let Ok(path) = repo.get("tokenizer_config.json").await {
-            if let Ok(content) = std::fs::read_to_string(&path) {
-                if let Ok(config) = serde_json::from_str::<serde_json::Value>(&content) {
-                    // Some models reference a separate tokenizer model
-                    if let Some(name) = config.get("tokenizer_name").and_then(|v| v.as_str()) {
-                        // Handle relative references: "author/model" → use as-is,
-                        // "name_only" → prepend the model's author
-                        if !name.contains('/') {
-                            if let Some(author) = model.split('/').next() {
-                                return Ok(format!("{author}/{name}"));
-                            }
-                        }
-                        return Ok(name.to_string());
-                    }
-                    // Model has its own tokenizer files
-                    return Ok(model.to_string());
+        if let Ok(path) = repo.get("tokenizer_config.json").await
+            && let Ok(content) = std::fs::read_to_string(&path)
+            && let Ok(config) = serde_json::from_str::<serde_json::Value>(&content)
+        {
+            // Some models reference a separate tokenizer model
+            if let Some(name) = config.get("tokenizer_name").and_then(|v| v.as_str()) {
+                // Handle relative references: "author/model" → use as-is,
+                // "name_only" → prepend the model's author
+                if !name.contains('/')
+                    && let Some(author) = model.split('/').next()
+                {
+                    return Ok(format!("{author}/{name}"));
                 }
+                return Ok(name.to_string());
             }
+            // Model has its own tokenizer files
+            return Ok(model.to_string());
         }
     }
 

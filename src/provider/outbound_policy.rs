@@ -2,7 +2,9 @@ use crate::error::HiLLMError;
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 use reqwest::dns::{Addrs, Name, Resolve, Resolving};
 use std::net::IpAddr;
-use std::sync::{Arc, OnceLock, RwLock};
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
+use std::sync::Arc;
+use std::sync::{OnceLock, RwLock};
 use url::Url;
 
 #[derive(Debug, Clone, Default)]
