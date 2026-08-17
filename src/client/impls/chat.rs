@@ -218,7 +218,6 @@ impl ChatCompletionClient for Client {
         })
     }
 
-
     fn chat_raw(
         &self,
         req: ChatCompletionRequest,

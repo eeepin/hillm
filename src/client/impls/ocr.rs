@@ -1,4 +1,4 @@
-use crate::client::{str_pair, Client, OcrClient};
+use crate::client::{Client, OcrClient, str_pair};
 use crate::error::{HiLLMError, HiLLMResult};
 use crate::http;
 use crate::types::ocr::{OcrRequest, OcrResponse};

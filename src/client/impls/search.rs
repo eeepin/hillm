@@ -1,4 +1,4 @@
-use crate::client::{str_pair, Client, SearchClient};
+use crate::client::{Client, SearchClient, str_pair};
 use crate::error::{HiLLMError, HiLLMResult};
 use crate::http;
 use crate::types::raw::RawExchange;

@@ -5,7 +5,7 @@ use tower::{Layer, Service};
 use super::config::ClientConfig;
 use super::{
     AudioClient, BatchClient, BoxFuture, BoxStream, ChatCompletionClient, Client, EmbeddingClient,
-    FileClient, ImageClient, ModerationClient, ModelClient, OcrClient, RerankClient,
+    FileClient, ImageClient, ModelClient, ModerationClient, OcrClient, RerankClient,
     ResponseClient, SearchClient,
 };
 use crate::error::{HiLLMError, HiLLMResult};
@@ -144,7 +144,7 @@ fn build_service_stack(
                     config: backend_config,
                 } => {
                     match OpenDalCacheStore::from_config(
-                        &scheme,
+                        scheme,
                         backend_config.clone(),
                         "llm-cache/",
                         cache_cfg.ttl,

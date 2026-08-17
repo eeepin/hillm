@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use futures_util::StreamExt;
 use hillm::client::{
-    AnthropicMessagesClient, ClientConfigBuilder, Client, ChatCompletionClient, ResponseClient,
+    AnthropicMessagesClient, ChatCompletionClient, Client, ClientConfigBuilder, ResponseClient,
 };
 use hillm::provider::APIType;
 use hillm::types::ChatCompletionRequest;
@@ -745,8 +745,8 @@ async fn chat_on_anthropic_uses_explicit_compat_adapter() {
     let config = ClientConfigBuilder::new("sk-ant-test")
         .api_type(APIType::OpenAIChatCompletions)
         .build();
-    let client = Client::new(config, Some("anthropic".to_string()))
-        .expect("compat adapter instance builds");
+    let client =
+        Client::new(config, Some("anthropic".to_string())).expect("compat adapter instance builds");
 
     let result = client.chat(simple_chat_request("mock-model")).await;
 

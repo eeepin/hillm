@@ -1,4 +1,4 @@
-use crate::client::{str_pair, BoxFuture, Client, ModerationClient};
+use crate::client::{BoxFuture, Client, ModerationClient, str_pair};
 use crate::error::{HiLLMError, HiLLMResult};
 use crate::http;
 use crate::types::moderation::{ModerationRequest, ModerationResponse};

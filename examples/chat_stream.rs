@@ -7,7 +7,8 @@
 
 use futures_util::StreamExt;
 use hillm::{
-    ChatCompletionRequest, ClientBuilder, ChatCompletionClient, Message, MessageContent, UserMessage,
+    ChatCompletionClient, ChatCompletionRequest, ClientBuilder, Message, MessageContent,
+    UserMessage,
 };
 
 #[tokio::main]

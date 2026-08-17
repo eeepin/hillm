@@ -1,4 +1,4 @@
-use crate::client::{str_pair, Client, ModelClient};
+use crate::client::{Client, ModelClient, str_pair};
 use crate::error::HiLLMResult;
 use crate::http;
 use crate::types::model::ModelsListResponse;
@@ -27,7 +27,8 @@ impl ModelClient for Client {
             )
             .await?;
             self.provider.transform_response(&mut raw)?;
-            serde_json::from_value::<ModelsListResponse>(raw).map_err(crate::error::HiLLMError::from)
+            serde_json::from_value::<ModelsListResponse>(raw)
+                .map_err(crate::error::HiLLMError::from)
         })
     }
 }

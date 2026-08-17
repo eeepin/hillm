@@ -170,23 +170,27 @@ pub trait ChatCompletionClient {
 pub trait EmbeddingClient: Send + Sync {
     fn embed(&self, req: EmbeddingRequest) -> BoxFuture<'_, HiLLMResult<EmbeddingResponse>>;
 
-    fn embed_raw(&self, req: EmbeddingRequest) -> BoxFuture<'_, HiLLMResult<RawExchange<EmbeddingResponse>>>;
+    fn embed_raw(
+        &self,
+        req: EmbeddingRequest,
+    ) -> BoxFuture<'_, HiLLMResult<RawExchange<EmbeddingResponse>>>;
 }
 
 #[cfg(target_arch = "wasm32")]
 pub trait EmbeddingClient {
     fn embed(&self, req: EmbeddingRequest) -> BoxFuture<'_, HiLLMResult<EmbeddingResponse>>;
 
-    fn embed_raw(&self, req: EmbeddingRequest) -> BoxFuture<'_, HiLLMResult<RawExchange<EmbeddingResponse>>>;
+    fn embed_raw(
+        &self,
+        req: EmbeddingRequest,
+    ) -> BoxFuture<'_, HiLLMResult<RawExchange<EmbeddingResponse>>>;
 }
 
 /// OpenAI Images API client.
 #[cfg(not(target_arch = "wasm32"))]
 pub trait ImageClient: Send + Sync {
-    fn image_generate(
-        &self,
-        req: CreateImageRequest,
-    ) -> BoxFuture<'_, HiLLMResult<ImagesResponse>>;
+    fn image_generate(&self, req: CreateImageRequest)
+    -> BoxFuture<'_, HiLLMResult<ImagesResponse>>;
 
     fn image_generate_raw(
         &self,
@@ -196,10 +200,8 @@ pub trait ImageClient: Send + Sync {
 
 #[cfg(target_arch = "wasm32")]
 pub trait ImageClient {
-    fn image_generate(
-        &self,
-        req: CreateImageRequest,
-    ) -> BoxFuture<'_, HiLLMResult<ImagesResponse>>;
+    fn image_generate(&self, req: CreateImageRequest)
+    -> BoxFuture<'_, HiLLMResult<ImagesResponse>>;
 
     fn image_generate_raw(
         &self,
@@ -243,14 +245,20 @@ pub trait AudioClient {
 pub trait ModerationClient: Send + Sync {
     fn moderate(&self, req: ModerationRequest) -> BoxFuture<'_, HiLLMResult<ModerationResponse>>;
 
-    fn moderate_raw(&self, req: ModerationRequest) -> BoxFuture<'_, HiLLMResult<RawExchange<ModerationResponse>>>;
+    fn moderate_raw(
+        &self,
+        req: ModerationRequest,
+    ) -> BoxFuture<'_, HiLLMResult<RawExchange<ModerationResponse>>>;
 }
 
 #[cfg(target_arch = "wasm32")]
 pub trait ModerationClient {
     fn moderate(&self, req: ModerationRequest) -> BoxFuture<'_, HiLLMResult<ModerationResponse>>;
 
-    fn moderate_raw(&self, req: ModerationRequest) -> BoxFuture<'_, HiLLMResult<RawExchange<ModerationResponse>>>;
+    fn moderate_raw(
+        &self,
+        req: ModerationRequest,
+    ) -> BoxFuture<'_, HiLLMResult<RawExchange<ModerationResponse>>>;
 }
 
 /// Rerank API client.
@@ -258,14 +266,20 @@ pub trait ModerationClient {
 pub trait RerankClient: Send + Sync {
     fn rerank(&self, req: RerankRequest) -> BoxFuture<'_, HiLLMResult<RerankResponse>>;
 
-    fn rerank_raw(&self, req: RerankRequest) -> BoxFuture<'_, HiLLMResult<RawExchange<RerankResponse>>>;
+    fn rerank_raw(
+        &self,
+        req: RerankRequest,
+    ) -> BoxFuture<'_, HiLLMResult<RawExchange<RerankResponse>>>;
 }
 
 #[cfg(target_arch = "wasm32")]
 pub trait RerankClient {
     fn rerank(&self, req: RerankRequest) -> BoxFuture<'_, HiLLMResult<RerankResponse>>;
 
-    fn rerank_raw(&self, req: RerankRequest) -> BoxFuture<'_, HiLLMResult<RawExchange<RerankResponse>>>;
+    fn rerank_raw(
+        &self,
+        req: RerankRequest,
+    ) -> BoxFuture<'_, HiLLMResult<RawExchange<RerankResponse>>>;
 }
 
 /// Search API client.
@@ -273,14 +287,20 @@ pub trait RerankClient {
 pub trait SearchClient: Send + Sync {
     fn search(&self, req: SearchRequest) -> BoxFuture<'_, HiLLMResult<SearchResponse>>;
 
-    fn search_raw(&self, req: SearchRequest) -> BoxFuture<'_, HiLLMResult<RawExchange<SearchResponse>>>;
+    fn search_raw(
+        &self,
+        req: SearchRequest,
+    ) -> BoxFuture<'_, HiLLMResult<RawExchange<SearchResponse>>>;
 }
 
 #[cfg(target_arch = "wasm32")]
 pub trait SearchClient {
     fn search(&self, req: SearchRequest) -> BoxFuture<'_, HiLLMResult<SearchResponse>>;
 
-    fn search_raw(&self, req: SearchRequest) -> BoxFuture<'_, HiLLMResult<RawExchange<SearchResponse>>>;
+    fn search_raw(
+        &self,
+        req: SearchRequest,
+    ) -> BoxFuture<'_, HiLLMResult<RawExchange<SearchResponse>>>;
 }
 
 /// OCR API client.

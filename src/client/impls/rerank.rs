@@ -1,4 +1,4 @@
-use crate::client::{str_pair, Client, RerankClient};
+use crate::client::{Client, RerankClient, str_pair};
 use crate::error::{HiLLMError, HiLLMResult};
 use crate::http;
 use crate::types::raw::RawExchange;

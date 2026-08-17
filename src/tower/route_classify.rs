@@ -230,11 +230,7 @@ impl<C> LLMClassifier<C>
 where
     C: ChatCompletionClient + EmbeddingClient + Send + Sync + 'static,
 {
-    pub fn new(
-        client: Arc<C>,
-        model: impl Into<String>,
-        system_prompt: impl Into<String>,
-    ) -> Self {
+    pub fn new(client: Arc<C>, model: impl Into<String>, system_prompt: impl Into<String>) -> Self {
         Self {
             client,
             model: model.into(),

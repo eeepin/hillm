@@ -1,4 +1,4 @@
-use crate::client::{str_pair, AudioClient, BoxFuture, Client};
+use crate::client::{AudioClient, BoxFuture, Client, str_pair};
 use crate::error::HiLLMResult;
 use crate::http;
 use crate::types::audio::{CreateSpeechRequest, CreateTranscriptionRequest, TranscriptionResponse};
@@ -73,7 +73,8 @@ impl AudioClient for Client {
             )
             .await?;
             prepared.provider.transform_response(&mut raw)?;
-            serde_json::from_value::<TranscriptionResponse>(raw).map_err(crate::error::HiLLMError::from)
+            serde_json::from_value::<TranscriptionResponse>(raw)
+                .map_err(crate::error::HiLLMError::from)
         })
     }
 
@@ -114,8 +115,8 @@ impl AudioClient for Client {
 
             let raw_response = Some(raw.clone());
             prepared.provider.transform_response(&mut raw)?;
-            let data =
-                serde_json::from_value::<TranscriptionResponse>(raw).map_err(crate::error::HiLLMError::from)?;
+            let data = serde_json::from_value::<TranscriptionResponse>(raw)
+                .map_err(crate::error::HiLLMError::from)?;
 
             Ok(RawExchange {
                 data,

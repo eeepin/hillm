@@ -29,8 +29,8 @@ pub mod vectorstore;
 pub use client::{
     AnthropicMessagesClient, AudioClient, BatchClient, BatchWaitError, BoxFuture, BoxStream,
     ChatCompletionClient, Client, ClientBuilder, ClientConfig, ClientConfigBuilder,
-    EmbeddingClient, FileClient, FileConfig, ImageClient, ModelClient, ModerationClient,
-    OcrClient, ResponseClient, RerankClient, SearchClient, WaitForBatchConfig,
+    EmbeddingClient, FileClient, FileConfig, ImageClient, ModelClient, ModerationClient, OcrClient,
+    RerankClient, ResponseClient, SearchClient, WaitForBatchConfig,
 };
 #[cfg(not(any(feature = "default-http", feature = "wasm-http")))]
 pub use client::{

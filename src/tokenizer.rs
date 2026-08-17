@@ -159,7 +159,7 @@ pub async fn count_request_tokens(model: &str, req: &ChatCompletionRequest) -> H
                 } else {
                     total += count_message_content_tokens(
                         &tokenizer,
-                        &m.content
+                        m.content
                             .as_ref()
                             .unwrap_or(&MessageContent::Text(String::default())),
                     )?;

@@ -6,8 +6,8 @@
 //! ```
 
 use hillm::{
-    AssistantMessage, ChatCompletionRequest, ClientBuilder, ChatCompletionClient, Message, MessageContent,
-    UserMessage,
+    AssistantMessage, ChatCompletionClient, ChatCompletionRequest, ClientBuilder, Message,
+    MessageContent, UserMessage,
 };
 
 #[tokio::main]

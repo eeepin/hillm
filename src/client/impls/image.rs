@@ -1,4 +1,4 @@
-use crate::client::{str_pair, BoxFuture, Client, ImageClient};
+use crate::client::{BoxFuture, Client, ImageClient, str_pair};
 use crate::error::{HiLLMError, HiLLMResult};
 use crate::http;
 use crate::types::image::{CreateImageRequest, ImagesResponse};
