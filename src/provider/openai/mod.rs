@@ -3,6 +3,7 @@ use crate::error::{HiLLMError, HiLLMResult};
 use crate::provider::APIType;
 use crate::provider::codec::APITypeCodec;
 use std::borrow::Cow;
+use std::collections::HashMap;
 
 pub mod chat_completions_codec;
 pub mod responses_codec;
@@ -47,8 +48,8 @@ impl Provider for OpenAIProvider {
         "https://api.openai.com/v1"
     }
 
-    fn env_var(&self) -> Option<&str> {
-        Some("OPENAI_API_KEY")
+    fn env_vars(&self) -> HashMap<&str, &str> {
+        [("api_key", "OPENAI_API_KEY")].into_iter().collect()
     }
 
     fn auth_header<'a>(&'a self, api_key: &'a str) -> Option<(Cow<'static, str>, Cow<'a, str>)> {

@@ -3,6 +3,7 @@ use crate::error::HiLLMResult;
 use crate::provider::anthropic::codec::AnthropicMessagesCodec;
 use crate::provider::{APIType, Provider, codec::APITypeCodec, registry_get};
 use std::borrow::Cow;
+use std::collections::HashMap;
 
 #[allow(dead_code)]
 static ANTHROPIC_EXTRA_HEADERS: &[(&str, &str)] = &[("anthropic-version", "2023-06-01")];
@@ -182,7 +183,7 @@ impl Provider for AnthropicProvider {
         }
     }
 
-    fn env_var(&self) -> Option<&'static str> {
-        Some("ANTHROPIC_API_KEY")
+    fn env_vars(&self) -> HashMap<&str, &str> {
+        [("api_key", "ANTHROPIC_API_KEY")].into_iter().collect()
     }
 }

@@ -46,6 +46,7 @@ mod compat_convert;
 
 use bytes::Bytes;
 use serde_json::Value;
+use std::collections::HashMap;
 
 use crate::error::HiLLMResult;
 use crate::provider::APIType;
@@ -149,8 +150,8 @@ impl crate::provider::Provider for AnthropicChatCompatProvider {
         self.inner.matches_model(model)
     }
 
-    fn env_var(&self) -> Option<&str> {
-        self.inner.env_var()
+    fn env_vars(&self) -> HashMap<&str, &str> {
+        self.inner.env_vars()
     }
 
     fn available_api_types(&self) -> Vec<APIType> {

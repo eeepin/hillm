@@ -25,7 +25,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         base_url: "https://api.example.com/v1".to_string(),
         auth_header: AuthHeaderFormat::Bearer,
         models: vec!["gpt-4".to_string(), "gpt-3.5-turbo".to_string()],
-        env_var: Some("MY_PROVIDER_API_KEY".to_string()),
+        env_vars: [("api_key".to_string(), "MY_PROVIDER_API_KEY".to_string())]
+            .into_iter()
+            .collect(),
         available_api_types: vec![APIType::OpenAIChatCompletions],
         default_api_type: Some(APIType::OpenAIChatCompletions),
     };

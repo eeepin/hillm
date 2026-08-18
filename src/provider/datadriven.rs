@@ -1,6 +1,7 @@
 use super::{APIType, AuthType, Provider, ProviderConfig};
 use crate::error::HiLLMResult;
 use std::borrow::Cow;
+use std::collections::HashMap;
 
 pub(crate) struct ConfigDrivenProvider {
     config: ProviderConfig,
@@ -22,8 +23,17 @@ impl Provider for ConfigDrivenProvider {
         self.config.base_url.as_deref().unwrap_or("")
     }
 
-    fn env_var(&self) -> Option<&str> {
-        self.config.auth.as_ref().and_then(|a| a.env_var.as_deref())
+    fn env_vars(&self) -> HashMap<&str, &str> {
+        self.config
+            .auth
+            .as_ref()
+            .map(|a| {
+                a.env_vars
+                    .iter()
+                    .map(|(k, v)| (k.as_str(), v.as_str()))
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     fn transform_request(&self, body: &mut serde_json::Value) -> HiLLMResult<()> {

@@ -101,16 +101,22 @@ pub struct ProviderEntry {
 
 impl ProviderEntry {
     pub fn to_config(&self) -> ProviderConfig {
-        let mut auth = None;
+        let mut env_vars = HashMap::new();
         for e in &self.env {
             if e.contains("API_KEY") || e.contains("API_TOKEN") {
-                auth = Some(AuthConfig {
-                    auth_type: AuthType::Bearer,
-                    env_var: Some(e.clone()),
-                });
-                break;
+                env_vars.insert("api_key".to_string(), e.clone());
+            } else {
+                env_vars.insert(e.to_lowercase(), e.clone());
             }
         }
+        let auth = if env_vars.is_empty() {
+            None
+        } else {
+            Some(AuthConfig {
+                auth_type: AuthType::Bearer,
+                env_vars,
+            })
+        };
         let models = self.models.keys().cloned().collect();
         ProviderConfig {
             name: self.id.clone(),
@@ -483,7 +489,8 @@ pub struct AuthConfig {
     #[serde(rename = "type")]
     pub auth_type: AuthType,
     #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
-    pub env_var: Option<String>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub env_vars: HashMap<String, String>,
 }
 
 // Provider trait
@@ -531,9 +538,21 @@ pub(crate) trait Provider: Send + Sync {
         None
     }
 
+    /// Returns the complete map of environment variable names for this provider.
+    ///
+    /// Keys are semantic names (e.g., "api_key", "org_id"), values are the
+    /// actual environment variable names (e.g., "OPENAI_API_KEY").
     #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
-    fn env_var(&self) -> Option<&str> {
-        None
+    fn env_vars(&self) -> HashMap<&str, &str> {
+        HashMap::new()
+    }
+
+    /// Returns the environment variable name for the given key.
+    ///
+    /// Common keys: "api_key", "org_id", "project_id".
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    fn env_var(&self, key: &str) -> Option<&str> {
+        self.env_vars().get(key).copied()
     }
 
     fn validate(&self) -> HiLLMResult<()> {
@@ -694,8 +713,8 @@ impl Provider for BaseUrlOverride {
         self.inner.codec_for(api_type)
     }
 
-    fn env_var(&self) -> Option<&str> {
-        self.inner.env_var()
+    fn env_vars(&self) -> HashMap<&str, &str> {
+        self.inner.env_vars()
     }
 
     fn validate(&self) -> HiLLMResult<()> {
@@ -1100,7 +1119,13 @@ mod tests {
         };
         let config = entry.to_config();
         assert_eq!(
-            config.auth.as_ref().unwrap().env_var.as_deref(),
+            config
+                .auth
+                .as_ref()
+                .unwrap()
+                .env_vars
+                .get("api_key")
+                .map(|s| s.as_str()),
             Some("MY_API_KEY")
         );
     }

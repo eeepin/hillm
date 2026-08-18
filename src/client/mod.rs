@@ -500,7 +500,7 @@ impl Client {
         #[cfg(not(target_arch = "wasm32"))]
         if config.load_env
             && config.api_key.expose_secret().is_empty()
-            && let Some(env_var_name) = provider.env_var()
+            && let Some(env_var_name) = provider.env_var("api_key")
         {
             match std::env::var(env_var_name) {
                 Ok(val) if !val.is_empty() => {
