@@ -39,7 +39,9 @@ use crate::types::search::{SearchRequest, SearchResponse};
 use crate::auth::Credential;
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 use crate::provider::{
-    self, APIType, Provider, openai::OpenAIProvider, openai_compatible::OpenAiCompatibleProvider,
+    self, APIType, Provider,
+    custom::{ApiTypeFilter, AuthHeaderFormat, CustomProvider, CustomProviderConfig},
+    openai::OpenAIProvider,
 };
 
 pub use builder::{ClientBuilder, NoApiKey, NoProvider, WithApiKey, WithProvider};
@@ -705,13 +707,18 @@ fn build_provider(
         //   Completions. This fallback is DEPRECATED: future versions will
         //   require an explicit API type whenever a custom base URL is used.
         let api_type = config.api_type.unwrap_or(APIType::OpenAIChatCompletions);
-        return Ok(Arc::new(OpenAiCompatibleProvider {
-            name: "custom".into(),
-            base_url: base_url.clone(),
-            env_var: None,
-            models: vec![],
-            api_type,
-        }));
+        return Ok(Arc::new(CustomProvider::from_config(
+            CustomProviderConfig {
+                name: "custom".into(),
+                base_url: base_url.clone(),
+                auth_header: AuthHeaderFormat::Bearer,
+                models: vec![],
+                env_var: None,
+                available_api_types: vec![api_type],
+                default_api_type: Some(api_type),
+            },
+            ApiTypeFilter::Exact(api_type),
+        )));
     }
 
     if let Some(name) = provider_name {

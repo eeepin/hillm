@@ -6,7 +6,6 @@ pub mod cost;
 pub(crate) mod custom;
 pub(crate) mod datadriven;
 pub(crate) mod openai;
-pub(crate) mod openai_compatible;
 pub mod outbound_policy;
 
 pub use api_type::APIType;

@@ -32,6 +32,7 @@ use std::sync::{OnceLock, RwLock};
 ///     base_url: "https://api.my-provider.com/v1".into(),
 ///     auth_header: AuthHeaderFormat::Bearer,
 ///     models: vec!["my-model".into()],
+///     env_var: None,
 ///     available_api_types: vec![],
 ///     default_api_type: None,
 /// }).unwrap();
@@ -52,8 +53,9 @@ impl CustomProviderRegistry {
     /// Register a custom provider configuration.
     ///
     /// If a provider with the same name already exists, it is replaced.
-    /// Validates the configuration (non-empty name, base_url, at least one
-    /// model), API type consistency, and outbound URL policy.
+    /// Validates the configuration (non-empty name, base_url), API type
+    /// consistency, and outbound URL policy. An empty `models` list is
+    /// allowed and means "accept any model" (wildcard).
     pub fn register(&self, config: CustomProviderConfig) -> HiLLMResult<()> {
         validate_config(&config)?;
         config.validate_api_types()?;
@@ -248,7 +250,14 @@ pub struct CustomProviderConfig {
     pub name: String,
     pub base_url: String,
     pub auth_header: AuthHeaderFormat,
+    /// Models this provider serves. An empty list means "accept any model"
+    /// (wildcard) — useful for generic OpenAI-compatible endpoints.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub models: Vec<String>,
+    /// Environment variable name from which to read the API key when no
+    /// explicit key is supplied to the client builder.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub env_var: Option<String>,
     /// API types this provider supports. Empty defaults to `[OpenAIChatCompletions]`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub available_api_types: Vec<APIType>,
@@ -319,12 +328,6 @@ fn validate_config(config: &CustomProviderConfig) -> HiLLMResult<()> {
             status: 400,
         });
     }
-    if config.models.is_empty() {
-        return Err(HiLLMError::BadRequest {
-            message: "custom provider must have at least one model".into(),
-            status: 400,
-        });
-    }
     for model_name in &config.models {
         if model_name.is_empty() {
             return Err(HiLLMError::BadRequest {
@@ -345,7 +348,7 @@ pub(crate) struct CustomProvider {
 }
 
 impl CustomProvider {
-    fn from_config(config: CustomProviderConfig, filter: ApiTypeFilter) -> Self {
+    pub(crate) fn from_config(config: CustomProviderConfig, filter: ApiTypeFilter) -> Self {
         let api_type = match filter {
             ApiTypeFilter::Exact(api_type) => api_type,
             ApiTypeFilter::Any => config.effective_default_api_type(),
@@ -377,10 +380,18 @@ impl Provider for CustomProvider {
     }
 
     fn matches_model(&self, model: &str) -> bool {
-        self.config
-            .models
-            .iter()
-            .any(|model_name| model == model_name)
+        // An empty model list means "accept any model" (wildcard), matching
+        // the behavior of the former `OpenAiCompatibleProvider`.
+        self.config.models.is_empty()
+            || self
+                .config
+                .models
+                .iter()
+                .any(|model_name| model == model_name)
+    }
+
+    fn env_var(&self) -> Option<&str> {
+        self.config.env_var.as_deref()
     }
 
     fn available_api_types(&self) -> Vec<APIType> {
@@ -430,6 +441,7 @@ mod tests {
             base_url: "https://api.my-provider.com/v1".into(),
             auth_header: AuthHeaderFormat::Bearer,
             models: vec!["my-model-7b".into(), "my-provider-llama-70b".into()],
+            env_var: None,
             available_api_types: vec![],
             default_api_type: None,
         };
@@ -466,6 +478,7 @@ mod tests {
             base_url: "https://api.ephemeral.com/v1".into(),
             auth_header: AuthHeaderFormat::Bearer,
             models: vec!["eph-model".into()],
+            env_var: None,
             available_api_types: vec![],
             default_api_type: None,
         };
@@ -499,6 +512,7 @@ mod tests {
             base_url: "https://api.secure.com/v1".into(),
             auth_header: AuthHeaderFormat::ApiKey("X-Custom-Auth".into()),
             models: vec!["secure-model-1".into()],
+            env_var: None,
             available_api_types: vec![],
             default_api_type: None,
         };
@@ -523,6 +537,7 @@ mod tests {
             base_url: "http://localhost:8080/v1".into(),
             auth_header: AuthHeaderFormat::None,
             models: vec!["local-model".into()],
+            env_var: None,
             available_api_types: vec![],
             default_api_type: None,
         };
@@ -546,6 +561,7 @@ mod tests {
             base_url: "https://api.bearer.com/v1".into(),
             auth_header: AuthHeaderFormat::Bearer,
             models: vec!["bearer-model".into()],
+            env_var: None,
             available_api_types: vec![],
             default_api_type: None,
         };
@@ -570,6 +586,7 @@ mod tests {
             base_url: "https://old.example.com/v1".into(),
             auth_header: AuthHeaderFormat::Bearer,
             models: vec!["upd-model".into()],
+            env_var: None,
             available_api_types: vec![],
             default_api_type: None,
         };
@@ -580,6 +597,7 @@ mod tests {
             base_url: "https://new.example.com/v1".into(),
             auth_header: AuthHeaderFormat::Bearer,
             models: vec!["upd-model".into()],
+            env_var: None,
             available_api_types: vec![],
             default_api_type: None,
         };
@@ -603,6 +621,7 @@ mod tests {
             base_url: "https://example.com".into(),
             auth_header: AuthHeaderFormat::Bearer,
             models: vec!["model-a".into()],
+            env_var: None,
             available_api_types: vec![],
             default_api_type: None,
         };
@@ -619,6 +638,7 @@ mod tests {
             base_url: String::new(),
             auth_header: AuthHeaderFormat::Bearer,
             models: vec!["model-b".into()],
+            env_var: None,
             available_api_types: vec![],
             default_api_type: None,
         };
@@ -627,19 +647,28 @@ mod tests {
     }
 
     #[test]
-    fn validation_rejects_no_models() {
+    fn empty_models_is_wildcard() {
         let _guard = setup();
 
         let config = CustomProviderConfig {
-            name: "valid-name".into(),
+            name: "wildcard-provider".into(),
             base_url: "https://example.com".into(),
             auth_header: AuthHeaderFormat::Bearer,
             models: vec![],
+            env_var: None,
             available_api_types: vec![],
             default_api_type: None,
         };
-        let result = register_custom_provider(config);
-        assert!(result.is_err(), "should reject empty models");
+        register_custom_provider(config).expect("should accept empty models");
+
+        // An empty model list matches any model name (wildcard).
+        let provider =
+            detect_custom_provider("wildcard-provider", "any-model-at-all", ApiTypeFilter::Any)
+                .expect("detection should not error");
+        assert!(
+            provider.is_some(),
+            "wildcard provider should match any model"
+        );
     }
 
     #[test]
@@ -649,6 +678,7 @@ mod tests {
             base_url: "https://example.com/v1".into(),
             auth_header: AuthHeaderFormat::ApiKey("X-Api-Key".into()),
             models: vec!["serde-model".into()],
+            env_var: None,
             available_api_types: vec![],
             default_api_type: None,
         };
@@ -668,6 +698,7 @@ mod tests {
             base_url: "https://example.com/v1".into(),
             auth_header: AuthHeaderFormat::Bearer,
             models: vec!["serde-model".into()],
+            env_var: None,
             available_api_types: vec![APIType::AnthropicMessages],
             default_api_type: Some(APIType::AnthropicMessages),
         };
@@ -688,6 +719,7 @@ mod tests {
             base_url: "https://example.com/v1".into(),
             auth_header: AuthHeaderFormat::Bearer,
             models: vec!["model-a".into()],
+            env_var: None,
             available_api_types: vec![APIType::OpenAIChatCompletions],
             default_api_type: Some(APIType::AnthropicMessages),
         };
@@ -707,6 +739,7 @@ mod tests {
             base_url: "https://example.com/v1".into(),
             auth_header: AuthHeaderFormat::Bearer,
             models: vec!["claude-like".into()],
+            env_var: None,
             available_api_types: vec![APIType::AnthropicMessages],
             default_api_type: None,
         };
@@ -746,6 +779,7 @@ mod tests {
             base_url: "https://example.com/v1".into(),
             auth_header: AuthHeaderFormat::Bearer,
             models: vec!["mm-1".into()],
+            env_var: None,
             available_api_types: vec![APIType::OpenAIChatCompletions],
             default_api_type: None,
         };
@@ -776,6 +810,7 @@ mod tests {
             base_url: "https://a.example.com/v1".into(),
             auth_header: AuthHeaderFormat::Bearer,
             models: vec!["shared-model".into()],
+            env_var: None,
             available_api_types: vec![],
             default_api_type: None,
         };
@@ -784,6 +819,7 @@ mod tests {
             base_url: "https://b.example.com/v1".into(),
             auth_header: AuthHeaderFormat::Bearer,
             models: vec!["shared-model".into()],
+            env_var: None,
             available_api_types: vec![],
             default_api_type: None,
         };
@@ -826,6 +862,7 @@ mod tests {
             base_url: "https://example.com/v1".into(),
             auth_header: AuthHeaderFormat::Bearer,
             models: vec!["d-model".into()],
+            env_var: None,
             available_api_types: vec![APIType::OpenAIResponses, APIType::OpenAIChatCompletions],
             default_api_type: Some(APIType::OpenAIResponses),
         };
@@ -845,6 +882,7 @@ mod tests {
             base_url: "https://example.com/v1".into(),
             auth_header: AuthHeaderFormat::Bearer,
             models: vec!["cc-model".into()],
+            env_var: None,
             available_api_types: vec![APIType::OpenAIChatCompletions],
             default_api_type: None,
         };
@@ -876,6 +914,7 @@ mod tests {
             base_url: "https://instance.example.com/v1".into(),
             auth_header: AuthHeaderFormat::Bearer,
             models: vec!["inst-model".into()],
+            env_var: None,
             available_api_types: vec![],
             default_api_type: None,
         };
@@ -907,6 +946,7 @@ mod tests {
             base_url: "https://scoped.example.com/v1".into(),
             auth_header: AuthHeaderFormat::Bearer,
             models: vec!["scoped-model".into()],
+            env_var: None,
             available_api_types: vec![],
             default_api_type: None,
         };
@@ -935,6 +975,7 @@ mod tests {
             base_url: "https://removable.example.com/v1".into(),
             auth_header: AuthHeaderFormat::Bearer,
             models: vec!["rem-model".into()],
+            env_var: None,
             available_api_types: vec![],
             default_api_type: None,
         };
@@ -957,6 +998,7 @@ mod tests {
             base_url: "https://example.com/v1".into(),
             auth_header: AuthHeaderFormat::Bearer,
             models: vec!["model".into()],
+            env_var: None,
             available_api_types: vec![],
             default_api_type: None,
         };
@@ -975,6 +1017,7 @@ mod tests {
             base_url: "https://multi.example.com/v1".into(),
             auth_header: AuthHeaderFormat::Bearer,
             models: vec!["flex-model".into()],
+            env_var: None,
             available_api_types: vec![APIType::OpenAIChatCompletions, APIType::OpenAIResponses],
             default_api_type: Some(APIType::OpenAIResponses),
         };
