@@ -2,9 +2,14 @@
 //!
 //! This shows how to use `CustomProviderConfig` directly with `ClientBuilder`,
 //! which is cleaner than setting individual fields like `base_url` and `api_type`.
+//!
+//! This example requires HTTP features to be enabled.
 
+// This example requires HTTP transport features
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
 use hillm::{AuthHeaderFormat, ClientBuilder, CustomProviderConfig, provider::APIType};
 
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Old approach (still supported for backward compatibility):
@@ -36,4 +41,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // This is useful when loading config from TOML/JSON files
 
     Ok(())
+}
+
+#[cfg(not(any(feature = "default-http", feature = "wasm-http")))]
+fn main() {
+    println!("This example requires HTTP features (default-http or wasm-http)");
 }
