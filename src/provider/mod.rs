@@ -638,6 +638,153 @@ pub(crate) trait Provider: Send + Sync {
     }
 }
 
+/// A provider wrapper that overrides the base URL.
+///
+/// Used when a named provider (e.g. "openai") is selected but the user wants
+/// to point at a different endpoint (e.g. a proxy or OpenAI-compatible service).
+/// All [`Provider`] methods delegate to the inner provider except [`Provider::base_url`].
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
+pub(crate) struct BaseUrlOverride {
+    inner: Arc<dyn Provider>,
+    base_url: String,
+}
+
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
+impl BaseUrlOverride {
+    pub(crate) fn new(inner: Arc<dyn Provider>, base_url: String) -> Self {
+        Self { inner, base_url }
+    }
+}
+
+#[cfg(any(feature = "default-http", feature = "wasm-http"))]
+impl Provider for BaseUrlOverride {
+    fn name(&self) -> &str {
+        self.inner.name()
+    }
+
+    fn base_url(&self) -> &str {
+        &self.base_url
+    }
+
+    fn auth_header<'a>(&'a self, api_key: &'a str) -> Option<(Cow<'static, str>, Cow<'a, str>)> {
+        self.inner.auth_header(api_key)
+    }
+
+    fn matches_model(&self, model: &str) -> bool {
+        self.inner.matches_model(model)
+    }
+
+    fn extra_headers(&self) -> &'static [(&'static str, &'static str)] {
+        self.inner.extra_headers()
+    }
+
+    fn dynamic_headers(&self, body: &serde_json::Value) -> Vec<(String, String)> {
+        self.inner.dynamic_headers(body)
+    }
+
+    fn available_api_types(&self) -> Vec<APIType> {
+        self.inner.available_api_types()
+    }
+
+    fn api_type(&self) -> APIType {
+        self.inner.api_type()
+    }
+
+    fn codec_for(&self, api_type: APIType) -> Option<Box<dyn codec::APITypeCodec>> {
+        self.inner.codec_for(api_type)
+    }
+
+    fn env_var(&self) -> Option<&str> {
+        self.inner.env_var()
+    }
+
+    fn validate(&self) -> HiLLMResult<()> {
+        self.inner.validate()
+    }
+
+    fn chat_completions_path(&self) -> &str {
+        self.inner.chat_completions_path()
+    }
+
+    fn embeddings_path(&self) -> &str {
+        self.inner.embeddings_path()
+    }
+
+    fn image_generations_path(&self) -> &str {
+        self.inner.image_generations_path()
+    }
+
+    fn audio_speech_path(&self) -> &str {
+        self.inner.audio_speech_path()
+    }
+
+    fn audio_transcriptions_path(&self) -> &str {
+        self.inner.audio_transcriptions_path()
+    }
+
+    fn moderations_path(&self) -> &str {
+        self.inner.moderations_path()
+    }
+
+    fn rerank_path(&self) -> &str {
+        self.inner.rerank_path()
+    }
+
+    fn search_path(&self) -> &str {
+        self.inner.search_path()
+    }
+
+    fn ocr_path(&self) -> &str {
+        self.inner.ocr_path()
+    }
+
+    fn models_path(&self) -> &str {
+        self.inner.models_path()
+    }
+
+    fn files_path(&self) -> &str {
+        self.inner.files_path()
+    }
+
+    fn batches_path(&self) -> &str {
+        self.inner.batches_path()
+    }
+
+    fn responses_path(&self) -> &str {
+        self.inner.responses_path()
+    }
+
+    fn build_url(&self, endpoint_path: &str, _model: &str) -> String {
+        // Use the overridden base_url, not the inner provider's
+        format!("{}{}", self.base_url(), endpoint_path)
+    }
+
+    fn build_stream_url(&self, endpoint_path: &str, _model: &str) -> String {
+        // Use the overridden base_url, not the inner provider's
+        self.build_url(endpoint_path, _model)
+    }
+
+    fn transform_request(&self, body: &mut serde_json::Value) -> HiLLMResult<()> {
+        self.inner.transform_request(body)
+    }
+
+    fn transform_response(&self, body: &mut serde_json::Value) -> HiLLMResult<()> {
+        self.inner.transform_response(body)
+    }
+
+    fn stream_format(&self) -> StreamFormat {
+        self.inner.stream_format()
+    }
+
+    fn parse_stream_event(&self, data: &str) -> HiLLMResult<Option<ChatCompletionChunk>> {
+        self.inner.parse_stream_event(data)
+    }
+
+    fn signing_headers(&self, method: &str, url: &str, body: &[u8]) -> Vec<(String, String)> {
+        self.inner.signing_headers(method, url, body)
+    }
+}
+
 pub(crate) fn get_provider(name: &str) -> Option<Box<dyn Provider>> {
     if let Ok(Some(provider)) = custom::detect_custom_provider(name, "", custom::ApiTypeFilter::Any)
     {

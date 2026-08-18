@@ -580,7 +580,7 @@ async fn anthropic_messages_route_url_headers_and_native_body() {
         .base_url(server.url())
         .api_type(APIType::AnthropicMessages)
         .build();
-    let client = Client::new(config, None).expect("client builds");
+    let client = Client::new(config, Some("anthropic".to_string())).expect("client builds");
 
     let resp = client
         .create_message(simple_anthropic_request("mock-model"))
@@ -621,7 +621,7 @@ async fn anthropic_messages_stream_emits_native_events() {
         .base_url(server.url())
         .api_type(APIType::AnthropicMessages)
         .build();
-    let client = Client::new(config, None).expect("client builds");
+    let client = Client::new(config, Some("anthropic".to_string())).expect("client builds");
 
     let stream = client
         .create_message_stream(simple_anthropic_request("mock-model"))

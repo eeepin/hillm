@@ -74,6 +74,10 @@ impl Provider for OpenAIProvider {
     }
 
     fn codec_for(&self, api_type: APIType) -> Option<Box<dyn APITypeCodec>> {
+        // Only return a codec if the requested API type matches the bound type
+        if api_type != self.api_type {
+            return None;
+        }
         match api_type {
             APIType::OpenAIChatCompletions => Some(Box::new(OpenAIChatCompletionsCodec)),
             APIType::OpenAIResponses => Some(Box::new(OpenAIResponsesCodec)),

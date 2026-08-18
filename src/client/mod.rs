@@ -39,8 +39,8 @@ use crate::types::search::{SearchRequest, SearchResponse};
 use crate::auth::Credential;
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 use crate::provider::{
-    self, APIType, Provider,
-    custom::{ApiTypeFilter, AuthHeaderFormat, CustomProvider, CustomProviderConfig},
+    self, Provider,
+    custom::{ApiTypeFilter, CustomProvider},
     openai::OpenAIProvider,
 };
 
@@ -698,42 +698,71 @@ fn build_provider(
     config: &ClientConfig,
     provider_name: Option<String>,
 ) -> HiLLMResult<Arc<dyn Provider>> {
-    if let Some(ref base_url) = config.base_url {
-        // A custom base URL no longer implicitly means "OpenAI-compatible
-        // chat completions". The API type is chosen explicitly:
-        //
-        // - `config.api_type` selects the protocol the endpoint speaks;
-        // - when absent, the compatibility default is OpenAI Chat
-        //   Completions. This fallback is DEPRECATED: future versions will
-        //   require an explicit API type whenever a custom base URL is used.
-        let api_type = config.api_type.unwrap_or(APIType::OpenAIChatCompletions);
-        return Ok(Arc::new(CustomProvider::from_config(
-            CustomProviderConfig {
-                name: "custom".into(),
-                base_url: base_url.clone(),
-                auth_header: AuthHeaderFormat::Bearer,
-                models: vec![],
-                env_var: None,
-                available_api_types: vec![api_type],
-                default_api_type: Some(api_type),
-            },
-            ApiTypeFilter::Exact(api_type),
-        )));
-    }
+    match provider_name {
+        // 1. Explicit name → try to resolve by name first
+        Some(name) => {
+            // Try to resolve the provider
+            let resolved_result = if let Some(api_type) = config.api_type {
+                // Explicit API type: validate and bind
+                provider::create_provider(&name, api_type).map(Some)
+            } else {
+                // No API type specified: use get_provider which returns default binding
+                Ok(provider::get_provider(&name))
+            };
 
-    if let Some(name) = provider_name {
-        // Explicit API type selection is validated at creation time: if the
-        // named provider does not support the requested API type, fail with
-        // a structured error instead of silently falling back.
-        if let Some(api_type) = config.api_type {
-            return Ok(Arc::from(provider::create_provider(&name, api_type)?));
+            match (resolved_result?, &config.base_url) {
+                // Found + no base_url → use as-is
+                (Some(provider), None) => Ok(Arc::from(provider)),
+
+                // Found + base_url → wrap with URL override
+                (Some(provider), Some(url)) => Ok(Arc::new(provider::BaseUrlOverride::new(
+                    Arc::from(provider),
+                    url.clone(),
+                ))),
+
+                // Not found + custom_provider set → use custom_provider as fallback
+                (None, _) if config.custom_provider.is_some() => {
+                    let custom_config = config.custom_provider.as_ref().unwrap();
+                    let api_type = config
+                        .api_type
+                        .unwrap_or_else(|| custom_config.effective_default_api_type());
+                    Ok(Arc::new(CustomProvider::from_config(
+                        custom_config.clone(),
+                        ApiTypeFilter::Exact(api_type),
+                    )))
+                }
+
+                // Not found + no custom_provider → error
+                (None, _) => Err(HiLLMError::ProviderNotFound { name }),
+            }
         }
-        let provider = provider::get_provider(&name)
-            .ok_or_else(|| HiLLMError::ProviderNotFound { name: name.clone() })?;
-        return Ok(Arc::from(provider));
-    }
 
-    Ok(Arc::new(OpenAIProvider::default()))
+        // 2. No name → check custom_provider, then base_url, then default
+        None => {
+            if let Some(ref custom_config) = config.custom_provider {
+                let api_type = config
+                    .api_type
+                    .unwrap_or_else(|| custom_config.effective_default_api_type());
+                Ok(Arc::new(CustomProvider::from_config(
+                    custom_config.clone(),
+                    ApiTypeFilter::Exact(api_type),
+                )))
+            } else if let Some(ref url) = config.base_url {
+                // No name + base_url → use OpenAI with URL override
+                let provider = if let Some(api_type) = config.api_type {
+                    OpenAIProvider::with_api_type(api_type)?
+                } else {
+                    OpenAIProvider::default()
+                };
+                Ok(Arc::new(provider::BaseUrlOverride::new(
+                    Arc::new(provider),
+                    url.clone(),
+                )))
+            } else {
+                Ok(Arc::new(OpenAIProvider::default()))
+            }
+        }
+    }
 }
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]

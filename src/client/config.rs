@@ -8,6 +8,7 @@ use crate::auth::CredentialProvider;
 use crate::error::{HiLLMError, HiLLMResult};
 use crate::http::transport::TransportConfig;
 use crate::provider::APIType;
+use crate::provider::custom::CustomProviderConfig;
 use crate::provider::outbound_policy::OutboundPolicyValidator;
 #[cfg(feature = "tower")]
 use crate::tower::{BudgetConfig, CacheConfig, CacheStore, LLMHook, RateLimitConfig};
@@ -20,6 +21,12 @@ pub struct ClientConfig {
     ///
     /// When `None`, the provider's effective default API type is used.
     pub api_type: Option<APIType>,
+    /// Complete custom provider configuration.
+    ///
+    /// When set, this takes precedence over `base_url` and `api_type` for
+    /// provider construction. Enables loading provider config from TOML/JSON
+    /// and passing it as a cohesive unit.
+    pub custom_provider: Option<CustomProviderConfig>,
     pub timeout: Duration,
     pub max_retries: u32,
     pub(crate) extra_headers: Vec<(String, String)>,
@@ -58,6 +65,7 @@ impl ClientConfig {
             api_key: SecretString::from(api_key.into()),
             base_url: None,
             api_type: None,
+            custom_provider: None,
             timeout: Duration::from_secs(60),
             max_retries: 3,
             extra_headers: Vec::new(),
@@ -102,6 +110,7 @@ impl std::fmt::Debug for ClientConfig {
         dbg.field("api_key", &"[redacted]")
             .field("base_url", &self.base_url)
             .field("api_type", &self.api_type)
+            .field("custom_provider", &self.custom_provider)
             .field("timeout", &self.timeout)
             .field("max_retries", &self.max_retries)
             .field("extra_headers", &redacted_headers)
@@ -167,6 +176,16 @@ impl ClientConfigBuilder {
     /// default API type is used.
     pub fn api_type(mut self, api_type: APIType) -> Self {
         self.config.api_type = Some(api_type);
+        self
+    }
+
+    /// Set a complete custom provider configuration.
+    ///
+    /// When set, this takes precedence over `base_url` and `api_type` for
+    /// provider construction. Useful for loading provider config from
+    /// TOML/JSON or passing a cohesive provider configuration.
+    pub fn custom_provider(mut self, config: CustomProviderConfig) -> Self {
+        self.config.custom_provider = Some(config);
         self
     }
 

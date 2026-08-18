@@ -8,6 +8,7 @@ use crate::auth::CredentialProvider;
 use crate::error::HiLLMResult;
 use crate::http::transport::TransportConfig;
 use crate::provider::APIType;
+use crate::provider::custom::CustomProviderConfig;
 use crate::provider::outbound_policy::OutboundPolicyValidator;
 #[cfg(feature = "tower")]
 use crate::tower::{BudgetConfig, CacheConfig, CacheStore, LLMHook, RateLimitConfig};
@@ -23,6 +24,7 @@ pub struct ClientBuilder<K = NoApiKey, P = NoProvider> {
     provider_name: Option<String>,
     base_url: Option<String>,
     api_type: Option<APIType>,
+    custom_provider: Option<CustomProviderConfig>,
     timeout: Duration,
     max_retries: u32,
     transport: TransportConfig,
@@ -58,6 +60,7 @@ impl ClientBuilder<NoApiKey, NoProvider> {
             provider_name: None,
             base_url: None,
             api_type: None,
+            custom_provider: None,
             timeout: Duration::from_secs(60),
             max_retries: 3,
             transport: TransportConfig::default(),
@@ -101,6 +104,7 @@ impl<K, P> ClientBuilder<K, P> {
             provider_name: self.provider_name,
             base_url: self.base_url,
             api_type: self.api_type,
+            custom_provider: self.custom_provider,
             timeout: self.timeout,
             max_retries: self.max_retries,
             transport: self.transport,
@@ -136,6 +140,7 @@ impl<K, P> ClientBuilder<K, P> {
             provider_name: Some(provider_name.into()),
             base_url: self.base_url,
             api_type: self.api_type,
+            custom_provider: self.custom_provider,
             timeout: self.timeout,
             max_retries: self.max_retries,
             transport: self.transport,
@@ -180,6 +185,50 @@ impl<K, P> ClientBuilder<K, P> {
     pub fn api_type(mut self, api_type: APIType) -> Self {
         self.api_type = Some(api_type);
         self
+    }
+
+    /// Set a complete custom provider configuration.
+    ///
+    /// When set, this takes precedence over `base_url` and `api_type` for
+    /// provider construction. Useful for loading provider config from
+    /// TOML/JSON or passing a cohesive provider configuration.
+    ///
+    /// This transitions the builder to the `WithProvider` state since the
+    /// provider is fully specified by the config.
+    pub fn custom_provider(self, config: CustomProviderConfig) -> ClientBuilder<K, WithProvider> {
+        ClientBuilder {
+            api_key: self.api_key,
+            provider_name: self.provider_name,
+            base_url: self.base_url,
+            api_type: self.api_type,
+            custom_provider: Some(config),
+            timeout: self.timeout,
+            max_retries: self.max_retries,
+            transport: self.transport,
+            load_env: self.load_env,
+            credential_provider: self.credential_provider,
+            outbound_policy: self.outbound_policy,
+            #[cfg(feature = "tower")]
+            cache_config: self.cache_config,
+            #[cfg(feature = "tower")]
+            cache_store: self.cache_store,
+            #[cfg(feature = "tower")]
+            budget_config: self.budget_config,
+            #[cfg(feature = "tower")]
+            hooks: self.hooks,
+            #[cfg(feature = "tower")]
+            cooldown_duration: self.cooldown_duration,
+            #[cfg(feature = "tower")]
+            rate_limit_config: self.rate_limit_config,
+            #[cfg(feature = "tower")]
+            health_check_interval: self.health_check_interval,
+            #[cfg(feature = "tower")]
+            enable_cost_tracking: self.enable_cost_tracking,
+            #[cfg(feature = "tower")]
+            enable_tracing: self.enable_tracing,
+            _key_state: self._key_state,
+            _provider_state: std::marker::PhantomData,
+        }
     }
 
     pub fn timeout(mut self, timeout: Duration) -> Self {
@@ -286,6 +335,7 @@ impl ClientBuilder<WithApiKey, WithProvider> {
             api_key: self.api_key,
             base_url: self.base_url,
             api_type: self.api_type,
+            custom_provider: self.custom_provider,
             timeout: self.timeout,
             max_retries: self.max_retries,
             extra_headers: Vec::new(),
