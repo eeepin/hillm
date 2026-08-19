@@ -440,7 +440,7 @@ use crate::types::anthropic::{
 /// Client for the Anthropic Messages API with its native request/response
 /// and stream event types.
 ///
-/// This trait only routes through [`provider::APIType::AnthropicMessages`].
+/// This trait only routes through [`provider::ApiType::AnthropicMessages`].
 /// Calling it against a provider instance bound to another API type fails
 /// with [`HiLlmError::EndpointNotSupported`] before any request is sent.
 #[cfg(not(target_arch = "wasm32"))]

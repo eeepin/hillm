@@ -7,7 +7,7 @@ use super::{
     Usage,
 };
 use crate::provider::cost::completion_cost_with_cache;
-use crate::types::{APIRequest, APIResponse};
+use crate::types::{ApiRequest, ApiResponse};
 
 /// Finish Reason
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -205,9 +205,9 @@ pub struct StreamFunctionCall {
     pub arguments: Option<String>,
 }
 
-// APIRequest/APIResponse trait implementations
+// ApiRequest/ApiResponse trait implementations
 
-impl APIRequest for ChatCompletionRequest {
+impl ApiRequest for ChatCompletionRequest {
     type Response = ChatCompletionResponse;
     type StreamEvent = ChatCompletionChunk;
 
@@ -220,7 +220,7 @@ impl APIRequest for ChatCompletionRequest {
     }
 }
 
-impl APIResponse for ChatCompletionResponse {}
+impl ApiResponse for ChatCompletionResponse {}
 
 #[cfg(test)]
 mod tests {

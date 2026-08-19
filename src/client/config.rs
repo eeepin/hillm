@@ -7,7 +7,7 @@ use crate::auth::CredentialProvider;
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 use crate::error::{HiLlmError, HiLlmResult};
 use crate::http::transport::TransportConfig;
-use crate::provider::APIType;
+use crate::provider::ApiType;
 use crate::provider::custom::CustomProviderConfig;
 use crate::provider::outbound_policy::OutboundPolicyValidator;
 #[cfg(feature = "tower")]
@@ -20,7 +20,7 @@ pub struct ClientConfig {
     /// Explicit API type selection for the provider instance.
     ///
     /// When `None`, the provider's effective default API type is used.
-    pub api_type: Option<APIType>,
+    pub api_type: Option<ApiType>,
     /// Complete custom provider configuration.
     ///
     /// When set, this takes precedence over `base_url` and `api_type` for
@@ -174,7 +174,7 @@ impl ClientConfigBuilder {
     /// When combined with a custom `base_url`, this declares which protocol
     /// the endpoint implements. When omitted, the provider's effective
     /// default API type is used.
-    pub fn api_type(mut self, api_type: APIType) -> Self {
+    pub fn api_type(mut self, api_type: ApiType) -> Self {
         self.config.api_type = Some(api_type);
         self
     }

@@ -1,7 +1,7 @@
 use crate::error::HiLlmError;
 use crate::error::HiLlmResult;
 use crate::provider::anthropic::codec::AnthropicMessagesCodec;
-use crate::provider::{APIType, Provider, codec::APITypeCodec, registry_get};
+use crate::provider::{ApiType, Provider, codec::ApiTypeCodec, registry_get};
 use std::borrow::Cow;
 use std::collections::HashMap;
 
@@ -79,11 +79,11 @@ impl AnthropicProvider {
     }
 
     /// Creates a provider instance bound to `api_type`, failing with
-    /// [`HiLlmError::APITypeUnsupported`] unless it is
-    /// [`APIType::AnthropicMessages`].
-    pub(crate) fn with_api_type(api_type: APIType) -> HiLlmResult<Self> {
-        if api_type != APIType::AnthropicMessages {
-            return Err(HiLlmError::APITypeUnsupported {
+    /// [`HiLlmError::ApiTypeUnsupported`] unless it is
+    /// [`ApiType::AnthropicMessages`].
+    pub(crate) fn with_api_type(api_type: ApiType) -> HiLlmResult<Self> {
+        if api_type != ApiType::AnthropicMessages {
+            return Err(HiLlmError::ApiTypeUnsupported {
                 api_type: api_type.to_string(),
                 provider: "anthropic".to_string(),
             });
@@ -168,17 +168,17 @@ impl Provider for AnthropicProvider {
         })
     }
 
-    fn available_api_types(&self) -> Vec<APIType> {
-        vec![APIType::AnthropicMessages]
+    fn available_api_types(&self) -> Vec<ApiType> {
+        vec![ApiType::AnthropicMessages]
     }
 
-    fn api_type(&self) -> APIType {
-        APIType::AnthropicMessages
+    fn api_type(&self) -> ApiType {
+        ApiType::AnthropicMessages
     }
 
-    fn codec_for(&self, api_type: APIType) -> Option<Box<dyn APITypeCodec>> {
+    fn codec_for(&self, api_type: ApiType) -> Option<Box<dyn ApiTypeCodec>> {
         match api_type {
-            APIType::AnthropicMessages => Some(Box::new(AnthropicMessagesCodec)),
+            ApiType::AnthropicMessages => Some(Box::new(AnthropicMessagesCodec)),
             _ => None,
         }
     }

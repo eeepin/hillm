@@ -3,16 +3,16 @@
 use bytes::Bytes;
 
 use crate::error::{HiLlmError, HiLlmResult};
-use crate::provider::APIType;
-use crate::provider::codec::APITypeCodec;
+use crate::provider::ApiType;
+use crate::provider::codec::ApiTypeCodec;
 
 /// Codec for OpenAI Responses API.
 #[allow(dead_code)]
 pub struct OpenAIResponsesCodec;
 
-impl APITypeCodec for OpenAIResponsesCodec {
-    fn api_type(&self) -> APIType {
-        APIType::OpenAIResponses
+impl ApiTypeCodec for OpenAIResponsesCodec {
+    fn api_type(&self) -> ApiType {
+        ApiType::OpenAIResponses
     }
 
     fn endpoint_path(&self) -> &str {
@@ -52,7 +52,7 @@ mod tests {
     #[test]
     fn test_openai_responses_codec_api_type() {
         let codec = OpenAIResponsesCodec;
-        assert_eq!(codec.api_type(), APIType::OpenAIResponses);
+        assert_eq!(codec.api_type(), ApiType::OpenAIResponses);
     }
 
     #[test]

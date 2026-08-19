@@ -7,7 +7,7 @@ use crate::auth::CredentialProvider;
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 use crate::error::HiLlmResult;
 use crate::http::transport::TransportConfig;
-use crate::provider::APIType;
+use crate::provider::ApiType;
 use crate::provider::custom::CustomProviderConfig;
 use crate::provider::outbound_policy::OutboundPolicyValidator;
 #[cfg(feature = "tower")]
@@ -23,7 +23,7 @@ pub struct ClientBuilder<K = NoApiKey, P = NoProvider> {
     api_key: SecretString,
     provider_name: Option<String>,
     base_url: Option<String>,
-    api_type: Option<APIType>,
+    api_type: Option<ApiType>,
     custom_provider: Option<CustomProviderConfig>,
     timeout: Duration,
     max_retries: u32,
@@ -182,7 +182,7 @@ impl<K, P> ClientBuilder<K, P> {
     /// the endpoint implements. When omitted, the provider's effective
     /// default API type is used (marked deprecated for custom base URLs —
     /// prefer setting this explicitly).
-    pub fn api_type(mut self, api_type: APIType) -> Self {
+    pub fn api_type(mut self, api_type: ApiType) -> Self {
         self.api_type = Some(api_type);
         self
     }

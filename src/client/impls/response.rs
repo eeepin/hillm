@@ -18,7 +18,7 @@ impl ResponseClient for Client {
             req.stream = Some(false);
 
             // Prefer the Responses codec path when the provider supports it.
-            if let Some(codec) = self.provider.codec_for(provider::APIType::OpenAIResponses) {
+            if let Some(codec) = self.provider.codec_for(provider::ApiType::OpenAIResponses) {
                 let endpoint_path = codec.endpoint_path();
                 let url = self.provider.build_url(endpoint_path, "");
                 let body_json = serde_json::to_value(&req)?;
@@ -91,7 +91,7 @@ impl ResponseClient for Client {
             // before sending when the provider does not support it.
             let codec = self
                 .provider
-                .codec_for(provider::APIType::OpenAIResponses)
+                .codec_for(provider::ApiType::OpenAIResponses)
                 .ok_or_else(|| HiLlmError::EndpointNotSupported {
                     endpoint: "responses".to_string(),
                     provider: self.provider.name().to_string(),

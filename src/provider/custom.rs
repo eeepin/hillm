@@ -1,5 +1,5 @@
 use super::Provider;
-use super::api_type::APIType;
+use super::api_type::ApiType;
 use crate::error::{HiLlmError, HiLlmResult};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -160,7 +160,7 @@ pub(crate) enum ApiTypeFilter {
     /// `detect_custom_provider(name, model)`.
     Any,
     /// Only match providers that declare support for this API type.
-    Exact(APIType),
+    Exact(ApiType),
 }
 
 /// Detects a registered custom provider by explicit name first, then by
@@ -265,20 +265,20 @@ pub struct CustomProviderConfig {
     pub env_vars: HashMap<String, String>,
     /// API types this provider supports. Empty defaults to `[OpenAIChatCompletions]`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub available_api_types: Vec<APIType>,
+    pub available_api_types: Vec<ApiType>,
     /// The default API type to use when creating a provider instance.
     /// Must be one of `available_api_types` if both are set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub default_api_type: Option<APIType>,
+    pub default_api_type: Option<ApiType>,
 }
 
 impl CustomProviderConfig {
     /// Returns the effective available API types, falling back to
     /// `[OpenAIChatCompletions]` if empty.
     #[must_use]
-    pub fn effective_api_types(&self) -> Vec<APIType> {
+    pub fn effective_api_types(&self) -> Vec<ApiType> {
         if self.available_api_types.is_empty() {
-            vec![APIType::OpenAIChatCompletions]
+            vec![ApiType::OpenAIChatCompletions]
         } else {
             self.available_api_types.clone()
         }
@@ -287,7 +287,7 @@ impl CustomProviderConfig {
     /// Returns the effective default API type, falling back to the first
     /// available type.
     #[must_use]
-    pub fn effective_default_api_type(&self) -> APIType {
+    pub fn effective_default_api_type(&self) -> ApiType {
         self.default_api_type
             .unwrap_or_else(|| self.effective_api_types()[0])
     }
@@ -349,7 +349,7 @@ fn validate_config(config: &CustomProviderConfig) -> HiLlmResult<()> {
 pub(crate) struct CustomProvider {
     config: CustomProviderConfig,
     /// The API type this instance is bound to. Fixed at creation time.
-    api_type: APIType,
+    api_type: ApiType,
 }
 
 impl CustomProvider {
@@ -403,18 +403,18 @@ impl Provider for CustomProvider {
             .collect()
     }
 
-    fn available_api_types(&self) -> Vec<APIType> {
+    fn available_api_types(&self) -> Vec<ApiType> {
         self.config.effective_api_types()
     }
 
-    fn api_type(&self) -> APIType {
+    fn api_type(&self) -> ApiType {
         self.api_type
     }
 
     fn codec_for(
         &self,
-        api_type: APIType,
-    ) -> Option<Box<dyn crate::provider::codec::APITypeCodec>> {
+        api_type: ApiType,
+    ) -> Option<Box<dyn crate::provider::codec::ApiTypeCodec>> {
         if !self.config.effective_api_types().contains(&api_type) {
             return None;
         }
@@ -708,15 +708,15 @@ mod tests {
             auth_header: AuthHeaderFormat::Bearer,
             models: vec!["serde-model".into()],
             env_vars: HashMap::new(),
-            available_api_types: vec![APIType::AnthropicMessages],
-            default_api_type: Some(APIType::AnthropicMessages),
+            available_api_types: vec![ApiType::AnthropicMessages],
+            default_api_type: Some(ApiType::AnthropicMessages),
         };
 
         let json = serde_json::to_string(&config).expect("should serialize");
         assert!(json.contains("anthropic_messages"));
         let parsed: CustomProviderConfig = serde_json::from_str(&json).expect("should deserialize");
-        assert_eq!(parsed.available_api_types, vec![APIType::AnthropicMessages]);
-        assert_eq!(parsed.default_api_type, Some(APIType::AnthropicMessages));
+        assert_eq!(parsed.available_api_types, vec![ApiType::AnthropicMessages]);
+        assert_eq!(parsed.default_api_type, Some(ApiType::AnthropicMessages));
     }
 
     #[test]
@@ -729,8 +729,8 @@ mod tests {
             auth_header: AuthHeaderFormat::Bearer,
             models: vec!["model-a".into()],
             env_vars: HashMap::new(),
-            available_api_types: vec![APIType::OpenAIChatCompletions],
-            default_api_type: Some(APIType::AnthropicMessages),
+            available_api_types: vec![ApiType::OpenAIChatCompletions],
+            default_api_type: Some(ApiType::AnthropicMessages),
         };
         let result = register_custom_provider(config);
         assert!(result.is_err(), "should reject default not in available");
@@ -749,7 +749,7 @@ mod tests {
             auth_header: AuthHeaderFormat::Bearer,
             models: vec!["claude-like".into()],
             env_vars: HashMap::new(),
-            available_api_types: vec![APIType::AnthropicMessages],
+            available_api_types: vec![ApiType::AnthropicMessages],
             default_api_type: None,
         };
         register_custom_provider(config).expect("registration should succeed");
@@ -759,7 +759,7 @@ mod tests {
             detect_ok(
                 "anthropic-ish",
                 "",
-                ApiTypeFilter::Exact(APIType::OpenAIChatCompletions)
+                ApiTypeFilter::Exact(ApiType::OpenAIChatCompletions)
             )
             .is_none(),
             "provider without OpenAI Chat support must not match an Exact Chat filter"
@@ -769,13 +769,13 @@ mod tests {
         let provider = detect_ok(
             "anthropic-ish",
             "",
-            ApiTypeFilter::Exact(APIType::AnthropicMessages),
+            ApiTypeFilter::Exact(ApiType::AnthropicMessages),
         )
         .expect("should match supported api type");
-        assert_eq!(provider.api_type(), APIType::AnthropicMessages);
+        assert_eq!(provider.api_type(), ApiType::AnthropicMessages);
         assert_eq!(
             provider.available_api_types(),
-            vec![APIType::AnthropicMessages]
+            vec![ApiType::AnthropicMessages]
         );
     }
 
@@ -789,14 +789,14 @@ mod tests {
             auth_header: AuthHeaderFormat::Bearer,
             models: vec!["mm-1".into()],
             env_vars: HashMap::new(),
-            available_api_types: vec![APIType::OpenAIChatCompletions],
+            available_api_types: vec![ApiType::OpenAIChatCompletions],
             default_api_type: None,
         };
         register_custom_provider(config).expect("registration should succeed");
 
         // Model match alone is not enough when the API type is not supported.
         assert!(
-            detect_ok("", "mm-1", ApiTypeFilter::Exact(APIType::AnthropicMessages)).is_none(),
+            detect_ok("", "mm-1", ApiTypeFilter::Exact(ApiType::AnthropicMessages)).is_none(),
             "model match must not bypass the api type filter"
         );
 
@@ -804,10 +804,10 @@ mod tests {
         let provider = detect_ok(
             "",
             "mm-1",
-            ApiTypeFilter::Exact(APIType::OpenAIChatCompletions),
+            ApiTypeFilter::Exact(ApiType::OpenAIChatCompletions),
         )
         .expect("should match");
-        assert_eq!(provider.api_type(), APIType::OpenAIChatCompletions);
+        assert_eq!(provider.api_type(), ApiType::OpenAIChatCompletions);
     }
 
     #[test]
@@ -855,7 +855,7 @@ mod tests {
             detect_ok(
                 "",
                 "shared-model",
-                ApiTypeFilter::Exact(APIType::AnthropicMessages)
+                ApiTypeFilter::Exact(ApiType::AnthropicMessages)
             )
             .is_none(),
             "no provider supports AnthropicMessages, so nothing may match"
@@ -872,14 +872,14 @@ mod tests {
             auth_header: AuthHeaderFormat::Bearer,
             models: vec!["d-model".into()],
             env_vars: HashMap::new(),
-            available_api_types: vec![APIType::OpenAIResponses, APIType::OpenAIChatCompletions],
-            default_api_type: Some(APIType::OpenAIResponses),
+            available_api_types: vec![ApiType::OpenAIResponses, ApiType::OpenAIChatCompletions],
+            default_api_type: Some(ApiType::OpenAIResponses),
         };
         register_custom_provider(config).expect("registration should succeed");
 
         let provider =
             detect_ok("defaulted", "", ApiTypeFilter::Any).expect("should detect by name");
-        assert_eq!(provider.api_type(), APIType::OpenAIResponses);
+        assert_eq!(provider.api_type(), ApiType::OpenAIResponses);
     }
 
     #[test]
@@ -892,19 +892,19 @@ mod tests {
             auth_header: AuthHeaderFormat::Bearer,
             models: vec!["cc-model".into()],
             env_vars: HashMap::new(),
-            available_api_types: vec![APIType::OpenAIChatCompletions],
+            available_api_types: vec![ApiType::OpenAIChatCompletions],
             default_api_type: None,
         };
         register_custom_provider(config).expect("registration should succeed");
 
         let provider = detect_ok("codec-check", "", ApiTypeFilter::Any).expect("should detect");
         let codec = provider
-            .codec_for(APIType::OpenAIChatCompletions)
+            .codec_for(ApiType::OpenAIChatCompletions)
             .expect("codec for supported api type");
-        assert_eq!(codec.api_type(), APIType::OpenAIChatCompletions);
+        assert_eq!(codec.api_type(), ApiType::OpenAIChatCompletions);
         assert_eq!(codec.endpoint_path(), "/chat/completions");
         assert!(
-            provider.codec_for(APIType::AnthropicMessages).is_none(),
+            provider.codec_for(ApiType::AnthropicMessages).is_none(),
             "codec for unsupported api type must be None"
         );
     }
@@ -1027,8 +1027,8 @@ mod tests {
             auth_header: AuthHeaderFormat::Bearer,
             models: vec!["flex-model".into()],
             env_vars: HashMap::new(),
-            available_api_types: vec![APIType::OpenAIChatCompletions, APIType::OpenAIResponses],
-            default_api_type: Some(APIType::OpenAIResponses),
+            available_api_types: vec![ApiType::OpenAIChatCompletions, ApiType::OpenAIResponses],
+            default_api_type: Some(ApiType::OpenAIResponses),
         };
         registry.register(config).expect("should succeed");
 
@@ -1037,18 +1037,18 @@ mod tests {
             .detect("", "flex-model", ApiTypeFilter::Any)
             .unwrap()
             .expect("should match");
-        assert_eq!(provider.api_type(), APIType::OpenAIResponses);
+        assert_eq!(provider.api_type(), ApiType::OpenAIResponses);
 
         // Exact filter for supported type.
         let provider = registry
             .detect(
                 "",
                 "flex-model",
-                ApiTypeFilter::Exact(APIType::OpenAIChatCompletions),
+                ApiTypeFilter::Exact(ApiType::OpenAIChatCompletions),
             )
             .unwrap()
             .expect("should match");
-        assert_eq!(provider.api_type(), APIType::OpenAIChatCompletions);
+        assert_eq!(provider.api_type(), ApiType::OpenAIChatCompletions);
 
         // Exact filter for unsupported type.
         assert!(
@@ -1056,7 +1056,7 @@ mod tests {
                 .detect(
                     "",
                     "flex-model",
-                    ApiTypeFilter::Exact(APIType::AnthropicMessages)
+                    ApiTypeFilter::Exact(ApiType::AnthropicMessages)
                 )
                 .unwrap()
                 .is_none()

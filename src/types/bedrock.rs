@@ -1,6 +1,6 @@
 //! AWS Bedrock Converse API native types.
 
-use crate::types::{APIRequest, APIResponse};
+use crate::types::{ApiRequest, ApiResponse};
 use serde::{Deserialize, Serialize};
 
 // ============ Request Types ============
@@ -233,7 +233,7 @@ pub struct BedrockToolUseDelta {
 
 // ============ Trait Implementations ============
 
-impl APIRequest for BedrockConverseRequest {
+impl ApiRequest for BedrockConverseRequest {
     type Response = BedrockConverseResponse;
     type StreamEvent = BedrockStreamEvent;
 
@@ -246,4 +246,4 @@ impl APIRequest for BedrockConverseRequest {
     }
 }
 
-impl APIResponse for BedrockConverseResponse {}
+impl ApiResponse for BedrockConverseResponse {}

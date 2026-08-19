@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use crate::error::HiLlmError;
 use crate::error::HiLlmResult;
 use crate::provider::bedrock::codec::BedrockConverseCodec;
-use crate::provider::{APIType, Provider, StreamFormat, codec::APITypeCodec, registry_get};
+use crate::provider::{ApiType, Provider, StreamFormat, codec::ApiTypeCodec, registry_get};
 use crate::types::ChatCompletionChunk;
 
 pub mod codec;
@@ -142,17 +142,17 @@ impl Provider for BedrockProvider {
         Ok(())
     }
 
-    fn available_api_types(&self) -> Vec<APIType> {
-        vec![APIType::BedrockConverse]
+    fn available_api_types(&self) -> Vec<ApiType> {
+        vec![ApiType::BedrockConverse]
     }
 
-    fn api_type(&self) -> APIType {
-        APIType::BedrockConverse
+    fn api_type(&self) -> ApiType {
+        ApiType::BedrockConverse
     }
 
-    fn codec_for(&self, api_type: APIType) -> Option<Box<dyn APITypeCodec>> {
+    fn codec_for(&self, api_type: ApiType) -> Option<Box<dyn ApiTypeCodec>> {
         match api_type {
-            APIType::BedrockConverse => Some(Box::new(BedrockConverseCodec)),
+            ApiType::BedrockConverse => Some(Box::new(BedrockConverseCodec)),
             _ => None,
         }
     }

@@ -1,6 +1,6 @@
 //! Anthropic Messages API native types.
 
-use crate::types::{APIRequest, APIResponse};
+use crate::types::{ApiRequest, ApiResponse};
 use serde::{Deserialize, Serialize};
 
 // ============ Request Types ============
@@ -298,7 +298,7 @@ pub struct AnthropicStreamError {
 
 // ============ Trait Implementations ============
 
-impl APIRequest for AnthropicMessagesRequest {
+impl ApiRequest for AnthropicMessagesRequest {
     type Response = AnthropicMessagesResponse;
     type StreamEvent = AnthropicStreamEvent;
 
@@ -311,4 +311,4 @@ impl APIRequest for AnthropicMessagesRequest {
     }
 }
 
-impl APIResponse for AnthropicMessagesResponse {}
+impl ApiResponse for AnthropicMessagesResponse {}

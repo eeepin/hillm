@@ -3,20 +3,20 @@
 use bytes::Bytes;
 
 use crate::error::HiLlmResult;
-use crate::provider::APIType;
+use crate::provider::ApiType;
 
 /// Codec trait for protocol-specific request/response encoding and decoding.
 ///
-/// Each APIType has its own codec implementation that handles:
+/// Each ApiType has its own codec implementation that handles:
 /// - Request serialization
 /// - Response deserialization
 /// - Stream event parsing
 /// - Endpoint path construction
 /// - URL building (including stream URLs)
 /// - Signing headers (for providers like AWS Bedrock)
-pub trait APITypeCodec: Send + Sync {
+pub trait ApiTypeCodec: Send + Sync {
     /// Returns the API type this codec implements.
-    fn api_type(&self) -> APIType;
+    fn api_type(&self) -> ApiType;
 
     /// Returns the endpoint path for this API type (e.g., "/chat/completions").
     fn endpoint_path(&self) -> &str;

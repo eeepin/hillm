@@ -5,7 +5,7 @@ use std::time::Duration;
 use serde::Deserialize;
 
 use crate::error::{HiLlmError, HiLlmResult};
-use crate::provider::APIType;
+use crate::provider::ApiType;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -62,10 +62,10 @@ pub struct FileProviderConfig {
     pub auth_header: Option<String>,
     /// API types this provider supports. If empty, defaults to OpenAI Chat Completions.
     #[serde(default)]
-    pub available_api_types: Vec<APIType>,
+    pub available_api_types: Vec<ApiType>,
     /// The default API type to use. Must be one of `available_api_types` if set.
     #[serde(default)]
-    pub default_api_type: Option<APIType>,
+    pub default_api_type: Option<ApiType>,
 }
 
 impl FileProviderConfig {
@@ -73,7 +73,7 @@ impl FileProviderConfig {
     pub fn validate_api_types(&self) -> HiLlmResult<()> {
         if let Some(default) = self.default_api_type {
             let available = if self.available_api_types.is_empty() {
-                vec![APIType::OpenAIChatCompletions]
+                vec![ApiType::OpenAIChatCompletions]
             } else {
                 self.available_api_types.clone()
             };
@@ -316,11 +316,11 @@ default_api_type = "anthropic_messages"
         assert_eq!(config.providers().len(), 1);
         assert_eq!(
             config.providers()[0].available_api_types,
-            vec![APIType::AnthropicMessages]
+            vec![ApiType::AnthropicMessages]
         );
         assert_eq!(
             config.providers()[0].default_api_type,
-            Some(APIType::AnthropicMessages)
+            Some(ApiType::AnthropicMessages)
         );
     }
 

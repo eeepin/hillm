@@ -8,9 +8,9 @@ use crate::error::HiLlmResult;
 ///
 /// This trait defines the common interface for all request types across
 /// different API protocols (OpenAI Chat, OpenAI Responses, Anthropic Messages, etc.).
-pub trait APIRequest: Serialize + Send + Sync {
+pub trait ApiRequest: Serialize + Send + Sync {
     /// The response type this request expects.
-    type Response: APIResponse;
+    type Response: ApiResponse;
 
     /// The stream event type for streaming responses.
     type StreamEvent: Send + Sync;
@@ -30,7 +30,7 @@ pub trait APIRequest: Serialize + Send + Sync {
 ///
 /// This trait defines the common interface for all response types across
 /// different API protocols.
-pub trait APIResponse: DeserializeOwned + Send + Sync {
+pub trait ApiResponse: DeserializeOwned + Send + Sync {
     /// Validates the response after deserialization.
     ///
     /// This can be used to check for provider-specific error conditions

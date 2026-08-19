@@ -34,7 +34,7 @@ hillm 已经具备比较完整的 LLM 基础设施能力：多 provider、流式
 本文中的“API 路由”表示请求和响应所使用的上游协议，不表示负载均衡或 Tower Router 的流量选择策略。建议使用独立类型，避免与现有 `tower::router` 混淆：
 
 ```rust
-enum APIType {
+enum ApiType {
     OpenAIChatCompletions,
     OpenAIResponses,
     AnthropicMessages,
@@ -58,8 +58,8 @@ provider 配置描述可用能力：
 ```rust
 ProviderConfig {
     // 现有字段……
-    available_api_types: Vec<APIType>,
-    default_api_type: Option<APIType>,
+    available_api_types: Vec<ApiType>,
+    default_api_type: Option<ApiType>,
 }
 ```
 
@@ -68,7 +68,7 @@ ProviderConfig {
 ```rust
 ProviderInstance {
     config: Arc<ProviderConfig>,
-    api_type: APIType,
+    api_type: ApiType,
 }
 ```
 
@@ -87,7 +87,7 @@ ProviderInstance {
 1. 如果调用方显式指定 provider，先按 provider 名称查找。
 2. 如果未指定 provider，再按 model 的精确规则或明确的前缀规则匹配。
 3. 使用 `api_type` 过滤不支持该协议的 provider。
-4. 没有匹配时返回 `ProviderNotFound` 或 `APITypeUnsupported`。
+4. 没有匹配时返回 `ProviderNotFound` 或 `ApiTypeUnsupported`。
 5. 多个 provider 同时匹配时返回歧义错误；不要依赖注册顺序，也不要静默回退到 OpenAI。
 
 模型规则需要明确区分精确值和前缀，避免当前 `models: Vec<String>` 同时被测试理解为“前缀”、被实现理解为“精确名称”的问题。最小配置可以使用：
@@ -185,7 +185,7 @@ enum ModelMatch {
 
 ### 1. 先增加纯配置模型，不改变网络行为
 
-- [x] 新增 `APIType`，包含且仅包含 `OpenAIChatCompletions`、`OpenAIResponses`、`AnthropicMessages`。
+- [x] 新增 `ApiType`，包含且仅包含 `OpenAIChatCompletions`、`OpenAIResponses`、`AnthropicMessages`。
 - [x] 为静态、远端数据驱动和 custom provider 配置增加 `available_api_types` 与 `default_api_type`。
 - [x] 为文件配置增加相同字段，并对未知值、空列表和非法 default 做严格校验。
 - [x] 给内置 provider 设置明确能力：OpenAI 至少支持 Chat 和 Responses；Anthropic 支持 Messages；其他 provider 依据真实端点配置，不进行乐观推断。
@@ -199,13 +199,13 @@ enum ModelMatch {
 - [x] custom provider 检测同时校验 provider/model match 和 api type 支持。
 - [x] `base_url` 不再无条件创建 `OpenAICompatibleProvider`；使用自定义 base URL 时必须给出 api type，或使用明确的兼容默认值并标为待弃用。
 - [x] provider 实例暴露只读 `api_type()`，实例创建后不得改变。
-- [x] 增加 `APITypeUnsupported`、`AmbiguousProvider` 等结构化错误，避免统一返回 `BadRequest(String)`。
+- [x] 增加 `ApiTypeUnsupported`、`AmbiguousProvider` 等结构化错误，避免统一返回 `BadRequest(String)`。
 
 完成标准：每个 provider 实例的 api type 唯一、可观察且已验证；不再静默回退到 OpenAI。
 
 ### 3. 将 endpoint 和 codec 绑定到 api type
 
-- [x] 为每种 `APIType` 提供 api-type-specific codec：请求编码、非流响应解码、SSE 事件解码和结束条件。
+- [x] 为每种 `ApiType` 提供 api-type-specific codec：请求编码、非流响应解码、SSE 事件解码和结束条件。
 - [x] `OpenAIChatCompletions` 使用 `/chat/completions` 与 Chat Completion 原生类型。
 - [x] `OpenAIResponses` 使用 `/responses` 与 Responses 原生类型；补齐其流式 API，而不是先转换成 chat chunk。
 - [x] `AnthropicMessages` 使用 `/messages` 与 Anthropic 原生类型；新增原生 request、response、usage、content block 和 stream event 类型。
@@ -214,39 +214,39 @@ enum ModelMatch {
 
 完成标准：三条路由分别能执行非流请求；三类类型不会被强制归一成 OpenAI Chat 后再发送。
 
-#### 技术债务：APITypeCodec trait 的类型安全重构
+#### 技术债务：ApiTypeCodec trait 的类型安全重构
 
-**当前问题**：`APITypeCodec` trait 当前使用 `serde_json::Value` 作为请求/响应类型，而非关联类型 `Self::Request` / `Self::Response`。这是因为使用关联类型会导致 `Box<dyn APITypeCodec>` 无法满足对象安全（object safety）要求，编译器无法推断关联类型。
+**当前问题**：`ApiTypeCodec` trait 当前使用 `serde_json::Value` 作为请求/响应类型，而非关联类型 `Self::Request` / `Self::Response`。这是因为使用关联类型会导致 `Box<dyn ApiTypeCodec>` 无法满足对象安全（object safety）要求，编译器无法推断关联类型。
 
 **临时方案**：使用 `serde_json::Value` 作为通用类型，牺牲编译时类型安全以支持动态分发。
 
 **推荐重构方案**（后续实施）：使用 Enum 包装保持类型安全和动态分发：
 
 ```rust
-pub enum APIRequest {
+pub enum ApiRequest {
     ChatCompletion(ChatCompletionRequest),
     AnthropicMessages(AnthropicMessagesRequest),
     BedrockConverse(BedrockConverseRequest),
 }
 
-pub enum APIResponse {
+pub enum ApiResponse {
     ChatCompletion(ChatCompletionResponse),
     AnthropicMessages(AnthropicMessagesResponse),
     BedrockConverse(BedrockConverseResponse),
 }
 
-pub trait APITypeCodec: Send + Sync {
-    fn api_type(&self) -> APIType;
-    fn encode_request(&self, request: &APIRequest) -> HiLlmResult<Bytes>;
-    fn decode_response(&self, bytes: &[u8]) -> HiLlmResult<APIResponse>;
-    fn parse_stream_event(&self, data: &str) -> HiLlmResult<Option<APIStreamEvent>>;
+pub trait ApiTypeCodec: Send + Sync {
+    fn api_type(&self) -> ApiType;
+    fn encode_request(&self, request: &ApiRequest) -> HiLlmResult<Bytes>;
+    fn decode_response(&self, bytes: &[u8]) -> HiLlmResult<ApiResponse>;
+    fn parse_stream_event(&self, data: &str) -> HiLlmResult<Option<ApiStreamEvent>>;
 }
 ```
 
 **优势**：
 
 - 保持编译时类型检查
-- 支持动态分发（`Box<dyn APITypeCodec>`）
+- 支持动态分发（`Box<dyn ApiTypeCodec>`）
 - 明确的类型边界，符合 Rust 哲学
 - 与 TODO.md 中"三种路由分别拥有原生类型"的目标一致
 
@@ -269,7 +269,7 @@ pub trait APITypeCodec: Send + Sync {
 
 1. **基线修复**：修复现有 9 个测试、token 下溢、env 扫描和 Clippy。
 2. **SSE decoder**：只替换传输层状态机并补分片测试，不同时改 provider API。
-3. **路由配置模型**：加入 `APIType`、`available_api_types`、`default_api_type` 和校验，但暂不改变发送路径。
+3. **路由配置模型**：加入 `ApiType`、`available_api_types`、`default_api_type` 和校验，但暂不改变发送路径。
 4. **provider 实例选择**：工厂创建时选择 api type，修复 provider/model 匹配和 silent fallback。
 5. **OpenAI Chat codec**：先把现有行为迁入第一个 api_type_specific codec，保持兼容。
 6. **OpenAI Responses codec**：接入现有 ResponseClient，补原生 streaming。
@@ -312,7 +312,7 @@ pub trait APITypeCodec: Send + Sync {
 - [x] 添加 README、LICENSE、CHANGELOG、examples、CI、贡献指南和安全策略。（README.md、LICENSE-MIT、CHANGELOG.md、examples/{chat,chat_stream,anthropic_messages}.rs、.github/workflows/ci.yml）
 - [x] 补齐 Cargo package metadata：description、license、repository、documentation、keywords、categories、rust-version。
 - [ ] 为 feature、provider api type、SSE 限制、兼容 adapter 和安全默认值提供公开文档。
-- [ ] 在 0.2 发布前明确 Provider、APIType、错误类型和配置文件的稳定契约。
+- [ ] 在 0.2 发布前明确 Provider、ApiType、错误类型和配置文件的稳定契约。
 
 ## 暂不纳入最小方案
 

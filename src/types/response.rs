@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::types::{APIRequest, APIResponse};
+use crate::types::{ApiRequest, ApiResponse};
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -142,7 +142,7 @@ pub enum ResponsesStreamEvent {
     Unknown,
 }
 
-impl APIRequest for CreateResponseRequest {
+impl ApiRequest for CreateResponseRequest {
     type Response = ResponseObject;
     type StreamEvent = ResponsesStreamEvent;
 
@@ -155,7 +155,7 @@ impl APIRequest for CreateResponseRequest {
     }
 }
 
-impl APIResponse for ResponseObject {}
+impl ApiResponse for ResponseObject {}
 
 #[cfg(test)]
 mod tests {

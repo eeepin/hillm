@@ -89,7 +89,7 @@ pub enum HiLlmError {
     IdempotencyInFlight { key: String },
 
     #[error("provider '{provider}' does not support API type '{api_type}'")]
-    APITypeUnsupported { api_type: String, provider: String },
+    ApiTypeUnsupported { api_type: String, provider: String },
 
     #[error("ambiguous provider for model '{model}': multiple providers match: {candidates:?}")]
     AmbiguousProvider {
@@ -126,7 +126,7 @@ impl HiLlmError {
             Self::OutboundForbidden { .. } => 0,
             Self::IdempotencyConflict { .. } => 409,
             Self::IdempotencyInFlight { .. } => 409,
-            Self::APITypeUnsupported { .. } => 400,
+            Self::ApiTypeUnsupported { .. } => 400,
             Self::AmbiguousProvider { .. } => 400,
             Self::ProviderNotFound { .. } => 404,
         }
@@ -181,7 +181,7 @@ impl HiLlmError {
             Self::OutboundForbidden { .. } => "OutboundForbidden",
             Self::IdempotencyConflict { .. } => "IdempotencyConflict",
             Self::IdempotencyInFlight { .. } => "IdempotencyInFlight",
-            Self::APITypeUnsupported { .. } => "APITypeUnsupported",
+            Self::ApiTypeUnsupported { .. } => "ApiTypeUnsupported",
             Self::AmbiguousProvider { .. } => "AmbiguousProvider",
             Self::ProviderNotFound { .. } => "ProviderNotFound",
         }
@@ -258,7 +258,7 @@ impl HiLlmError {
             },
             Self::IdempotencyConflict { key } => Self::IdempotencyConflict { key: key.clone() },
             Self::IdempotencyInFlight { key } => Self::IdempotencyInFlight { key: key.clone() },
-            Self::APITypeUnsupported { api_type, provider } => Self::APITypeUnsupported {
+            Self::ApiTypeUnsupported { api_type, provider } => Self::ApiTypeUnsupported {
                 api_type: api_type.clone(),
                 provider: provider.clone(),
             },

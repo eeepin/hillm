@@ -3,11 +3,11 @@
 //!
 //! This module is the *explicit* compatibility layer required by the API-type
 //! routing design: the Anthropic provider's native protocol is
-//! [`APIType::AnthropicMessages`]. Callers that still want to use the OpenAI
+//! [`ApiType::AnthropicMessages`]. Callers that still want to use the OpenAI
 //! Chat Completions shapes ([`ChatCompletionClient::chat`](crate::client::ChatCompletionClient))
 //! against Anthropic must opt in by creating a provider instance through
 //! [`AnthropicChatCompatProvider`] (e.g. by explicitly selecting
-//! [`APIType::OpenAIChatCompletions`] for the `anthropic` provider). The
+//! [`ApiType::OpenAIChatCompletions`] for the `anthropic` provider). The
 //! adapter is never applied implicitly by [`AnthropicProvider`].
 //!
 //! # Information loss
@@ -49,9 +49,9 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 use crate::error::HiLlmResult;
-use crate::provider::APIType;
+use crate::provider::ApiType;
 use crate::provider::anthropic::AnthropicProvider;
-use crate::provider::codec::APITypeCodec;
+use crate::provider::codec::ApiTypeCodec;
 use compat_convert::*;
 
 pub(crate) const DEFAULT_MAX_TOKENS: u64 = 4096;
@@ -70,11 +70,11 @@ pub(crate) const HOSTED_TOOL_TYPES: &[&str] = &[
 /// module docs for what is lost in each direction.
 pub(crate) struct AnthropicChatCompatCodec;
 
-impl APITypeCodec for AnthropicChatCompatCodec {
-    fn api_type(&self) -> APIType {
+impl ApiTypeCodec for AnthropicChatCompatCodec {
+    fn api_type(&self) -> ApiType {
         // The adapter exists so callers can keep using the Chat Completions
         // shapes; the codec therefore reports the Chat protocol.
-        APIType::OpenAIChatCompletions
+        ApiType::OpenAIChatCompletions
     }
 
     fn endpoint_path(&self) -> &str {
@@ -106,9 +106,9 @@ impl APITypeCodec for AnthropicChatCompatCodec {
 /// explicit compatibility adapter.
 ///
 /// Create one through
-/// [`create_provider("anthropic", APIType::OpenAIChatCompletions)`](crate::provider::create_provider).
+/// [`create_provider("anthropic", ApiType::OpenAIChatCompletions)`](crate::provider::create_provider).
 /// For the native Messages protocol, use a separate instance created with
-/// [`APIType::AnthropicMessages`].
+/// [`ApiType::AnthropicMessages`].
 pub(crate) struct AnthropicChatCompatProvider {
     inner: AnthropicProvider,
 }
@@ -154,20 +154,20 @@ impl crate::provider::Provider for AnthropicChatCompatProvider {
         self.inner.env_vars()
     }
 
-    fn available_api_types(&self) -> Vec<APIType> {
+    fn available_api_types(&self) -> Vec<ApiType> {
         // This instance speaks Chat Completions (translated to the Anthropic
         // wire protocol). Use a native Messages instance for
         // AnthropicMessages.
-        vec![APIType::OpenAIChatCompletions]
+        vec![ApiType::OpenAIChatCompletions]
     }
 
-    fn api_type(&self) -> APIType {
-        APIType::OpenAIChatCompletions
+    fn api_type(&self) -> ApiType {
+        ApiType::OpenAIChatCompletions
     }
 
-    fn codec_for(&self, api_type: APIType) -> Option<Box<dyn APITypeCodec>> {
+    fn codec_for(&self, api_type: ApiType) -> Option<Box<dyn ApiTypeCodec>> {
         match api_type {
-            APIType::OpenAIChatCompletions => Some(Box::new(AnthropicChatCompatCodec)),
+            ApiType::OpenAIChatCompletions => Some(Box::new(AnthropicChatCompatCodec)),
             _ => None,
         }
     }
@@ -191,7 +191,7 @@ mod tests {
     #[test]
     fn codec_reports_chat_api_type_and_messages_endpoint() {
         let codec = AnthropicChatCompatCodec;
-        assert_eq!(codec.api_type(), APIType::OpenAIChatCompletions);
+        assert_eq!(codec.api_type(), ApiType::OpenAIChatCompletions);
         assert_eq!(codec.endpoint_path(), "/messages");
     }
 
@@ -488,13 +488,13 @@ mod tests {
 
         let provider = AnthropicChatCompatProvider::new();
         assert_eq!(provider.name(), "anthropic");
-        assert_eq!(provider.api_type(), APIType::OpenAIChatCompletions);
+        assert_eq!(provider.api_type(), ApiType::OpenAIChatCompletions);
         assert_eq!(
             provider.available_api_types(),
-            vec![APIType::OpenAIChatCompletions]
+            vec![ApiType::OpenAIChatCompletions]
         );
-        assert!(provider.codec_for(APIType::OpenAIChatCompletions).is_some());
-        assert!(provider.codec_for(APIType::AnthropicMessages).is_none());
+        assert!(provider.codec_for(ApiType::OpenAIChatCompletions).is_some());
+        assert!(provider.codec_for(ApiType::AnthropicMessages).is_none());
         // The base URL honors ANTHROPIC_BASE_URL when set.
         let expected_base = std::env::var("ANTHROPIC_BASE_URL")
             .ok()

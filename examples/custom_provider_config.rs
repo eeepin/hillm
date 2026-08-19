@@ -7,7 +7,7 @@
 
 // This example requires HTTP transport features
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
-use hillm::{AuthHeaderFormat, ClientBuilder, CustomProviderConfig, provider::APIType};
+use hillm::{AuthHeaderFormat, ClientBuilder, CustomProviderConfig, provider::ApiType};
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 #[tokio::main]
@@ -16,7 +16,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // let client = ClientBuilder::new()
     //     .api_key("sk-...")
     //     .base_url("https://api.example.com/v1")
-    //     .api_type(APIType::OpenAIChatCompletions)
+    //     .api_type(ApiType::OpenAIChatCompletions)
     //     .build()?;
 
     // New approach: use CustomProviderConfig directly
@@ -28,8 +28,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         env_vars: [("api_key".to_string(), "MY_PROVIDER_API_KEY".to_string())]
             .into_iter()
             .collect(),
-        available_api_types: vec![APIType::OpenAIChatCompletions],
-        default_api_type: Some(APIType::OpenAIChatCompletions),
+        available_api_types: vec![ApiType::OpenAIChatCompletions],
+        default_api_type: Some(ApiType::OpenAIChatCompletions),
     };
 
     let _client = ClientBuilder::new()

@@ -11,7 +11,7 @@
 
 use hillm::{
     client::AnthropicMessagesClient,
-    provider::APIType,
+    provider::ApiType,
     types::anthropic::{
         AnthropicContentBlock, AnthropicMessage, AnthropicMessagesRequest,
         AnthropicResponseContentBlock, AnthropicRole,
@@ -26,7 +26,7 @@ async fn main() {
     let client = hillm::ClientBuilder::new()
         .api_key(api_key)
         .provider("anthropic")
-        .api_type(APIType::AnthropicMessages)
+        .api_type(ApiType::AnthropicMessages)
         .build()
         .expect("client should build");
 

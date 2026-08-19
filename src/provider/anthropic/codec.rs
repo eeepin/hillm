@@ -1,17 +1,17 @@
 //! Anthropic Messages API codec implementation.
 
 use crate::error::{HiLlmError, HiLlmResult};
-use crate::provider::APIType;
-use crate::provider::codec::APITypeCodec;
+use crate::provider::ApiType;
+use crate::provider::codec::ApiTypeCodec;
 use bytes::Bytes;
 
 /// Codec for Anthropic Messages API.
 #[allow(dead_code)]
 pub struct AnthropicMessagesCodec;
 
-impl APITypeCodec for AnthropicMessagesCodec {
-    fn api_type(&self) -> APIType {
-        APIType::AnthropicMessages
+impl ApiTypeCodec for AnthropicMessagesCodec {
+    fn api_type(&self) -> ApiType {
+        ApiType::AnthropicMessages
     }
 
     fn endpoint_path(&self) -> &str {

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 /// Providers declare which API types they support, and clients select the appropriate
 /// API type when making requests.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum APIType {
+pub enum ApiType {
     /// OpenAI Chat Completions API (`/chat/completions`)
     #[serde(rename = "openai_chat_completions")]
     OpenAIChatCompletions,
@@ -26,7 +26,7 @@ pub enum APIType {
     BedrockConverse,
 }
 
-impl APIType {
+impl ApiType {
     /// Returns the default endpoint path for this API type.
     pub fn default_endpoint_path(&self) -> &'static str {
         match self {
@@ -48,7 +48,7 @@ impl APIType {
     }
 }
 
-impl std::fmt::Display for APIType {
+impl std::fmt::Display for ApiType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.display_name())
     }
@@ -61,19 +61,19 @@ mod tests {
     #[test]
     fn api_type_serialization() {
         assert_eq!(
-            serde_json::to_string(&APIType::OpenAIChatCompletions).unwrap(),
+            serde_json::to_string(&ApiType::OpenAIChatCompletions).unwrap(),
             "\"openai_chat_completions\""
         );
         assert_eq!(
-            serde_json::to_string(&APIType::OpenAIResponses).unwrap(),
+            serde_json::to_string(&ApiType::OpenAIResponses).unwrap(),
             "\"openai_responses\""
         );
         assert_eq!(
-            serde_json::to_string(&APIType::AnthropicMessages).unwrap(),
+            serde_json::to_string(&ApiType::AnthropicMessages).unwrap(),
             "\"anthropic_messages\""
         );
         assert_eq!(
-            serde_json::to_string(&APIType::BedrockConverse).unwrap(),
+            serde_json::to_string(&ApiType::BedrockConverse).unwrap(),
             "\"bedrock_converse\""
         );
     }
@@ -81,39 +81,39 @@ mod tests {
     #[test]
     fn api_type_deserialization() {
         assert_eq!(
-            serde_json::from_str::<APIType>("\"openai_chat_completions\"").unwrap(),
-            APIType::OpenAIChatCompletions
+            serde_json::from_str::<ApiType>("\"openai_chat_completions\"").unwrap(),
+            ApiType::OpenAIChatCompletions
         );
         assert_eq!(
-            serde_json::from_str::<APIType>("\"openai_responses\"").unwrap(),
-            APIType::OpenAIResponses
+            serde_json::from_str::<ApiType>("\"openai_responses\"").unwrap(),
+            ApiType::OpenAIResponses
         );
         assert_eq!(
-            serde_json::from_str::<APIType>("\"anthropic_messages\"").unwrap(),
-            APIType::AnthropicMessages
+            serde_json::from_str::<ApiType>("\"anthropic_messages\"").unwrap(),
+            ApiType::AnthropicMessages
         );
         assert_eq!(
-            serde_json::from_str::<APIType>("\"bedrock_converse\"").unwrap(),
-            APIType::BedrockConverse
+            serde_json::from_str::<ApiType>("\"bedrock_converse\"").unwrap(),
+            ApiType::BedrockConverse
         );
     }
 
     #[test]
     fn api_type_default_endpoints() {
         assert_eq!(
-            APIType::OpenAIChatCompletions.default_endpoint_path(),
+            ApiType::OpenAIChatCompletions.default_endpoint_path(),
             "/chat/completions"
         );
         assert_eq!(
-            APIType::OpenAIResponses.default_endpoint_path(),
+            ApiType::OpenAIResponses.default_endpoint_path(),
             "/responses"
         );
         assert_eq!(
-            APIType::AnthropicMessages.default_endpoint_path(),
+            ApiType::AnthropicMessages.default_endpoint_path(),
             "/messages"
         );
         assert_eq!(
-            APIType::BedrockConverse.default_endpoint_path(),
+            ApiType::BedrockConverse.default_endpoint_path(),
             "/converse"
         );
     }
@@ -121,11 +121,11 @@ mod tests {
     #[test]
     fn api_type_display() {
         assert_eq!(
-            APIType::OpenAIChatCompletions.to_string(),
+            ApiType::OpenAIChatCompletions.to_string(),
             "OpenAI Chat Completions"
         );
-        assert_eq!(APIType::OpenAIResponses.to_string(), "OpenAI Responses");
-        assert_eq!(APIType::AnthropicMessages.to_string(), "Anthropic Messages");
-        assert_eq!(APIType::BedrockConverse.to_string(), "AWS Bedrock Converse");
+        assert_eq!(ApiType::OpenAIResponses.to_string(), "OpenAI Responses");
+        assert_eq!(ApiType::AnthropicMessages.to_string(), "Anthropic Messages");
+        assert_eq!(ApiType::BedrockConverse.to_string(), "AWS Bedrock Converse");
     }
 }

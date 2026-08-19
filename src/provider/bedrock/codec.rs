@@ -1,17 +1,17 @@
 //! AWS Bedrock Converse API codec implementation.
 
 use crate::error::{HiLlmError, HiLlmResult};
-use crate::provider::APIType;
-use crate::provider::codec::APITypeCodec;
+use crate::provider::ApiType;
+use crate::provider::codec::ApiTypeCodec;
 use bytes::Bytes;
 
 /// Codec for AWS Bedrock Converse API.
 #[allow(dead_code)]
 pub struct BedrockConverseCodec;
 
-impl APITypeCodec for BedrockConverseCodec {
-    fn api_type(&self) -> APIType {
-        APIType::BedrockConverse
+impl ApiTypeCodec for BedrockConverseCodec {
+    fn api_type(&self) -> ApiType {
+        ApiType::BedrockConverse
     }
 
     fn endpoint_path(&self) -> &str {

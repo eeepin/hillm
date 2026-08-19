@@ -15,7 +15,7 @@ use futures_util::StreamExt;
 use hillm::client::{
     AnthropicMessagesClient, ChatCompletionClient, Client, ClientConfigBuilder, ResponseClient,
 };
-use hillm::provider::APIType;
+use hillm::provider::ApiType;
 use hillm::types::ChatCompletionRequest;
 use hillm::types::anthropic::{
     AnthropicContentBlock, AnthropicMessage, AnthropicMessagesRequest, AnthropicRole,
@@ -418,7 +418,7 @@ async fn openai_chat_route_url_headers_and_body() {
     let server = MockServer::start().await;
     let config = ClientConfigBuilder::new("sk-test-key")
         .base_url(server.url())
-        .api_type(APIType::OpenAIChatCompletions)
+        .api_type(ApiType::OpenAIChatCompletions)
         .build();
     let client = Client::new(config, None).expect("client builds");
 
@@ -455,7 +455,7 @@ async fn openai_chat_stream_survives_arbitrary_chunk_split() {
     let server = MockServer::start().await;
     let config = ClientConfigBuilder::new("sk-test-key")
         .base_url(server.url())
-        .api_type(APIType::OpenAIChatCompletions)
+        .api_type(ApiType::OpenAIChatCompletions)
         .build();
     let client = Client::new(config, None).expect("client builds");
 
@@ -493,7 +493,7 @@ async fn openai_responses_route_url_headers_and_native_body() {
     let server = MockServer::start().await;
     let config = ClientConfigBuilder::new("sk-test-key")
         .base_url(server.url())
-        .api_type(APIType::OpenAIResponses)
+        .api_type(ApiType::OpenAIResponses)
         .build();
     let client = Client::new(config, None).expect("client builds");
 
@@ -531,7 +531,7 @@ async fn openai_responses_stream_emits_native_events() {
     let server = MockServer::start().await;
     let config = ClientConfigBuilder::new("sk-test-key")
         .base_url(server.url())
-        .api_type(APIType::OpenAIResponses)
+        .api_type(ApiType::OpenAIResponses)
         .build();
     let client = Client::new(config, None).expect("client builds");
 
@@ -578,7 +578,7 @@ async fn anthropic_messages_route_url_headers_and_native_body() {
     let server = MockServer::start().await;
     let config = ClientConfigBuilder::new("sk-test-key")
         .base_url(server.url())
-        .api_type(APIType::AnthropicMessages)
+        .api_type(ApiType::AnthropicMessages)
         .build();
     let client = Client::new(config, Some("anthropic".to_string())).expect("client builds");
 
@@ -619,7 +619,7 @@ async fn anthropic_messages_stream_emits_native_events() {
     let server = MockServer::start().await;
     let config = ClientConfigBuilder::new("sk-test-key")
         .base_url(server.url())
-        .api_type(APIType::AnthropicMessages)
+        .api_type(ApiType::AnthropicMessages)
         .build();
     let client = Client::new(config, Some("anthropic".to_string())).expect("client builds");
 
@@ -672,15 +672,15 @@ async fn unsupported_api_type_fails_before_sending() {
     // Named provider + unsupported API type: must fail at build time with a
     // structured error — no request may be sent.
     let config = ClientConfigBuilder::new("sk-test-key")
-        .api_type(APIType::AnthropicMessages)
+        .api_type(ApiType::AnthropicMessages)
         .build();
     let err = match Client::new(config, Some("openai".to_string())) {
         Err(err) => err,
-        Ok(_) => panic!("expected APITypeUnsupported"),
+        Ok(_) => panic!("expected ApiTypeUnsupported"),
     };
     assert!(
-        matches!(err, HiLlmError::APITypeUnsupported { .. }),
-        "expected APITypeUnsupported, got: {err}"
+        matches!(err, HiLlmError::ApiTypeUnsupported { .. }),
+        "expected ApiTypeUnsupported, got: {err}"
     );
 }
 
@@ -690,7 +690,7 @@ async fn streaming_other_routes_fails_before_sending_on_chat_instance() {
     // An instance bound to OpenAI Chat Completions.
     let config = ClientConfigBuilder::new("sk-test-key")
         .base_url(server.url())
-        .api_type(APIType::OpenAIChatCompletions)
+        .api_type(ApiType::OpenAIChatCompletions)
         .build();
     let client = Client::new(config, None).expect("client builds");
 
@@ -743,7 +743,7 @@ async fn chat_on_anthropic_uses_explicit_compat_adapter() {
     }
 
     let config = ClientConfigBuilder::new("sk-ant-test")
-        .api_type(APIType::OpenAIChatCompletions)
+        .api_type(ApiType::OpenAIChatCompletions)
         .build();
     let client =
         Client::new(config, Some("anthropic".to_string())).expect("compat adapter instance builds");

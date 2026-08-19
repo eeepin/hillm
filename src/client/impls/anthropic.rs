@@ -19,7 +19,7 @@ impl AnthropicMessagesClient for Client {
             // Anthropic Messages API type; fail before sending otherwise.
             let codec = self
                 .provider
-                .codec_for(provider::APIType::AnthropicMessages)
+                .codec_for(provider::ApiType::AnthropicMessages)
                 .ok_or_else(|| HiLlmError::EndpointNotSupported {
                     endpoint: "messages".to_string(),
                     provider: self.provider.name().to_string(),
@@ -74,7 +74,7 @@ impl AnthropicMessagesClient for Client {
         Box::pin(async move {
             let codec = self
                 .provider
-                .codec_for(provider::APIType::AnthropicMessages)
+                .codec_for(provider::ApiType::AnthropicMessages)
                 .ok_or_else(|| HiLlmError::EndpointNotSupported {
                     endpoint: "messages".to_string(),
                     provider: self.provider.name().to_string(),

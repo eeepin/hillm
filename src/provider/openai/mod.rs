@@ -1,7 +1,7 @@
 use super::{Provider, registry_get};
 use crate::error::{HiLlmError, HiLlmResult};
-use crate::provider::APIType;
-use crate::provider::codec::APITypeCodec;
+use crate::provider::ApiType;
+use crate::provider::codec::ApiTypeCodec;
 use std::borrow::Cow;
 use std::collections::HashMap;
 
@@ -13,16 +13,16 @@ pub use responses_codec::OpenAIResponsesCodec;
 
 pub(crate) struct OpenAIProvider {
     /// The API type this instance is bound to. Fixed at creation time.
-    api_type: APIType,
+    api_type: ApiType,
 }
 
 impl OpenAIProvider {
     /// Creates a provider instance bound to `api_type`, failing with
-    /// [`HiLlmError::APITypeUnsupported`] if OpenAI does not support it.
-    pub(crate) fn with_api_type(api_type: APIType) -> HiLlmResult<Self> {
-        let available = [APIType::OpenAIChatCompletions, APIType::OpenAIResponses];
+    /// [`HiLlmError::ApiTypeUnsupported`] if OpenAI does not support it.
+    pub(crate) fn with_api_type(api_type: ApiType) -> HiLlmResult<Self> {
+        let available = [ApiType::OpenAIChatCompletions, ApiType::OpenAIResponses];
         if !available.contains(&api_type) {
-            return Err(HiLlmError::APITypeUnsupported {
+            return Err(HiLlmError::ApiTypeUnsupported {
                 api_type: api_type.to_string(),
                 provider: "openai".to_string(),
             });
@@ -34,7 +34,7 @@ impl OpenAIProvider {
 impl Default for OpenAIProvider {
     fn default() -> Self {
         Self {
-            api_type: APIType::OpenAIChatCompletions,
+            api_type: ApiType::OpenAIChatCompletions,
         }
     }
 }
@@ -66,22 +66,22 @@ impl Provider for OpenAIProvider {
         })
     }
 
-    fn available_api_types(&self) -> Vec<APIType> {
-        vec![APIType::OpenAIChatCompletions, APIType::OpenAIResponses]
+    fn available_api_types(&self) -> Vec<ApiType> {
+        vec![ApiType::OpenAIChatCompletions, ApiType::OpenAIResponses]
     }
 
-    fn api_type(&self) -> APIType {
+    fn api_type(&self) -> ApiType {
         self.api_type
     }
 
-    fn codec_for(&self, api_type: APIType) -> Option<Box<dyn APITypeCodec>> {
+    fn codec_for(&self, api_type: ApiType) -> Option<Box<dyn ApiTypeCodec>> {
         // Only return a codec if the requested API type matches the bound type
         if api_type != self.api_type {
             return None;
         }
         match api_type {
-            APIType::OpenAIChatCompletions => Some(Box::new(OpenAIChatCompletionsCodec)),
-            APIType::OpenAIResponses => Some(Box::new(OpenAIResponsesCodec)),
+            ApiType::OpenAIChatCompletions => Some(Box::new(OpenAIChatCompletionsCodec)),
+            ApiType::OpenAIResponses => Some(Box::new(OpenAIResponsesCodec)),
             _ => None,
         }
     }

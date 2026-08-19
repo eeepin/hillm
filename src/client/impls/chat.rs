@@ -18,7 +18,7 @@ impl ChatCompletionClient for Client {
             // Try codec path first
             if let Some(codec) = self
                 .provider
-                .codec_for(provider::APIType::OpenAIChatCompletions)
+                .codec_for(provider::ApiType::OpenAIChatCompletions)
             {
                 let endpoint_path = codec.endpoint_path();
                 let url = self.provider.build_url(endpoint_path, &req.model);
@@ -109,7 +109,7 @@ impl ChatCompletionClient for Client {
             // Try codec path first
             if let Some(codec) = self
                 .provider
-                .codec_for(provider::APIType::OpenAIChatCompletions)
+                .codec_for(provider::ApiType::OpenAIChatCompletions)
             {
                 let endpoint_path = codec.endpoint_path();
                 let url = self.provider.build_stream_url(endpoint_path, &req.model);
