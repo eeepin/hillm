@@ -1,6 +1,6 @@
 use super::Provider;
 use super::api_type::APIType;
-use crate::error::{HiLLMError, HiLLMResult};
+use crate::error::{HiLlmError, HiLlmResult};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -58,14 +58,14 @@ impl CustomProviderRegistry {
     /// Validates the configuration (non-empty name, base_url), API type
     /// consistency, and outbound URL policy. An empty `models` list is
     /// allowed and means "accept any model" (wildcard).
-    pub fn register(&self, config: CustomProviderConfig) -> HiLLMResult<()> {
+    pub fn register(&self, config: CustomProviderConfig) -> HiLlmResult<()> {
         validate_config(&config)?;
         config.validate_api_types()?;
         crate::provider::validate_outbound_url_sync(&config.base_url)?;
         let mut providers = self
             .providers
             .write()
-            .map_err(|e| HiLLMError::ServerError {
+            .map_err(|e| HiLlmError::ServerError {
                 message: format!("custom provider registry lock poisoned: {e}"),
                 status: 500,
             })?;
@@ -79,11 +79,11 @@ impl CustomProviderRegistry {
 
     /// Remove a custom provider by name. Returns `true` if a provider was
     /// removed, `false` if no provider with that name was registered.
-    pub fn unregister(&self, name: &str) -> HiLLMResult<bool> {
+    pub fn unregister(&self, name: &str) -> HiLlmResult<bool> {
         let mut providers = self
             .providers
             .write()
-            .map_err(|e| HiLLMError::ServerError {
+            .map_err(|e| HiLlmError::ServerError {
                 message: format!("custom provider registry lock poisoned: {e}"),
                 status: 500,
             })?;
@@ -100,8 +100,8 @@ impl CustomProviderRegistry {
         name: &str,
         model: &str,
         filter: ApiTypeFilter,
-    ) -> Result<Option<Box<dyn Provider>>, HiLLMError> {
-        let providers = self.providers.read().map_err(|e| HiLLMError::ServerError {
+    ) -> Result<Option<Box<dyn Provider>>, HiLlmError> {
+        let providers = self.providers.read().map_err(|e| HiLlmError::ServerError {
             message: format!("custom provider registry lock poisoned: {e}"),
             status: 500,
         })?;
@@ -144,11 +144,11 @@ fn global_registry() -> &'static CustomProviderRegistry {
     GLOBAL_REGISTRY.get_or_init(CustomProviderRegistry::default)
 }
 
-pub fn register_custom_provider(config: CustomProviderConfig) -> HiLLMResult<()> {
+pub fn register_custom_provider(config: CustomProviderConfig) -> HiLlmResult<()> {
     global_registry().register(config)
 }
 
-pub fn unregister_custom_provider(name: &str) -> HiLLMResult<bool> {
+pub fn unregister_custom_provider(name: &str) -> HiLlmResult<bool> {
     global_registry().unregister(name)
 }
 
@@ -169,18 +169,18 @@ pub(crate) enum ApiTypeFilter {
 /// Returns:
 /// - `Ok(Some(provider))` when exactly one provider matches;
 /// - `Ok(None)` when nothing matches;
-/// - `Err(HiLLMError::AmbiguousProvider)` when a non-empty `model` matches
+/// - `Err(HiLlmError::AmbiguousProvider)` when a non-empty `model` matches
 ///   several providers and no provider name was given — callers must not
 ///   silently pick one by registration order.
 pub(crate) fn detect_custom_provider(
     name: &str,
     model: &str,
     filter: ApiTypeFilter,
-) -> Result<Option<Box<dyn Provider>>, HiLLMError> {
+) -> Result<Option<Box<dyn Provider>>, HiLlmError> {
     let providers = global_registry()
         .providers
         .read()
-        .map_err(|e| HiLLMError::ServerError {
+        .map_err(|e| HiLlmError::ServerError {
             message: format!("custom provider registry lock poisoned: {e}"),
             status: 500,
         })?;
@@ -194,7 +194,7 @@ fn detect_in_slice(
     name: &str,
     model: &str,
     filter: ApiTypeFilter,
-) -> Result<Option<Box<dyn Provider>>, HiLLMError> {
+) -> Result<Option<Box<dyn Provider>>, HiLlmError> {
     let supports = |cfg: &CustomProviderConfig| match filter {
         ApiTypeFilter::Any => true,
         ApiTypeFilter::Exact(api_type) => cfg.effective_api_types().contains(&api_type),
@@ -231,7 +231,7 @@ fn detect_in_slice(
                 let mut names: Vec<String> =
                     candidates.iter().map(|cfg| cfg.name.clone()).collect();
                 names.sort();
-                return Err(HiLLMError::AmbiguousProvider {
+                return Err(HiLlmError::AmbiguousProvider {
                     model: model.to_string(),
                     candidates: names,
                 });
@@ -294,11 +294,11 @@ impl CustomProviderConfig {
 
     /// Validates the API type configuration: `default_api_type`, when set,
     /// must be one of the (effective) available API types.
-    pub fn validate_api_types(&self) -> HiLLMResult<()> {
+    pub fn validate_api_types(&self) -> HiLlmResult<()> {
         if let Some(default) = self.default_api_type {
             let available = self.effective_api_types();
             if !available.contains(&default) {
-                return Err(HiLLMError::BadRequest {
+                return Err(HiLlmError::BadRequest {
                     message: format!(
                         "custom provider '{}': default_api_type '{default}' is not in \
                          available_api_types {:?}",
@@ -320,22 +320,22 @@ pub enum AuthHeaderFormat {
     None,
 }
 
-fn validate_config(config: &CustomProviderConfig) -> HiLLMResult<()> {
+fn validate_config(config: &CustomProviderConfig) -> HiLlmResult<()> {
     if config.name.trim().is_empty() {
-        return Err(HiLLMError::BadRequest {
+        return Err(HiLlmError::BadRequest {
             message: "custom provider name must not be empty or whitespace-only".into(),
             status: 400,
         });
     }
     if config.base_url.trim().is_empty() {
-        return Err(HiLLMError::BadRequest {
+        return Err(HiLlmError::BadRequest {
             message: "custom provider base_url must not be empty or whitespace-only".into(),
             status: 400,
         });
     }
     for model_name in &config.models {
         if model_name.is_empty() {
-            return Err(HiLLMError::BadRequest {
+            return Err(HiLlmError::BadRequest {
                 message: "custom provider's model name must not be empty".into(),
                 status: 400,
             });
@@ -837,7 +837,7 @@ mod tests {
 
         let result = detect_custom_provider("", "shared-model", ApiTypeFilter::Any);
         match result {
-            Err(HiLLMError::AmbiguousProvider { model, candidates }) => {
+            Err(HiLlmError::AmbiguousProvider { model, candidates }) => {
                 assert_eq!(model, "shared-model");
                 assert_eq!(candidates, vec!["amb-a".to_string(), "amb-b".to_string()]);
             }

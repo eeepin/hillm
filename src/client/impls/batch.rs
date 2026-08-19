@@ -3,7 +3,7 @@ use std::time::Duration;
 use crate::client::{
     BatchClient, BatchRetriever, BatchWaitError, BoxFuture, Client, WaitForBatchConfig,
 };
-use crate::error::{HiLLMError, HiLLMResult};
+use crate::error::{HiLlmError, HiLlmResult};
 use crate::http;
 use crate::types::batch::{
     BatchListQuery, BatchListResponse, BatchObject, BatchStatus, CreateBatchRequest,
@@ -13,7 +13,7 @@ use super::super::str_pair;
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 impl BatchClient for Client {
-    fn create_batch(&self, req: CreateBatchRequest) -> BoxFuture<'_, HiLLMResult<BatchObject>> {
+    fn create_batch(&self, req: CreateBatchRequest) -> BoxFuture<'_, HiLlmResult<BatchObject>> {
         Box::pin(async move {
             let url = self.provider.build_url(self.provider.batches_path(), "");
             let body_bytes = bytes::Bytes::from(serde_json::to_vec(&req)?);
@@ -36,11 +36,11 @@ impl BatchClient for Client {
                 self.config.max_retries,
             )
             .await?;
-            serde_json::from_value::<BatchObject>(raw).map_err(HiLLMError::from)
+            serde_json::from_value::<BatchObject>(raw).map_err(HiLlmError::from)
         })
     }
 
-    fn retrieve_batch(&self, batch_id: &str) -> BoxFuture<'_, HiLLMResult<BatchObject>> {
+    fn retrieve_batch(&self, batch_id: &str) -> BoxFuture<'_, HiLlmResult<BatchObject>> {
         let batch_id = batch_id.to_owned();
         Box::pin(async move {
             let url = format!(
@@ -64,14 +64,14 @@ impl BatchClient for Client {
                 self.config.max_retries,
             )
             .await?;
-            serde_json::from_value::<BatchObject>(raw).map_err(HiLLMError::from)
+            serde_json::from_value::<BatchObject>(raw).map_err(HiLlmError::from)
         })
     }
 
     fn list_batches(
         &self,
         query: Option<BatchListQuery>,
-    ) -> BoxFuture<'_, HiLLMResult<BatchListResponse>> {
+    ) -> BoxFuture<'_, HiLlmResult<BatchListResponse>> {
         Box::pin(async move {
             let base_url = self.provider.build_url(self.provider.batches_path(), "");
             let url = if let Some(ref q) = query {
@@ -106,11 +106,11 @@ impl BatchClient for Client {
                 self.config.max_retries,
             )
             .await?;
-            serde_json::from_value::<BatchListResponse>(raw).map_err(HiLLMError::from)
+            serde_json::from_value::<BatchListResponse>(raw).map_err(HiLlmError::from)
         })
     }
 
-    fn cancel_batch(&self, batch_id: &str) -> BoxFuture<'_, HiLLMResult<BatchObject>> {
+    fn cancel_batch(&self, batch_id: &str) -> BoxFuture<'_, HiLlmResult<BatchObject>> {
         let batch_id = batch_id.to_owned();
         Box::pin(async move {
             let url = format!(
@@ -137,7 +137,7 @@ impl BatchClient for Client {
                 self.config.max_retries,
             )
             .await?;
-            serde_json::from_value::<BatchObject>(raw).map_err(HiLLMError::from)
+            serde_json::from_value::<BatchObject>(raw).map_err(HiLlmError::from)
         })
     }
 }
@@ -146,7 +146,7 @@ impl BatchClient for Client {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl BatchRetriever for Client {
-    async fn fetch_batch_for_polling(&self, batch_id: &str) -> HiLLMResult<BatchObject> {
+    async fn fetch_batch_for_polling(&self, batch_id: &str) -> HiLlmResult<BatchObject> {
         self.retrieve_batch(batch_id).await
     }
 }

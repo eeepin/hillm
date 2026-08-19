@@ -6,19 +6,19 @@ use std::task::{Context, Poll};
 use futures_core::Stream;
 use tower::Service;
 
-use super::types::{LLMRequest, LLMRequestKind, LLMResponse};
+use super::types::{LlmRequest, LlmRequestKind, LlmResponse};
 use crate::client::{
     AudioClient, BoxFuture, ChatCompletionClient, EmbeddingClient, ImageClient, ModelClient,
     ModerationClient, OcrClient, RerankClient, SearchClient,
 };
-use crate::error::{HiLLMError, HiLLMResult};
+use crate::error::{HiLlmError, HiLlmResult};
 use crate::types::ChatCompletionChunk;
 
-pub struct LLMService<C> {
+pub struct LlmService<C> {
     inner: Arc<C>,
 }
 
-impl<C> LLMService<C> {
+impl<C> LlmService<C> {
     #[must_use]
     pub fn new(client: C) -> Self {
         Self {
@@ -36,7 +36,7 @@ impl<C> LLMService<C> {
     }
 }
 
-impl<C> Clone for LLMService<C> {
+impl<C> Clone for LlmService<C> {
     fn clone(&self) -> Self {
         Self {
             inner: Arc::clone(&self.inner),
@@ -44,7 +44,7 @@ impl<C> Clone for LLMService<C> {
     }
 }
 
-impl<C> Service<LLMRequest> for LLMService<C>
+impl<C> Service<LlmRequest> for LlmService<C>
 where
     C: ChatCompletionClient
         + EmbeddingClient
@@ -59,66 +59,66 @@ where
         + Sync
         + 'static,
 {
-    type Response = LLMResponse;
-    type Error = HiLLMError;
-    type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
+    type Response = LlmResponse;
+    type Error = HiLlmError;
+    type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
 
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: LLMRequest) -> Self::Future {
+    fn call(&mut self, req: LlmRequest) -> Self::Future {
         let client = Arc::clone(&self.inner);
         Box::pin(async move {
             match req.kind {
-                LLMRequestKind::Chat(r) => {
+                LlmRequestKind::Chat(r) => {
                     let resp = client.chat(r).await?;
-                    Ok(LLMResponse::Chat(resp))
+                    Ok(LlmResponse::Chat(resp))
                 }
-                LLMRequestKind::ChatStream(r) => {
+                LlmRequestKind::ChatStream(r) => {
                     let stream = client.chat_stream(r).await?;
                     let chunks = collect_stream(stream).await?;
                     let static_stream: crate::client::BoxStream<
                         'static,
-                        HiLLMResult<ChatCompletionChunk>,
+                        HiLlmResult<ChatCompletionChunk>,
                     > = Box::pin(OwnedChunksStream { chunks });
-                    Ok(LLMResponse::ChatStream(static_stream))
+                    Ok(LlmResponse::ChatStream(static_stream))
                 }
-                LLMRequestKind::Embed(r) => {
+                LlmRequestKind::Embed(r) => {
                     let resp = client.embed(r).await?;
-                    Ok(LLMResponse::Embed(resp))
+                    Ok(LlmResponse::Embed(resp))
                 }
-                LLMRequestKind::ListModels => {
+                LlmRequestKind::ListModels => {
                     let resp = client.list_models().await?;
-                    Ok(LLMResponse::ListModels(resp))
+                    Ok(LlmResponse::ListModels(resp))
                 }
-                LLMRequestKind::ImageGenerate(r) => {
+                LlmRequestKind::ImageGenerate(r) => {
                     let resp = client.image_generate(r).await?;
-                    Ok(LLMResponse::ImageGenerate(resp))
+                    Ok(LlmResponse::ImageGenerate(resp))
                 }
-                LLMRequestKind::Speech(r) => {
+                LlmRequestKind::Speech(r) => {
                     let resp = client.speech(r).await?;
-                    Ok(LLMResponse::Speech(resp))
+                    Ok(LlmResponse::Speech(resp))
                 }
-                LLMRequestKind::Transcribe(r) => {
+                LlmRequestKind::Transcribe(r) => {
                     let resp = client.transcribe(r).await?;
-                    Ok(LLMResponse::Transcribe(resp))
+                    Ok(LlmResponse::Transcribe(resp))
                 }
-                LLMRequestKind::Moderate(r) => {
+                LlmRequestKind::Moderate(r) => {
                     let resp = client.moderate(r).await?;
-                    Ok(LLMResponse::Moderate(resp))
+                    Ok(LlmResponse::Moderate(resp))
                 }
-                LLMRequestKind::Rerank(r) => {
+                LlmRequestKind::Rerank(r) => {
                     let resp = client.rerank(r).await?;
-                    Ok(LLMResponse::Rerank(resp))
+                    Ok(LlmResponse::Rerank(resp))
                 }
-                LLMRequestKind::Search(r) => {
+                LlmRequestKind::Search(r) => {
                     let resp = client.search(r).await?;
-                    Ok(LLMResponse::Search(resp))
+                    Ok(LlmResponse::Search(resp))
                 }
-                LLMRequestKind::Ocr(r) => {
+                LlmRequestKind::Ocr(r) => {
                     let resp = client.ocr(r).await?;
-                    Ok(LLMResponse::Ocr(resp))
+                    Ok(LlmResponse::Ocr(resp))
                 }
             }
         })
@@ -126,8 +126,8 @@ where
 }
 
 async fn collect_stream<'a>(
-    mut stream: crate::client::BoxStream<'a, HiLLMResult<ChatCompletionChunk>>,
-) -> HiLLMResult<VecDeque<ChatCompletionChunk>> {
+    mut stream: crate::client::BoxStream<'a, HiLlmResult<ChatCompletionChunk>>,
+) -> HiLlmResult<VecDeque<ChatCompletionChunk>> {
     let mut chunks = VecDeque::new();
     loop {
         let item = std::future::poll_fn(|cx| Pin::as_mut(&mut stream).poll_next(cx)).await;
@@ -145,7 +145,7 @@ struct OwnedChunksStream {
 }
 
 impl Stream for OwnedChunksStream {
-    type Item = HiLLMResult<ChatCompletionChunk>;
+    type Item = HiLlmResult<ChatCompletionChunk>;
 
     fn poll_next(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         Poll::Ready(self.chunks.pop_front().map(Ok))

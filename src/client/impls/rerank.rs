@@ -1,5 +1,5 @@
 use crate::client::{Client, RerankClient, str_pair};
-use crate::error::{HiLLMError, HiLLMResult};
+use crate::error::{HiLlmError, HiLlmResult};
 use crate::http;
 use crate::types::raw::RawExchange;
 use crate::types::rerank::{RerankRequest, RerankResponse};
@@ -8,7 +8,7 @@ use super::super::BoxFuture;
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 impl RerankClient for Client {
-    fn rerank(&self, req: RerankRequest) -> BoxFuture<'_, HiLLMResult<RerankResponse>> {
+    fn rerank(&self, req: RerankRequest) -> BoxFuture<'_, HiLlmResult<RerankResponse>> {
         Box::pin(async move {
             let prepared = self.prepare_request(&req, |p| p.rerank_path(), &req.model, None)?;
 
@@ -38,14 +38,14 @@ impl RerankClient for Client {
             )
             .await?;
             prepared.provider.transform_response(&mut raw)?;
-            serde_json::from_value::<RerankResponse>(raw).map_err(HiLLMError::from)
+            serde_json::from_value::<RerankResponse>(raw).map_err(HiLlmError::from)
         })
     }
 
     fn rerank_raw(
         &self,
         req: RerankRequest,
-    ) -> BoxFuture<'_, HiLLMResult<RawExchange<RerankResponse>>> {
+    ) -> BoxFuture<'_, HiLlmResult<RawExchange<RerankResponse>>> {
         Box::pin(async move {
             let prepared = self.prepare_request(&req, |p| p.rerank_path(), &req.model, None)?;
             let raw_request = prepared.body_json.clone();
@@ -78,7 +78,7 @@ impl RerankClient for Client {
 
             let raw_response = Some(raw.clone());
             prepared.provider.transform_response(&mut raw)?;
-            let data = serde_json::from_value::<RerankResponse>(raw).map_err(HiLLMError::from)?;
+            let data = serde_json::from_value::<RerankResponse>(raw).map_err(HiLlmError::from)?;
 
             Ok(RawExchange {
                 data,

@@ -5,13 +5,13 @@ use secrecy::SecretString;
 
 use crate::auth::CredentialProvider;
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
-use crate::error::{HiLLMError, HiLLMResult};
+use crate::error::{HiLlmError, HiLlmResult};
 use crate::http::transport::TransportConfig;
 use crate::provider::APIType;
 use crate::provider::custom::CustomProviderConfig;
 use crate::provider::outbound_policy::OutboundPolicyValidator;
 #[cfg(feature = "tower")]
-use crate::tower::{BudgetConfig, CacheConfig, CacheStore, LLMHook, RateLimitConfig};
+use crate::tower::{BudgetConfig, CacheConfig, CacheStore, LlmHook, RateLimitConfig};
 
 #[derive(Clone)]
 pub struct ClientConfig {
@@ -46,7 +46,7 @@ pub struct ClientConfig {
     #[cfg(feature = "tower")]
     pub budget_config: Option<BudgetConfig>,
     #[cfg(feature = "tower")]
-    pub hooks: Vec<Arc<dyn LLMHook>>,
+    pub hooks: Vec<Arc<dyn LlmHook>>,
     #[cfg(feature = "tower")]
     pub cooldown_duration: Option<Duration>,
     #[cfg(feature = "tower")]
@@ -205,18 +205,18 @@ impl ClientConfigBuilder {
     }
 
     #[cfg(any(feature = "default-http", feature = "wasm-http"))]
-    pub fn header(mut self, key: impl Into<String>, value: impl Into<String>) -> HiLLMResult<Self> {
+    pub fn header(mut self, key: impl Into<String>, value: impl Into<String>) -> HiLlmResult<Self> {
         let key = key.into();
         let value = value.into();
 
         reqwest::header::HeaderName::from_bytes(key.as_bytes()).map_err(|e| {
-            HiLLMError::InvalidHeader {
+            HiLlmError::InvalidHeader {
                 name: key.clone(),
                 reason: e.to_string(),
             }
         })?;
 
-        reqwest::header::HeaderValue::from_str(&value).map_err(|e| HiLLMError::InvalidHeader {
+        reqwest::header::HeaderValue::from_str(&value).map_err(|e| HiLlmError::InvalidHeader {
             name: key.clone(),
             reason: e.to_string(),
         })?;
@@ -260,13 +260,13 @@ impl ClientConfigBuilder {
     }
 
     #[cfg(feature = "tower")]
-    pub fn hook(mut self, hook: Arc<dyn LLMHook>) -> Self {
+    pub fn hook(mut self, hook: Arc<dyn LlmHook>) -> Self {
         self.config.hooks.push(hook);
         self
     }
 
     #[cfg(feature = "tower")]
-    pub fn hooks(mut self, hooks: Vec<Arc<dyn LLMHook>>) -> Self {
+    pub fn hooks(mut self, hooks: Vec<Arc<dyn LlmHook>>) -> Self {
         self.config.hooks = hooks;
         self
     }

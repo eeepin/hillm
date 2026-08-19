@@ -39,7 +39,7 @@ pub use client::{
     ImageClient, ModelClient, ModerationClient, OcrClient, RerankClient, SearchClient,
     WaitForBatchConfig,
 };
-pub use error::{HiLLMError, HiLLMResult};
+pub use error::{HiLlmError, HiLlmResult};
 pub use http::transport::TransportConfig;
 pub use provider::{
     AuthConfig, AuthType, ModelCapabilities, ProviderConfig, StreamFormat, all_providers,

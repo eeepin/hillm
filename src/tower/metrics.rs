@@ -9,9 +9,9 @@ mod inner {
     use opentelemetry::metrics::{Counter, Histogram, Meter};
     use tower::{Layer, Service};
 
-    use super::super::types::{LLMRequest, LLMResponse};
+    use super::super::types::{LlmRequest, LlmResponse};
     use crate::client::BoxFuture;
-    use crate::error::{HiLLMError, HiLLMResult};
+    use crate::error::{HiLlmError, HiLlmResult};
 
     static METER: OnceLock<Meter> = OnceLock::new();
 
@@ -237,20 +237,20 @@ mod inner {
         }
     }
 
-    impl<S> Service<LLMRequest> for MetricsService<S>
+    impl<S> Service<LlmRequest> for MetricsService<S>
     where
-        S: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + Send + 'static,
+        S: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Send + 'static,
         S::Future: Send + 'static,
     {
-        type Response = LLMResponse;
-        type Error = HiLLMError;
-        type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
+        type Response = LlmResponse;
+        type Error = HiLlmError;
+        type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
 
-        fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
+        fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
             self.inner.poll_ready(cx)
         }
 
-        fn call(&mut self, req: LLMRequest) -> Self::Future {
+        fn call(&mut self, req: LlmRequest) -> Self::Future {
             let start = Instant::now();
 
             let operation = req.operation_name();
@@ -269,8 +269,8 @@ mod inner {
                 if let Some(instr) = instruments() {
                     let response_model = match &result {
                         Ok(resp) => match resp {
-                            LLMResponse::Chat(r) => r.model.clone(),
-                            LLMResponse::Embed(r) => r.model.clone(),
+                            LlmResponse::Chat(r) => r.model.clone(),
+                            LlmResponse::Embed(r) => r.model.clone(),
                             _ => model_str.clone(),
                         },
                         Err(_) => model_str.clone(),
@@ -477,9 +477,9 @@ mod inner {
 
     use tower::{Layer, Service};
 
-    use super::super::types::{LLMRequest, LLMResponse};
+    use super::super::types::{LlmRequest, LlmResponse};
     use crate::client::BoxFuture;
-    use crate::error::{HiLLMError, HiLLMResult};
+    use crate::error::{HiLlmError, HiLlmResult};
 
     #[derive(Clone)]
     pub struct MetricsLayer;
@@ -504,20 +504,20 @@ mod inner {
         }
     }
 
-    impl<S> Service<LLMRequest> for MetricsService<S>
+    impl<S> Service<LlmRequest> for MetricsService<S>
     where
-        S: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + Send + 'static,
+        S: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Send + 'static,
         S::Future: Send + 'static,
     {
-        type Response = LLMResponse;
-        type Error = HiLLMError;
-        type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
+        type Response = LlmResponse;
+        type Error = HiLlmError;
+        type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
 
-        fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
+        fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
             self.inner.poll_ready(cx)
         }
 
-        fn call(&mut self, req: LLMRequest) -> Self::Future {
+        fn call(&mut self, req: LlmRequest) -> Self::Future {
             Box::pin(self.inner.call(req))
         }
     }

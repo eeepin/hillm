@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::error::HiLLMResult;
+use crate::error::HiLlmResult;
 
 pub mod openai;
 pub use openai::OpenAiRealtimeTranslator;
@@ -149,9 +149,9 @@ impl RealtimeEnvelope {
 }
 
 pub trait RealtimeTranslator: Send + Sync + 'static {
-    fn translate_inbound(&self, raw: serde_json::Value) -> HiLLMResult<RealtimeEvent>;
+    fn translate_inbound(&self, raw: serde_json::Value) -> HiLlmResult<RealtimeEvent>;
 
-    fn translate_outbound(&self, event: &RealtimeEvent) -> HiLLMResult<serde_json::Value>;
+    fn translate_outbound(&self, event: &RealtimeEvent) -> HiLlmResult<serde_json::Value>;
 
     fn provider(&self) -> &'static str;
 }

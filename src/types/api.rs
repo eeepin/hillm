@@ -2,7 +2,7 @@
 
 use serde::{Serialize, de::DeserializeOwned};
 
-use crate::error::HiLLMResult;
+use crate::error::HiLlmResult;
 
 /// Trait for API requests that can be sent to LLM providers.
 ///
@@ -37,7 +37,7 @@ pub trait APIResponse: DeserializeOwned + Send + Sync {
     /// or to normalize response data.
     ///
     /// Default implementation returns `Ok(())`.
-    fn validate(&self) -> HiLLMResult<()> {
+    fn validate(&self) -> HiLlmResult<()> {
         Ok(())
     }
 }

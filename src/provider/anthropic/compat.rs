@@ -48,7 +48,7 @@ use bytes::Bytes;
 use serde_json::Value;
 use std::collections::HashMap;
 
-use crate::error::HiLLMResult;
+use crate::error::HiLlmResult;
 use crate::provider::APIType;
 use crate::provider::anthropic::AnthropicProvider;
 use crate::provider::codec::APITypeCodec;
@@ -82,19 +82,19 @@ impl APITypeCodec for AnthropicChatCompatCodec {
         "/messages"
     }
 
-    fn encode_request(&self, request: &Value) -> HiLLMResult<Bytes> {
+    fn encode_request(&self, request: &Value) -> HiLlmResult<Bytes> {
         let mut body = request.clone();
         convert_chat_request_to_anthropic(&mut body)?;
         Ok(Bytes::from(serde_json::to_vec(&body)?))
     }
 
-    fn decode_response(&self, bytes: &[u8]) -> HiLLMResult<Value> {
+    fn decode_response(&self, bytes: &[u8]) -> HiLlmResult<Value> {
         let mut value: Value = serde_json::from_slice(bytes)?;
         convert_anthropic_response_to_chat(&mut value)?;
         Ok(value)
     }
 
-    fn parse_stream_event(&self, data: &str) -> HiLLMResult<Option<Value>> {
+    fn parse_stream_event(&self, data: &str) -> HiLlmResult<Option<Value>> {
         match parse_anthropic_event_as_chat_chunk(data)? {
             Some(chunk) => Ok(Some(serde_json::to_value(chunk)?)),
             None => Ok(None),
@@ -178,7 +178,7 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    use crate::error::HiLLMError;
+    use crate::error::HiLlmError;
     use crate::types::FinishReason;
 
     fn chat_request(messages: Value) -> Value {
@@ -447,7 +447,7 @@ mod tests {
             "error": {"type": "overloaded_error", "message": "overloaded"}
         });
         let result = parse_anthropic_event_as_chat_chunk(&event.to_string());
-        assert!(matches!(result, Err(HiLLMError::Streaming { .. })));
+        assert!(matches!(result, Err(HiLlmError::Streaming { .. })));
     }
 
     #[test]

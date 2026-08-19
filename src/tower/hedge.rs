@@ -4,9 +4,9 @@ use std::time::Duration;
 
 use tower::{Layer, Service};
 
-use super::types::{LLMRequest, LLMResponse};
+use super::types::{LlmRequest, LlmResponse};
 use crate::client::BoxFuture;
-use crate::error::{HiLLMError, HiLLMResult};
+use crate::error::{HiLlmError, HiLlmResult};
 
 pub trait HedgePolicy: Send + Sync + 'static {
     fn delay_for_attempt(&self, attempt: u32, latency_so_far: Duration) -> Option<Duration>;
@@ -78,21 +78,21 @@ impl<P: HedgePolicy, S: Clone> Clone for HedgeService<P, S> {
     }
 }
 
-impl<P, S> Service<LLMRequest> for HedgeService<P, S>
+impl<P, S> Service<LlmRequest> for HedgeService<P, S>
 where
     P: HedgePolicy + 'static,
-    S: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + Send + Clone + 'static,
+    S: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Send + Clone + 'static,
     S::Future: Send + 'static,
 {
-    type Response = LLMResponse;
-    type Error = HiLLMError;
-    type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
+    type Response = LlmResponse;
+    type Error = HiLlmError;
+    type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
         self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, req: LLMRequest) -> Self::Future {
+    fn call(&mut self, req: LlmRequest) -> Self::Future {
         let policy = Arc::clone(&self.policy);
         let max_attempts = policy.max_attempts();
 
@@ -109,14 +109,14 @@ where
 }
 
 async fn hedge_race<S>(
-    req: LLMRequest,
+    req: LlmRequest,
     mut primary: S,
     inner_for_hedges: S,
     policy: Arc<impl HedgePolicy>,
     max_attempts: u32,
-) -> HiLLMResult<LLMResponse>
+) -> HiLlmResult<LlmResponse>
 where
-    S: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + Send + Clone + 'static,
+    S: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Send + Clone + 'static,
     S::Future: Send + 'static,
 {
     use std::time::Instant;
@@ -130,7 +130,7 @@ where
         return primary.call(req).await;
     }
 
-    let mut join_set: tokio::task::JoinSet<(u32, HiLLMResult<LLMResponse>)> =
+    let mut join_set: tokio::task::JoinSet<(u32, HiLlmResult<LlmResponse>)> =
         tokio::task::JoinSet::new();
 
     {
@@ -171,7 +171,7 @@ where
         });
     }
 
-    let mut last_err: Option<HiLLMError> = None;
+    let mut last_err: Option<HiLlmError> = None;
 
     while let Some(join_result) = join_set.join_next().await {
         match join_result {
@@ -187,14 +187,14 @@ where
             Err(join_err) if join_err.is_cancelled() => {}
             Err(join_err) => {
                 tracing::error!(error = %join_err, "hedged task panicked");
-                last_err = Some(HiLLMError::InternalError {
+                last_err = Some(HiLlmError::InternalError {
                     message: format!("hedge task panicked: {join_err}"),
                 });
             }
         }
     }
 
-    Err(last_err.unwrap_or(HiLLMError::InternalError {
+    Err(last_err.unwrap_or(HiLlmError::InternalError {
         message: "all hedged attempts failed with no error recorded".into(),
     }))
 }
@@ -202,7 +202,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tower::types::{LLMRequest, LLMResponse};
+    use crate::tower::types::{LlmRequest, LlmResponse};
     use crate::types::{
         AssistantMessage, ChatCompletionRequest, ChatCompletionResponse, Choice, Message,
         MessageContent, Usage,
@@ -212,9 +212,9 @@ mod tests {
     use tokio::time::Duration;
     use tower::ServiceExt;
 
-    fn create_chat_request(content: &str) -> LLMRequest {
-        LLMRequest {
-            kind: crate::tower::types::LLMRequestKind::Chat(ChatCompletionRequest {
+    fn create_chat_request(content: &str) -> LlmRequest {
+        LlmRequest {
+            kind: crate::tower::types::LlmRequestKind::Chat(ChatCompletionRequest {
                 model: "test-model".to_string(),
                 messages: vec![Message::User(crate::types::UserMessage {
                     content: MessageContent::Text(content.to_string()),
@@ -227,8 +227,8 @@ mod tests {
         }
     }
 
-    fn create_chat_response(content: &str) -> LLMResponse {
-        LLMResponse::Chat(ChatCompletionResponse {
+    fn create_chat_response(content: &str) -> LlmResponse {
+        LlmResponse::Chat(ChatCompletionResponse {
             id: "test-id".to_string(),
             object: "chat.completion".to_string(),
             created: 1234567890,
@@ -273,16 +273,16 @@ mod tests {
         }
     }
 
-    impl Service<LLMRequest> for DelayedMockService {
-        type Response = LLMResponse;
-        type Error = HiLLMError;
-        type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
+    impl Service<LlmRequest> for DelayedMockService {
+        type Response = LlmResponse;
+        type Error = HiLlmError;
+        type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
 
-        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
+        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
             Poll::Ready(Ok(()))
         }
 
-        fn call(&mut self, _req: LLMRequest) -> Self::Future {
+        fn call(&mut self, _req: LlmRequest) -> Self::Future {
             self.call_count.fetch_add(1, Ordering::SeqCst);
             let delay = self.delay;
             let should_fail = self.should_fail;
@@ -291,7 +291,7 @@ mod tests {
                     tokio::time::sleep(delay).await;
                 }
                 if should_fail {
-                    Err(HiLLMError::ServiceUnavailable {
+                    Err(HiLlmError::ServiceUnavailable {
                         message: "mock fail".to_string(),
                         status: 503,
                     })

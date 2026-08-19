@@ -12,9 +12,9 @@ use tower::Layer;
 use tower::Service;
 
 use super::cache::CACHE_STATE_CELL;
-use super::types::{LLMRequest, LLMResponse};
+use super::types::{LlmRequest, LlmResponse};
 use crate::client::BoxFuture;
-use crate::error::{HiLLMError, HiLLMResult};
+use crate::error::{HiLlmError, HiLlmResult};
 use crate::observability::usage::{
     CacheState, UsageEvent, UsageEventOutcome, UsageSink, UsageSinkErased,
 };
@@ -23,20 +23,20 @@ static REQUEST_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 // Hook trait
 /// Callback trait
-pub trait LLMHook: Send + Sync + 'static {
+pub trait LlmHook: Send + Sync + 'static {
     /// Called before the request
     fn on_request(
         &self,
-        _req: &LLMRequest,
-    ) -> Pin<Box<dyn Future<Output = HiLLMResult<()>> + Send + '_>> {
+        _req: &LlmRequest,
+    ) -> Pin<Box<dyn Future<Output = HiLlmResult<()>> + Send + '_>> {
         Box::pin(async { Ok(()) })
     }
 
     /// Called after the response
     fn on_response(
         &self,
-        _req: &LLMRequest,
-        _resp: &LLMResponse,
+        _req: &LlmRequest,
+        _resp: &LlmResponse,
     ) -> Pin<Box<dyn Future<Output = ()> + Send + '_>> {
         Box::pin(async {})
     }
@@ -44,8 +44,8 @@ pub trait LLMHook: Send + Sync + 'static {
     /// Called when errors occur
     fn on_error(
         &self,
-        _req: &LLMRequest,
-        _err: &HiLLMError,
+        _req: &LlmRequest,
+        _err: &HiLlmError,
     ) -> Pin<Box<dyn Future<Output = ()> + Send + '_>> {
         Box::pin(async {})
     }
@@ -53,14 +53,14 @@ pub trait LLMHook: Send + Sync + 'static {
 
 #[derive(Clone)]
 pub struct HooksLayer {
-    hooks: Arc<Vec<Arc<dyn LLMHook>>>,
+    hooks: Arc<Vec<Arc<dyn LlmHook>>>,
     usage_sink: Option<Arc<dyn UsageSinkErased>>,
     provider: String,
 }
 
 impl HooksLayer {
     #[must_use]
-    pub fn new(hooks: Vec<Arc<dyn LLMHook>>, provider: impl Into<String>) -> Self {
+    pub fn new(hooks: Vec<Arc<dyn LlmHook>>, provider: impl Into<String>) -> Self {
         Self {
             hooks: Arc::new(hooks),
             usage_sink: None,
@@ -69,7 +69,7 @@ impl HooksLayer {
     }
 
     #[must_use]
-    pub fn single(hook: Arc<dyn LLMHook>, provider: impl Into<String>) -> Self {
+    pub fn single(hook: Arc<dyn LlmHook>, provider: impl Into<String>) -> Self {
         Self::new(vec![hook], provider)
     }
 
@@ -95,7 +95,7 @@ impl<S> Layer<S> for HooksLayer {
 
 pub struct HooksService<S> {
     inner: S,
-    hooks: Arc<Vec<Arc<dyn LLMHook>>>,
+    hooks: Arc<Vec<Arc<dyn LlmHook>>>,
     usage_sink: Option<Arc<dyn UsageSinkErased>>,
     provider: String,
 }
@@ -111,20 +111,20 @@ impl<S: Clone> Clone for HooksService<S> {
     }
 }
 
-impl<S> Service<LLMRequest> for HooksService<S>
+impl<S> Service<LlmRequest> for HooksService<S>
 where
-    S: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + Send + 'static,
+    S: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Send + 'static,
     S::Future: Send + 'static,
 {
-    type Response = LLMResponse;
-    type Error = HiLLMError;
-    type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
+    type Response = LlmResponse;
+    type Error = HiLlmError;
+    type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
         self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, req: LLMRequest) -> Self::Future {
+    fn call(&mut self, req: LlmRequest) -> Self::Future {
         let hooks = Arc::clone(&self.hooks);
         let usage_sink = self.usage_sink.clone();
         let req_clone = req.clone();
@@ -141,7 +141,7 @@ where
                     Ok(Err(e)) => return Err(e),
                     Err(_panic) => {
                         tracing::error!("hook panicked during on_request");
-                        return Err(HiLLMError::HookRejected {
+                        return Err(HiLlmError::HookRejected {
                             message: "hook panicked".into(),
                         });
                     }
@@ -253,14 +253,14 @@ struct CancellationGuard {
 
 struct CancellationGuardInner {
     sink: Arc<dyn UsageSinkErased>,
-    req: LLMRequest,
+    req: LlmRequest,
     start: Instant,
 }
 
 impl CancellationGuard {
     fn new(
         sink: Arc<dyn UsageSinkErased>,
-        req: LLMRequest,
+        req: LlmRequest,
         start: Instant,
         provider: impl Into<String>,
     ) -> Self {
@@ -307,7 +307,7 @@ impl Drop for CancellationGuard {
 
 // - Helpers -----
 
-fn request_id(req: &LLMRequest) -> String {
+fn request_id(req: &LlmRequest) -> String {
     req.idempotency_key.clone().unwrap_or_else(|| {
         REQUEST_COUNTER
             .fetch_add(1, AtomicOrdering::Relaxed)
@@ -315,33 +315,33 @@ fn request_id(req: &LLMRequest) -> String {
     })
 }
 
-fn classify_error_outcome(err: &HiLLMError) -> UsageEventOutcome {
+fn classify_error_outcome(err: &HiLlmError) -> UsageEventOutcome {
     match err {
-        HiLLMError::Timeout => UsageEventOutcome::TimedOut,
+        HiLlmError::Timeout => UsageEventOutcome::TimedOut,
         _ => UsageEventOutcome::Error,
     }
 }
 
-fn effective_model_from_response(resp: &LLMResponse) -> Option<String> {
+fn effective_model_from_response(resp: &LlmResponse) -> Option<String> {
     match resp {
-        LLMResponse::Chat(r) => Some(r.model.clone()),
-        LLMResponse::Embed(r) => Some(r.model.clone()),
-        LLMResponse::Moderate(r) => Some(r.model.clone()),
-        LLMResponse::Ocr(r) => Some(r.model.clone()),
-        LLMResponse::Search(r) => Some(r.model.clone()),
-        LLMResponse::ChatStream(_)
-        | LLMResponse::Speech(_)
-        | LLMResponse::Transcribe(_)
-        | LLMResponse::Rerank(_)
-        | LLMResponse::ListModels(_)
-        | LLMResponse::ImageGenerate(_) => None,
+        LlmResponse::Chat(r) => Some(r.model.clone()),
+        LlmResponse::Embed(r) => Some(r.model.clone()),
+        LlmResponse::Moderate(r) => Some(r.model.clone()),
+        LlmResponse::Ocr(r) => Some(r.model.clone()),
+        LlmResponse::Search(r) => Some(r.model.clone()),
+        LlmResponse::ChatStream(_)
+        | LlmResponse::Speech(_)
+        | LlmResponse::Transcribe(_)
+        | LlmResponse::Rerank(_)
+        | LlmResponse::ListModels(_)
+        | LlmResponse::ImageGenerate(_) => None,
     }
 }
 
 fn build_usage_event(
     provider: &str,
-    req: &LLMRequest,
-    resp: &LLMResponse,
+    req: &LlmRequest,
+    resp: &LlmResponse,
     latency_ms: u64,
     outcome: UsageEventOutcome,
     cache_state: CacheState,
@@ -377,7 +377,7 @@ fn build_usage_event(
     .unwrap_or(rust_decimal::Decimal::ZERO);
 
     let finish_reason = match resp {
-        LLMResponse::Chat(r) => r
+        LlmResponse::Chat(r) => r
             .choices
             .first()
             .and_then(|c| c.finish_reason.as_ref())
@@ -409,7 +409,7 @@ fn build_usage_event(
 
 fn build_error_usage_event(
     provider: &str,
-    req: &LLMRequest,
+    req: &LlmRequest,
     latency_ms: u64,
     outcome: UsageEventOutcome,
     cache_state: CacheState,

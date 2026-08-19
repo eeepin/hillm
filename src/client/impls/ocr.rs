@@ -1,5 +1,5 @@
 use crate::client::{Client, OcrClient, str_pair};
-use crate::error::{HiLLMError, HiLLMResult};
+use crate::error::{HiLlmError, HiLlmResult};
 use crate::http;
 use crate::types::ocr::{OcrRequest, OcrResponse};
 use crate::types::raw::RawExchange;
@@ -8,7 +8,7 @@ use super::super::BoxFuture;
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 impl OcrClient for Client {
-    fn ocr(&self, req: OcrRequest) -> BoxFuture<'_, HiLLMResult<OcrResponse>> {
+    fn ocr(&self, req: OcrRequest) -> BoxFuture<'_, HiLlmResult<OcrResponse>> {
         Box::pin(async move {
             let prepared = self.prepare_request(&req, |p| p.ocr_path(), &req.model, None)?;
 
@@ -38,11 +38,11 @@ impl OcrClient for Client {
             )
             .await?;
             prepared.provider.transform_response(&mut raw)?;
-            serde_json::from_value::<OcrResponse>(raw).map_err(HiLLMError::from)
+            serde_json::from_value::<OcrResponse>(raw).map_err(HiLlmError::from)
         })
     }
 
-    fn ocr_raw(&self, req: OcrRequest) -> BoxFuture<'_, HiLLMResult<RawExchange<OcrResponse>>> {
+    fn ocr_raw(&self, req: OcrRequest) -> BoxFuture<'_, HiLlmResult<RawExchange<OcrResponse>>> {
         Box::pin(async move {
             let prepared = self.prepare_request(&req, |p| p.ocr_path(), &req.model, None)?;
             let raw_request = prepared.body_json.clone();
@@ -75,7 +75,7 @@ impl OcrClient for Client {
 
             let raw_response = Some(raw.clone());
             prepared.provider.transform_response(&mut raw)?;
-            let data = serde_json::from_value::<OcrResponse>(raw).map_err(HiLLMError::from)?;
+            let data = serde_json::from_value::<OcrResponse>(raw).map_err(HiLlmError::from)?;
 
             Ok(RawExchange {
                 data,

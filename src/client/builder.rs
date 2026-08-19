@@ -5,13 +5,13 @@ use secrecy::SecretString;
 
 use crate::auth::CredentialProvider;
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
-use crate::error::HiLLMResult;
+use crate::error::HiLlmResult;
 use crate::http::transport::TransportConfig;
 use crate::provider::APIType;
 use crate::provider::custom::CustomProviderConfig;
 use crate::provider::outbound_policy::OutboundPolicyValidator;
 #[cfg(feature = "tower")]
-use crate::tower::{BudgetConfig, CacheConfig, CacheStore, LLMHook, RateLimitConfig};
+use crate::tower::{BudgetConfig, CacheConfig, CacheStore, LlmHook, RateLimitConfig};
 
 pub struct NoApiKey;
 pub struct WithApiKey;
@@ -38,7 +38,7 @@ pub struct ClientBuilder<K = NoApiKey, P = NoProvider> {
     #[cfg(feature = "tower")]
     budget_config: Option<BudgetConfig>,
     #[cfg(feature = "tower")]
-    hooks: Vec<Arc<dyn LLMHook>>,
+    hooks: Vec<Arc<dyn LlmHook>>,
     #[cfg(feature = "tower")]
     cooldown_duration: Option<Duration>,
     #[cfg(feature = "tower")]
@@ -284,13 +284,13 @@ impl<K, P> ClientBuilder<K, P> {
     }
 
     #[cfg(feature = "tower")]
-    pub fn hook(mut self, hook: Arc<dyn LLMHook>) -> Self {
+    pub fn hook(mut self, hook: Arc<dyn LlmHook>) -> Self {
         self.hooks.push(hook);
         self
     }
 
     #[cfg(feature = "tower")]
-    pub fn hooks(mut self, hooks: Vec<Arc<dyn LLMHook>>) -> Self {
+    pub fn hooks(mut self, hooks: Vec<Arc<dyn LlmHook>>) -> Self {
         self.hooks = hooks;
         self
     }
@@ -328,7 +328,7 @@ impl<K, P> ClientBuilder<K, P> {
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 impl ClientBuilder<WithApiKey, WithProvider> {
-    pub fn build(self) -> HiLLMResult<super::Client> {
+    pub fn build(self) -> HiLlmResult<super::Client> {
         use super::config::ClientConfig;
 
         let config = ClientConfig {

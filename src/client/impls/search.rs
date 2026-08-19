@@ -1,5 +1,5 @@
 use crate::client::{Client, SearchClient, str_pair};
-use crate::error::{HiLLMError, HiLLMResult};
+use crate::error::{HiLlmError, HiLlmResult};
 use crate::http;
 use crate::types::raw::RawExchange;
 use crate::types::search::{SearchRequest, SearchResponse};
@@ -8,7 +8,7 @@ use super::super::BoxFuture;
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 impl SearchClient for Client {
-    fn search(&self, req: SearchRequest) -> BoxFuture<'_, HiLLMResult<SearchResponse>> {
+    fn search(&self, req: SearchRequest) -> BoxFuture<'_, HiLlmResult<SearchResponse>> {
         Box::pin(async move {
             let prepared = self.prepare_request(&req, |p| p.search_path(), &req.model, None)?;
 
@@ -38,14 +38,14 @@ impl SearchClient for Client {
             )
             .await?;
             prepared.provider.transform_response(&mut raw)?;
-            serde_json::from_value::<SearchResponse>(raw).map_err(HiLLMError::from)
+            serde_json::from_value::<SearchResponse>(raw).map_err(HiLlmError::from)
         })
     }
 
     fn search_raw(
         &self,
         req: SearchRequest,
-    ) -> BoxFuture<'_, HiLLMResult<RawExchange<SearchResponse>>> {
+    ) -> BoxFuture<'_, HiLlmResult<RawExchange<SearchResponse>>> {
         Box::pin(async move {
             let prepared = self.prepare_request(&req, |p| p.search_path(), &req.model, None)?;
             let raw_request = prepared.body_json.clone();
@@ -78,7 +78,7 @@ impl SearchClient for Client {
 
             let raw_response = Some(raw.clone());
             prepared.provider.transform_response(&mut raw)?;
-            let data = serde_json::from_value::<SearchResponse>(raw).map_err(HiLLMError::from)?;
+            let data = serde_json::from_value::<SearchResponse>(raw).map_err(HiLlmError::from)?;
 
             Ok(RawExchange {
                 data,

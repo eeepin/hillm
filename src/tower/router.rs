@@ -17,9 +17,9 @@ use tower::limit::ConcurrencyLimit;
 use tower::ready_cache::ReadyCache;
 
 use super::route_classify::RouteClassifier;
-use super::types::{LLMRequest, LLMRequestKind, LLMResponse};
+use super::types::{LlmRequest, LlmRequestKind, LlmResponse};
 use crate::client::BoxFuture;
-use crate::error::{HiLLMError, HiLLMResult};
+use crate::error::{HiLlmError, HiLlmResult};
 use crate::provider::cost::completion_cost;
 use crate::types::{Message, MessageContent};
 
@@ -149,16 +149,16 @@ impl<S> Router<S> {
         deployments: Vec<S>,
         strategy: RoutingStrategy,
         provider: impl Into<String>,
-    ) -> HiLLMResult<Self> {
+    ) -> HiLlmResult<Self> {
         if deployments.is_empty() {
-            return Err(HiLLMError::BadRequest {
+            return Err(HiLlmError::BadRequest {
                 message: "Router requires at least one deployment".into(),
                 status: 400,
             });
         }
         if let RoutingStrategy::WeightedRandom { ref weights } = strategy {
             if weights.len() != deployments.len() {
-                return Err(HiLLMError::BadRequest {
+                return Err(HiLlmError::BadRequest {
                     message: format!(
                         "WeightedRandom: weights length ({}) must match deployments length ({})",
                         weights.len(),
@@ -169,7 +169,7 @@ impl<S> Router<S> {
             }
             let total: u64 = weights.iter().map(|w| u64::from(w.as_u32())).sum();
             if total == 0 {
-                return Err(HiLLMError::BadRequest {
+                return Err(HiLlmError::BadRequest {
                     message: "WeightedRandom: total weight must be positive".into(),
                     status: 400,
                 });
@@ -197,20 +197,20 @@ impl<S: Clone> Clone for Router<S> {
     }
 }
 
-impl<S> Service<LLMRequest> for Router<S>
+impl<S> Service<LlmRequest> for Router<S>
 where
-    S: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + Clone + Send + 'static,
+    S: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Clone + Send + 'static,
     S::Future: Send + 'static,
 {
-    type Response = LLMResponse;
-    type Error = HiLLMError;
-    type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
+    type Response = LlmResponse;
+    type Error = HiLlmError;
+    type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
 
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: LLMRequest) -> Self::Future {
+    fn call(&mut self, req: LlmRequest) -> Self::Future {
         match &self.strategy {
             RoutingStrategy::RoundRobin => {
                 let idx = self.counter.fetch_add(1, Ordering::Relaxed) % self.deployments.len();
@@ -220,7 +220,7 @@ where
             RoutingStrategy::Fallback => {
                 let deployments = self.deployments.clone();
                 Box::pin(async move {
-                    let mut last_err: Option<HiLLMError> = None;
+                    let mut last_err: Option<HiLlmError> = None;
                     for mut svc in deployments {
                         match svc.call(req.clone()).await {
                             Ok(resp) => return Ok(resp),
@@ -234,7 +234,7 @@ where
                             Err(e) => return Err(e),
                         }
                     }
-                    Err(last_err.unwrap_or(HiLLMError::ServerError {
+                    Err(last_err.unwrap_or(HiLlmError::ServerError {
                         message: "all deployments failed".into(),
                         status: 500,
                     }))
@@ -277,7 +277,7 @@ where
                 let provider = self.provider.clone();
 
                 Box::pin(async move {
-                    let mut last_err: Option<HiLLMError> = None;
+                    let mut last_err: Option<HiLlmError> = None;
                     for mut svc in deployments {
                         match svc.call(req.clone()).await {
                             Ok(resp) => {
@@ -304,7 +304,7 @@ where
                             Err(e) => return Err(e),
                         }
                     }
-                    Err(last_err.unwrap_or(HiLLMError::ServerError {
+                    Err(last_err.unwrap_or(HiLlmError::ServerError {
                         message: "all deployments failed".into(),
                         status: 500,
                     }))
@@ -327,7 +327,7 @@ where
                 let available_models: Vec<String> = (0..n).map(|i| i.to_string()).collect();
 
                 let (prompt, system_prompt) = match &req.kind {
-                    LLMRequestKind::Chat(r) => {
+                    LlmRequestKind::Chat(r) => {
                         let prompt = r
                             .messages
                             .iter()
@@ -421,9 +421,9 @@ impl RouterError {
     }
 }
 
-impl From<RouterError> for HiLLMError {
+impl From<RouterError> for HiLlmError {
     fn from(e: RouterError) -> Self {
-        HiLLMError::ServerError {
+        HiLlmError::ServerError {
             message: e.to_string(),
             status: 503,
         }
@@ -474,18 +474,18 @@ impl Default for ProviderConfig {
 pub struct DynamicRouter<D>
 where
     D: Discover<Key = String>,
-    D::Service: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError>,
+    D::Service: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError>,
 {
     discover: D,
-    services: ReadyCache<String, ConcurrencyLimit<D::Service>, LLMRequest>,
+    services: ReadyCache<String, ConcurrencyLimit<D::Service>, LlmRequest>,
     provider_configs: HashMap<String, ProviderConfig>,
-    _marker: PhantomData<LLMRequest>,
+    _marker: PhantomData<LlmRequest>,
 }
 
 impl<D> fmt::Debug for DynamicRouter<D>
 where
     D: Discover<Key = String> + fmt::Debug,
-    D::Service: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + fmt::Debug,
+    D::Service: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("DynamicRouter")
@@ -498,8 +498,8 @@ impl<D> DynamicRouter<D>
 where
     D: Discover<Key = String> + Unpin,
     D::Service:
-        Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + Send + Unpin + 'static,
-    <D::Service as Service<LLMRequest>>::Future: Send + 'static,
+        Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Send + Unpin + 'static,
+    <D::Service as Service<LlmRequest>>::Future: Send + 'static,
     D::Error: Into<tower::BoxError>,
 {
     pub fn new(discover: D) -> Self {
@@ -557,19 +557,19 @@ where
     }
 }
 
-impl<D> Service<LLMRequest> for DynamicRouter<D>
+impl<D> Service<LlmRequest> for DynamicRouter<D>
 where
     D: Discover<Key = String> + Unpin + Send,
     D::Service:
-        Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + Send + Unpin + 'static,
-    <D::Service as Service<LLMRequest>>::Future: Send + 'static,
+        Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Send + Unpin + 'static,
+    <D::Service as Service<LlmRequest>>::Future: Send + 'static,
     D::Error: Into<tower::BoxError>,
 {
-    type Response = LLMResponse;
-    type Error = HiLLMError;
-    type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
+    type Response = LlmResponse;
+    type Error = HiLlmError;
+    type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
         if let Err(e) = self.update_from_discover(cx) {
             return Poll::Ready(Err(e.into()));
         }
@@ -583,7 +583,7 @@ where
         }
     }
 
-    fn call(&mut self, req: LLMRequest) -> Self::Future {
+    fn call(&mut self, req: LlmRequest) -> Self::Future {
         if self.services.ready_len() == 0 {
             return Box::pin(async { Err(RouterError::NoReadyUpstream { code: 2002 }.into()) });
         }
@@ -685,7 +685,7 @@ mod tests {
     // Test infrastructure: mock service and request builder
     // -----------------------------------------------------------------------
 
-    use crate::tower::types::{LLMRequest, LLMResponse};
+    use crate::tower::types::{LlmRequest, LlmResponse};
     use crate::types::{
         AssistantMessage, ChatCompletionRequest, ChatCompletionResponse, Choice, Message,
         MessageContent, Usage,
@@ -693,9 +693,9 @@ mod tests {
     use std::sync::atomic::{AtomicU32, Ordering as StdOrdering};
     use tower::ServiceExt;
 
-    fn create_chat_request(content: &str) -> LLMRequest {
-        LLMRequest {
-            kind: crate::tower::types::LLMRequestKind::Chat(ChatCompletionRequest {
+    fn create_chat_request(content: &str) -> LlmRequest {
+        LlmRequest {
+            kind: crate::tower::types::LlmRequestKind::Chat(ChatCompletionRequest {
                 model: "test-model".to_string(),
                 messages: vec![Message::User(crate::types::UserMessage {
                     content: MessageContent::Text(content.to_string()),
@@ -708,8 +708,8 @@ mod tests {
         }
     }
 
-    fn create_chat_response() -> LLMResponse {
-        LLMResponse::Chat(ChatCompletionResponse {
+    fn create_chat_response() -> LlmResponse {
+        LlmResponse::Chat(ChatCompletionResponse {
             id: "test-id".to_string(),
             object: "chat.completion".to_string(),
             created: 1234567890,
@@ -768,26 +768,26 @@ mod tests {
         }
     }
 
-    impl Service<LLMRequest> for MockService {
-        type Response = LLMResponse;
-        type Error = HiLLMError;
-        type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
+    impl Service<LlmRequest> for MockService {
+        type Response = LlmResponse;
+        type Error = HiLlmError;
+        type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
 
-        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
+        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
             Poll::Ready(Ok(()))
         }
 
-        fn call(&mut self, _req: LLMRequest) -> Self::Future {
+        fn call(&mut self, _req: LlmRequest) -> Self::Future {
             self.call_count.fetch_add(1, StdOrdering::SeqCst);
             let behavior = self.behavior.clone();
             Box::pin(async move {
                 match behavior {
                     MockBehavior::Success => Ok(create_chat_response()),
-                    MockBehavior::TransientFail => Err(HiLLMError::ServiceUnavailable {
+                    MockBehavior::TransientFail => Err(HiLlmError::ServiceUnavailable {
                         message: "transient".to_string(),
                         status: 503,
                     }),
-                    MockBehavior::TerminalFail => Err(HiLLMError::BadRequest {
+                    MockBehavior::TerminalFail => Err(HiLlmError::BadRequest {
                         message: "terminal".to_string(),
                         status: 400,
                     }),
@@ -1072,7 +1072,7 @@ mod tests {
 
     #[test]
     fn router_error_converts_to_server_error_503() {
-        let err: HiLLMError = RouterError::NoReadyUpstream { code: 2002 }.into();
+        let err: HiLlmError = RouterError::NoReadyUpstream { code: 2002 }.into();
         assert_eq!(err.status_code(), 503);
     }
 }

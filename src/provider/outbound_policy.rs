@@ -1,4 +1,4 @@
-use crate::error::HiLLMError;
+use crate::error::HiLlmError;
 #[cfg(all(
     any(feature = "default-http", feature = "wasm-http"),
     not(target_arch = "wasm32")
@@ -115,7 +115,7 @@ impl OutboundPolicyValidator {
     /// Always parses the URL and rejects non-http/https schemes, even when
     /// the policy is `Off`. When the policy is not `Off`, performs additional
     /// address-range checks on the host.
-    pub fn validate_url_sync(&self, raw_url: &str) -> Result<(), HiLLMError> {
+    pub fn validate_url_sync(&self, raw_url: &str) -> Result<(), HiLlmError> {
         let policy = self.current_policy();
         validate_url_with_policy(&policy, raw_url)
     }
@@ -128,7 +128,7 @@ impl OutboundPolicyValidator {
         any(feature = "default-http", feature = "wasm-http"),
         not(target_arch = "wasm32")
     ))]
-    pub async fn validate_url(&self, raw_url: &str) -> Result<(), HiLLMError> {
+    pub async fn validate_url(&self, raw_url: &str) -> Result<(), HiLlmError> {
         let policy = self.current_policy();
         validate_url_with_policy_async(&policy, raw_url).await
     }
@@ -170,11 +170,11 @@ pub fn current_policy() -> OutboundPolicy {
     any(feature = "default-http", feature = "wasm-http"),
     not(target_arch = "wasm32")
 ))]
-pub async fn validate_outbound_url(raw_url: &str) -> Result<(), HiLLMError> {
+pub async fn validate_outbound_url(raw_url: &str) -> Result<(), HiLlmError> {
     global_validator().validate_url(raw_url).await
 }
 
-pub fn validate_outbound_url_sync(raw_url: &str) -> Result<(), HiLLMError> {
+pub fn validate_outbound_url_sync(raw_url: &str) -> Result<(), HiLlmError> {
     global_validator().validate_url_sync(raw_url)
 }
 
@@ -189,9 +189,9 @@ pub fn validate_outbound_url_sync(raw_url: &str) -> Result<(), HiLLMError> {
 async fn validate_url_with_policy_async(
     policy: &OutboundPolicy,
     raw_url: &str,
-) -> Result<(), HiLLMError> {
+) -> Result<(), HiLlmError> {
     // Always parse URL and validate scheme, even when policy is Off
-    let url = Url::parse(raw_url).map_err(|e| HiLLMError::OutboundForbidden {
+    let url = Url::parse(raw_url).map_err(|e| HiLlmError::OutboundForbidden {
         url: raw_url.to_string(),
         reason: format!("invalid URL: {e}"),
     })?;
@@ -199,7 +199,7 @@ async fn validate_url_with_policy_async(
     match url.scheme() {
         "http" | "https" => {}
         other => {
-            return Err(HiLLMError::OutboundForbidden {
+            return Err(HiLlmError::OutboundForbidden {
                 url: raw_url.to_string(),
                 reason: format!("scheme '{other}' is not allowed; only http/https"),
             });
@@ -214,9 +214,9 @@ async fn validate_url_with_policy_async(
     }
 }
 
-fn validate_url_with_policy(policy: &OutboundPolicy, raw_url: &str) -> Result<(), HiLLMError> {
+fn validate_url_with_policy(policy: &OutboundPolicy, raw_url: &str) -> Result<(), HiLlmError> {
     // Always parse URL and validate scheme, even when policy is Off
-    let url = Url::parse(raw_url).map_err(|e| HiLLMError::OutboundForbidden {
+    let url = Url::parse(raw_url).map_err(|e| HiLlmError::OutboundForbidden {
         url: raw_url.to_string(),
         reason: format!("invalid URL: {e}"),
     })?;
@@ -224,7 +224,7 @@ fn validate_url_with_policy(policy: &OutboundPolicy, raw_url: &str) -> Result<()
     match url.scheme() {
         "http" | "https" => {}
         other => {
-            return Err(HiLLMError::OutboundForbidden {
+            return Err(HiLlmError::OutboundForbidden {
                 url: raw_url.to_string(),
                 reason: format!("scheme '{other}' is not allowed; only http/https"),
             });
@@ -238,13 +238,13 @@ fn validate_url_with_policy(policy: &OutboundPolicy, raw_url: &str) -> Result<()
 
     match url.host() {
         Some(url::Host::Ipv4(v4)) if is_forbidden(IpAddr::V4(v4)) => {
-            return Err(HiLLMError::OutboundForbidden {
+            return Err(HiLlmError::OutboundForbidden {
                 url: raw_url.to_string(),
                 reason: format!("host is a forbidden address {v4}"),
             });
         }
         Some(url::Host::Ipv6(v6)) if is_forbidden(IpAddr::V6(v6)) => {
-            return Err(HiLLMError::OutboundForbidden {
+            return Err(HiLlmError::OutboundForbidden {
                 url: raw_url.to_string(),
                 reason: format!("host is a forbidden address {v6}"),
             });
@@ -263,10 +263,10 @@ fn validate_url_with_policy(policy: &OutboundPolicy, raw_url: &str) -> Result<()
     any(feature = "default-http", feature = "wasm-http"),
     not(target_arch = "wasm32")
 ))]
-async fn check_deny_private(url: &Url, raw: &str) -> Result<(), HiLLMError> {
+async fn check_deny_private(url: &Url, raw: &str) -> Result<(), HiLlmError> {
     let host = url
         .host_str()
-        .ok_or_else(|| HiLLMError::OutboundForbidden {
+        .ok_or_else(|| HiLlmError::OutboundForbidden {
             url: raw.to_string(),
             reason: "URL has no host".into(),
         })?;
@@ -275,14 +275,14 @@ async fn check_deny_private(url: &Url, raw: &str) -> Result<(), HiLLMError> {
 
     let addrs = tokio::net::lookup_host(format!("{host}:{port}"))
         .await
-        .map_err(|e| HiLLMError::OutboundForbidden {
+        .map_err(|e| HiLlmError::OutboundForbidden {
             url: raw.to_string(),
             reason: format!("DNS resolution failed: {e}"),
         })?;
 
     for sa in addrs {
         if is_forbidden(sa.ip()) {
-            return Err(HiLLMError::OutboundForbidden {
+            return Err(HiLlmError::OutboundForbidden {
                 url: raw.to_string(),
                 reason: format!("host resolves to forbidden address {}", sa.ip()),
             });
@@ -291,7 +291,7 @@ async fn check_deny_private(url: &Url, raw: &str) -> Result<(), HiLLMError> {
     Ok(())
 }
 
-fn check_allowlist(url: &Url, raw: &str, allowed: &[Url]) -> Result<(), HiLLMError> {
+fn check_allowlist(url: &Url, raw: &str, allowed: &[Url]) -> Result<(), HiLlmError> {
     let origin_match = allowed.iter().any(|a| {
         a.scheme() == url.scheme()
             && a.host_str() == url.host_str()
@@ -300,7 +300,7 @@ fn check_allowlist(url: &Url, raw: &str, allowed: &[Url]) -> Result<(), HiLLMErr
     if origin_match {
         Ok(())
     } else {
-        Err(HiLLMError::OutboundForbidden {
+        Err(HiLlmError::OutboundForbidden {
             url: raw.to_string(),
             reason: "URL not in outbound allowlist".into(),
         })

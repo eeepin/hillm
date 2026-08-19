@@ -111,8 +111,8 @@ enum ModelMatch {
 
 最低兼容策略：
 
-- 保留现有 `LLMClient::chat` 和 `ResponseClient`，避免立即破坏已有调用方。
-- `LLMClient::chat` 只直接对应 `OpenAIChatCompletions`；如果用它调用 `AnthropicMessages`，兼容转换必须是显式 adapter，而不是 provider 的隐藏默认行为。
+- 保留现有 `LlmClient::chat` 和 `ResponseClient`，避免立即破坏已有调用方。
+- `LlmClient::chat` 只直接对应 `OpenAIChatCompletions`；如果用它调用 `AnthropicMessages`，兼容转换必须是显式 adapter，而不是 provider 的隐藏默认行为。
 - `ResponseClient` 只对应 `OpenAIResponses`。
 - 新增 Anthropic Messages 的原生 request/response/event 类型和独立 client trait，避免把 Anthropic 的 content block、cache usage、stop reason 和 tool use 有损压缩成 OpenAI chat 类型。
 - 不在第一版中实现三种协议之间任意互转；只提供现有 Chat → Anthropic 的兼容 adapter，并标注可能丢失的信息。
@@ -237,9 +237,9 @@ pub enum APIResponse {
 
 pub trait APITypeCodec: Send + Sync {
     fn api_type(&self) -> APIType;
-    fn encode_request(&self, request: &APIRequest) -> HiLLMResult<Bytes>;
-    fn decode_response(&self, bytes: &[u8]) -> HiLLMResult<APIResponse>;
-    fn parse_stream_event(&self, data: &str) -> HiLLMResult<Option<APIStreamEvent>>;
+    fn encode_request(&self, request: &APIRequest) -> HiLlmResult<Bytes>;
+    fn decode_response(&self, bytes: &[u8]) -> HiLlmResult<APIResponse>;
+    fn parse_stream_event(&self, data: &str) -> HiLlmResult<Option<APIStreamEvent>>;
 }
 ```
 
@@ -322,7 +322,7 @@ pub trait APITypeCodec: Send + Sync {
 - 将 OpenAI Responses 与 Anthropic Messages 完整无损转换为 Chat Completion。
 - 同一 provider 实例按请求动态选择 API type。
 - 基于模型能力自动选择最优协议。
-- 重新设计全部 Tower `LLMRequestKind` 和缓存键。
+- 重新设计全部 Tower `LlmRequestKind` 和缓存键。
 - 立即拆成多个 crate。
 
 这些行为会引入隐式决策、缓存键变化和难以解释的 fallback。第一版应坚持“配置声明能力、创建实例时显式选择、发送期间保持不变”。

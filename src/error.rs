@@ -18,7 +18,7 @@ pub(crate) struct ApiError {
 /// Errors that may occur when using `hillm`.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
-pub enum HiLLMError {
+pub enum HiLlmError {
     #[error("authentication failed: {message}")]
     Authentication { message: String, status: u16 },
 
@@ -101,7 +101,7 @@ pub enum HiLLMError {
     ProviderNotFound { name: String },
 }
 
-impl HiLLMError {
+impl HiLlmError {
     #[must_use]
     pub fn status_code(&self) -> u16 {
         match self {
@@ -313,4 +313,4 @@ impl HiLLMError {
     }
 }
 
-pub type HiLLMResult<T> = std::result::Result<T, HiLLMError>;
+pub type HiLlmResult<T> = std::result::Result<T, HiLlmError>;

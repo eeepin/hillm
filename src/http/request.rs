@@ -2,7 +2,7 @@ use std::future::Future;
 
 use bytes::Bytes;
 
-use crate::error::{HiLLMError, HiLLMResult};
+use crate::error::{HiLlmError, HiLlmResult};
 use crate::http::retry;
 use crate::util::bound::{RESPONSE_BODY_MAX_BYTES, check_bound};
 
@@ -16,15 +16,15 @@ pub(crate) fn retry_after_from_response(resp: &reqwest::Response) -> Option<std:
 }
 
 /// Read a JSON response body with a size bound to prevent OOM attacks.
-async fn read_bounded_json(resp: reqwest::Response) -> HiLLMResult<serde_json::Value> {
-    let text = resp.text().await.map_err(HiLLMError::from)?;
+async fn read_bounded_json(resp: reqwest::Response) -> HiLlmResult<serde_json::Value> {
+    let text = resp.text().await.map_err(HiLlmError::from)?;
     check_bound("response body", 0, text.len(), RESPONSE_BODY_MAX_BYTES)?;
-    serde_json::from_str(&text).map_err(HiLLMError::from)
+    serde_json::from_str(&text).map_err(HiLlmError::from)
 }
 
 /// Read a binary response body with a size bound to prevent OOM attacks.
-async fn read_bounded_bytes(resp: reqwest::Response) -> HiLLMResult<Bytes> {
-    let bytes = resp.bytes().await.map_err(HiLLMError::from)?;
+async fn read_bounded_bytes(resp: reqwest::Response) -> HiLlmResult<Bytes> {
+    let bytes = resp.bytes().await.map_err(HiLlmError::from)?;
     check_bound("response body", 0, bytes.len(), RESPONSE_BODY_MAX_BYTES)?;
     Ok(bytes)
 }
@@ -45,7 +45,7 @@ async fn read_bounded_error_text(resp: reqwest::Response) -> String {
 pub(crate) async fn with_retry<F, Fut>(
     max_retries: u32,
     mut send: F,
-) -> HiLLMResult<reqwest::Response>
+) -> HiLlmResult<reqwest::Response>
 where
     F: FnMut() -> Fut,
     Fut: Future<Output = std::result::Result<reqwest::Response, reqwest::Error>>,
@@ -73,7 +73,7 @@ where
         }
 
         let text = read_bounded_error_text(resp).await;
-        return Err(HiLLMError::from_status(status, &text, server_retry_after));
+        return Err(HiLlmError::from_status(status, &text, server_retry_after));
     }
 }
 
@@ -96,7 +96,7 @@ pub async fn post_json_raw(
     extra_headers: &[(&str, &str)],
     body: Bytes,
     max_retries: u32,
-) -> HiLLMResult<serde_json::Value> {
+) -> HiLlmResult<serde_json::Value> {
     let mut retry_count = 0u32;
 
     let resp = with_retry(max_retries, || {
@@ -144,7 +144,7 @@ pub async fn post_binary(
     extra_headers: &[(&str, &str)],
     body: Bytes,
     max_retries: u32,
-) -> HiLLMResult<Bytes> {
+) -> HiLlmResult<Bytes> {
     let mut retry_count = 0u32;
 
     let resp = with_retry(max_retries, || {
@@ -190,7 +190,7 @@ pub async fn post_multipart(
     auth_header: Option<(&str, &str)>,
     extra_headers: &[(&str, &str)],
     form: reqwest::multipart::Form,
-) -> HiLLMResult<serde_json::Value> {
+) -> HiLlmResult<serde_json::Value> {
     let mut builder = client.post(url).multipart(form);
     if let Some((name, value)) = auth_header {
         builder = builder.header(name, value);
@@ -211,7 +211,7 @@ pub async fn post_multipart(
     if !resp.status().is_success() {
         let server_retry_after = retry_after_from_response(&resp);
         let text = read_bounded_error_text(resp).await;
-        return Err(HiLLMError::from_status(status, &text, server_retry_after));
+        return Err(HiLlmError::from_status(status, &text, server_retry_after));
     }
 
     read_bounded_json(resp).await
@@ -235,7 +235,7 @@ pub async fn get_json_raw(
     auth_header: Option<(&str, &str)>,
     extra_headers: &[(&str, &str)],
     max_retries: u32,
-) -> HiLLMResult<serde_json::Value> {
+) -> HiLlmResult<serde_json::Value> {
     let mut retry_count = 0u32;
 
     let resp = with_retry(max_retries, || {
@@ -279,7 +279,7 @@ pub async fn delete_json(
     auth_header: Option<(&str, &str)>,
     extra_headers: &[(&str, &str)],
     max_retries: u32,
-) -> HiLLMResult<serde_json::Value> {
+) -> HiLlmResult<serde_json::Value> {
     let mut retry_count = 0u32;
 
     let resp = with_retry(max_retries, || {
@@ -323,7 +323,7 @@ pub async fn get_binary(
     auth_header: Option<(&str, &str)>,
     extra_headers: &[(&str, &str)],
     max_retries: u32,
-) -> HiLLMResult<Bytes> {
+) -> HiLlmResult<Bytes> {
     let mut retry_count = 0u32;
 
     let resp = with_retry(max_retries, || {

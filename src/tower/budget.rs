@@ -10,9 +10,9 @@ use std::time::{Duration, SystemTime};
 use dashmap::DashMap;
 use tower::{Layer, Service};
 
-use super::types::{LLMRequest, LLMResponse};
+use super::types::{LlmRequest, LlmResponse};
 use crate::client::BoxFuture;
-use crate::error::{HiLLMError, HiLLMResult};
+use crate::error::{HiLlmError, HiLlmResult};
 use crate::provider::cost;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -572,20 +572,20 @@ impl<S: Clone> Clone for BudgetService<S> {
     }
 }
 
-impl<S> Service<LLMRequest> for BudgetService<S>
+impl<S> Service<LlmRequest> for BudgetService<S>
 where
-    S: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + Send + 'static,
+    S: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Send + 'static,
     S::Future: Send + 'static,
 {
-    type Response = LLMResponse;
-    type Error = HiLLMError;
-    type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
+    type Response = LlmResponse;
+    type Error = HiLlmError;
+    type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
         self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, req: LLMRequest) -> Self::Future {
+    fn call(&mut self, req: LlmRequest) -> Self::Future {
         let model = req.model().unwrap_or("unknown").to_owned();
         let config = self.config.clone();
         let state = Arc::clone(&self.state);
@@ -621,11 +621,11 @@ where
     }
 }
 
-fn check_budget(config: &BudgetConfig, state: &BudgetState, model: &str) -> Option<HiLLMError> {
+fn check_budget(config: &BudgetConfig, state: &BudgetState, model: &str) -> Option<HiLlmError> {
     if let Some(limit) = config.global_limit
         && state.global_spend() >= limit
     {
-        return Some(HiLLMError::BudgetExceeded {
+        return Some(HiLlmError::BudgetExceeded {
             message: format!(
                 "global budget exceeded: spent ${:.6}, limit ${:.6}",
                 state.global_spend(),
@@ -638,7 +638,7 @@ fn check_budget(config: &BudgetConfig, state: &BudgetState, model: &str) -> Opti
     if let Some(&limit) = config.model_limits.get(model)
         && state.model_spend(model) >= limit
     {
-        return Some(HiLLMError::BudgetExceeded {
+        return Some(HiLlmError::BudgetExceeded {
             message: format!(
                 "model {model} budget exceeded: spent ${:.6}, limit ${:.6}",
                 state.model_spend(model),

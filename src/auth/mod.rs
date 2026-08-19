@@ -3,14 +3,14 @@ use std::sync::Arc;
 use secrecy::SecretString;
 
 use crate::client::BoxFuture;
-use crate::error::HiLLMResult;
+use crate::error::HiLlmResult;
 
 pub trait CredentialProvider: Send + Sync {
-    fn resolve(&self) -> BoxFuture<'_, HiLLMResult<Credential>>;
+    fn resolve(&self) -> BoxFuture<'_, HiLlmResult<Credential>>;
 }
 
 impl CredentialProvider for Arc<dyn CredentialProvider> {
-    fn resolve(&self) -> BoxFuture<'_, HiLLMResult<Credential>> {
+    fn resolve(&self) -> BoxFuture<'_, HiLlmResult<Credential>> {
         (**self).resolve()
     }
 }
@@ -36,7 +36,7 @@ impl StaticTokenProvider {
 }
 
 impl CredentialProvider for StaticTokenProvider {
-    fn resolve(&self) -> BoxFuture<'_, HiLLMResult<Credential>> {
+    fn resolve(&self) -> BoxFuture<'_, HiLlmResult<Credential>> {
         let token = self.token.clone();
         Box::pin(async move { Ok(Credential::BearerToken(token)) })
     }

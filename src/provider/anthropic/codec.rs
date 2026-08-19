@@ -1,6 +1,6 @@
 //! Anthropic Messages API codec implementation.
 
-use crate::error::{HiLLMError, HiLLMResult};
+use crate::error::{HiLlmError, HiLlmResult};
 use crate::provider::APIType;
 use crate::provider::codec::APITypeCodec;
 use bytes::Bytes;
@@ -18,19 +18,19 @@ impl APITypeCodec for AnthropicMessagesCodec {
         "/messages"
     }
 
-    fn encode_request(&self, request: &serde_json::Value) -> HiLLMResult<Bytes> {
+    fn encode_request(&self, request: &serde_json::Value) -> HiLlmResult<Bytes> {
         Ok(Bytes::from(serde_json::to_vec(request)?))
     }
 
-    fn decode_response(&self, bytes: &[u8]) -> HiLLMResult<serde_json::Value> {
+    fn decode_response(&self, bytes: &[u8]) -> HiLlmResult<serde_json::Value> {
         Ok(serde_json::from_slice(bytes)?)
     }
 
-    fn parse_stream_event(&self, data: &str) -> HiLLMResult<Option<serde_json::Value>> {
+    fn parse_stream_event(&self, data: &str) -> HiLlmResult<Option<serde_json::Value>> {
         // Anthropic doesn't use [DONE] sentinel
         serde_json::from_str(data)
             .map(Some)
-            .map_err(|e| HiLLMError::Streaming {
+            .map_err(|e| HiLlmError::Streaming {
                 message: format!("Failed to parse AnthropicStreamEvent: {}", e),
             })
     }

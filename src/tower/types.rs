@@ -1,7 +1,7 @@
 use serde::Serialize;
 
 use crate::client::BoxStream;
-use crate::error::HiLLMResult;
+use crate::error::HiLlmResult;
 use crate::tenant::TenantId;
 use crate::types::audio::{CreateSpeechRequest, CreateTranscriptionRequest, TranscriptionResponse};
 use crate::types::image::{CreateImageRequest, ImagesResponse};
@@ -15,7 +15,7 @@ use crate::types::{
 };
 
 #[derive(Debug, Clone, Serialize)]
-pub enum LLMRequestKind {
+pub enum LlmRequestKind {
     Chat(ChatCompletionRequest),
     ChatStream(ChatCompletionRequest),
     Embed(EmbeddingRequest),
@@ -30,13 +30,13 @@ pub enum LLMRequestKind {
 }
 
 #[derive(Debug, Clone)]
-pub struct LLMRequest {
-    pub kind: LLMRequestKind,
+pub struct LlmRequest {
+    pub kind: LlmRequestKind,
     pub tenant_id: Option<TenantId>,
     pub idempotency_key: Option<String>,
 }
 
-impl serde::Serialize for LLMRequest {
+impl serde::Serialize for LlmRequest {
     fn serialize<S: serde::Serializer>(
         &self,
         serializer: S,
@@ -46,12 +46,12 @@ impl serde::Serialize for LLMRequest {
 }
 
 #[allow(non_snake_case)]
-impl LLMRequest {
+impl LlmRequest {
     /// Non-streaming chat completion.
     #[must_use]
     pub fn Chat(req: ChatCompletionRequest) -> Self {
         Self {
-            kind: LLMRequestKind::Chat(req),
+            kind: LlmRequestKind::Chat(req),
             tenant_id: None,
             idempotency_key: None,
         }
@@ -61,7 +61,7 @@ impl LLMRequest {
     #[must_use]
     pub fn ChatStream(req: ChatCompletionRequest) -> Self {
         Self {
-            kind: LLMRequestKind::ChatStream(req),
+            kind: LlmRequestKind::ChatStream(req),
             tenant_id: None,
             idempotency_key: None,
         }
@@ -71,7 +71,7 @@ impl LLMRequest {
     #[must_use]
     pub fn Embed(req: EmbeddingRequest) -> Self {
         Self {
-            kind: LLMRequestKind::Embed(req),
+            kind: LlmRequestKind::Embed(req),
             tenant_id: None,
             idempotency_key: None,
         }
@@ -81,7 +81,7 @@ impl LLMRequest {
     #[must_use]
     pub fn ListModels() -> Self {
         Self {
-            kind: LLMRequestKind::ListModels,
+            kind: LlmRequestKind::ListModels,
             tenant_id: None,
             idempotency_key: None,
         }
@@ -91,7 +91,7 @@ impl LLMRequest {
     #[must_use]
     pub fn ImageGenerate(req: CreateImageRequest) -> Self {
         Self {
-            kind: LLMRequestKind::ImageGenerate(req),
+            kind: LlmRequestKind::ImageGenerate(req),
             tenant_id: None,
             idempotency_key: None,
         }
@@ -101,7 +101,7 @@ impl LLMRequest {
     #[must_use]
     pub fn Speech(req: CreateSpeechRequest) -> Self {
         Self {
-            kind: LLMRequestKind::Speech(req),
+            kind: LlmRequestKind::Speech(req),
             tenant_id: None,
             idempotency_key: None,
         }
@@ -111,7 +111,7 @@ impl LLMRequest {
     #[must_use]
     pub fn Transcribe(req: CreateTranscriptionRequest) -> Self {
         Self {
-            kind: LLMRequestKind::Transcribe(req),
+            kind: LlmRequestKind::Transcribe(req),
             tenant_id: None,
             idempotency_key: None,
         }
@@ -121,7 +121,7 @@ impl LLMRequest {
     #[must_use]
     pub fn Moderate(req: ModerationRequest) -> Self {
         Self {
-            kind: LLMRequestKind::Moderate(req),
+            kind: LlmRequestKind::Moderate(req),
             tenant_id: None,
             idempotency_key: None,
         }
@@ -131,7 +131,7 @@ impl LLMRequest {
     #[must_use]
     pub fn Rerank(req: RerankRequest) -> Self {
         Self {
-            kind: LLMRequestKind::Rerank(req),
+            kind: LlmRequestKind::Rerank(req),
             tenant_id: None,
             idempotency_key: None,
         }
@@ -141,7 +141,7 @@ impl LLMRequest {
     #[must_use]
     pub fn Search(req: SearchRequest) -> Self {
         Self {
-            kind: LLMRequestKind::Search(req),
+            kind: LlmRequestKind::Search(req),
             tenant_id: None,
             idempotency_key: None,
         }
@@ -151,65 +151,65 @@ impl LLMRequest {
     #[must_use]
     pub fn Ocr(req: OcrRequest) -> Self {
         Self {
-            kind: LLMRequestKind::Ocr(req),
+            kind: LlmRequestKind::Ocr(req),
             tenant_id: None,
             idempotency_key: None,
         }
     }
 }
 
-impl LLMRequest {
+impl LlmRequest {
     #[must_use]
-    pub fn kind(&self) -> &LLMRequestKind {
+    pub fn kind(&self) -> &LlmRequestKind {
         &self.kind
     }
 
     #[must_use]
     pub fn operation_name(&self) -> &'static str {
         match &self.kind {
-            LLMRequestKind::Chat(_) | LLMRequestKind::ChatStream(_) => "chat",
-            LLMRequestKind::Embed(_) => "embeddings",
-            LLMRequestKind::ListModels => "list_models",
-            LLMRequestKind::ImageGenerate(_) => "image_generate",
-            LLMRequestKind::Speech(_) => "speech",
-            LLMRequestKind::Transcribe(_) => "transcribe",
-            LLMRequestKind::Moderate(_) => "moderate",
-            LLMRequestKind::Rerank(_) => "rerank",
-            LLMRequestKind::Search(_) => "search",
-            LLMRequestKind::Ocr(_) => "ocr",
+            LlmRequestKind::Chat(_) | LlmRequestKind::ChatStream(_) => "chat",
+            LlmRequestKind::Embed(_) => "embeddings",
+            LlmRequestKind::ListModels => "list_models",
+            LlmRequestKind::ImageGenerate(_) => "image_generate",
+            LlmRequestKind::Speech(_) => "speech",
+            LlmRequestKind::Transcribe(_) => "transcribe",
+            LlmRequestKind::Moderate(_) => "moderate",
+            LlmRequestKind::Rerank(_) => "rerank",
+            LlmRequestKind::Search(_) => "search",
+            LlmRequestKind::Ocr(_) => "ocr",
         }
     }
 
     #[must_use]
     pub fn request_type(&self) -> &'static str {
         match &self.kind {
-            LLMRequestKind::Chat(_) => "chat",
-            LLMRequestKind::ChatStream(_) => "chat_stream",
-            LLMRequestKind::Embed(_) => "embeddings",
-            LLMRequestKind::ListModels => "list_models",
-            LLMRequestKind::ImageGenerate(_) => "image_generate",
-            LLMRequestKind::Speech(_) => "speech",
-            LLMRequestKind::Transcribe(_) => "transcribe",
-            LLMRequestKind::Moderate(_) => "moderate",
-            LLMRequestKind::Rerank(_) => "rerank",
-            LLMRequestKind::Search(_) => "search",
-            LLMRequestKind::Ocr(_) => "ocr",
+            LlmRequestKind::Chat(_) => "chat",
+            LlmRequestKind::ChatStream(_) => "chat_stream",
+            LlmRequestKind::Embed(_) => "embeddings",
+            LlmRequestKind::ListModels => "list_models",
+            LlmRequestKind::ImageGenerate(_) => "image_generate",
+            LlmRequestKind::Speech(_) => "speech",
+            LlmRequestKind::Transcribe(_) => "transcribe",
+            LlmRequestKind::Moderate(_) => "moderate",
+            LlmRequestKind::Rerank(_) => "rerank",
+            LlmRequestKind::Search(_) => "search",
+            LlmRequestKind::Ocr(_) => "ocr",
         }
     }
 
     #[must_use]
     pub fn model(&self) -> Option<&str> {
         match &self.kind {
-            LLMRequestKind::Chat(r) | LLMRequestKind::ChatStream(r) => Some(r.model.as_str()),
-            LLMRequestKind::Embed(r) => Some(r.model.as_str()),
-            LLMRequestKind::ImageGenerate(r) => r.model.as_deref(),
-            LLMRequestKind::Speech(r) => Some(r.model.as_str()),
-            LLMRequestKind::Transcribe(r) => Some(r.model.as_str()),
-            LLMRequestKind::Moderate(r) => r.model.as_deref(),
-            LLMRequestKind::Rerank(r) => Some(r.model.as_str()),
-            LLMRequestKind::Search(r) => Some(r.model.as_str()),
-            LLMRequestKind::Ocr(r) => Some(r.model.as_str()),
-            LLMRequestKind::ListModels => None,
+            LlmRequestKind::Chat(r) | LlmRequestKind::ChatStream(r) => Some(r.model.as_str()),
+            LlmRequestKind::Embed(r) => Some(r.model.as_str()),
+            LlmRequestKind::ImageGenerate(r) => r.model.as_deref(),
+            LlmRequestKind::Speech(r) => Some(r.model.as_str()),
+            LlmRequestKind::Transcribe(r) => Some(r.model.as_str()),
+            LlmRequestKind::Moderate(r) => r.model.as_deref(),
+            LlmRequestKind::Rerank(r) => Some(r.model.as_str()),
+            LlmRequestKind::Search(r) => Some(r.model.as_str()),
+            LlmRequestKind::Ocr(r) => Some(r.model.as_str()),
+            LlmRequestKind::ListModels => None,
         }
     }
 
@@ -231,11 +231,11 @@ impl LLMRequest {
     }
 }
 
-pub enum LLMResponse {
+pub enum LlmResponse {
     /// Non-streaming chat completion.
     Chat(ChatCompletionResponse),
     /// Streaming chat completion.
-    ChatStream(BoxStream<'static, HiLLMResult<ChatCompletionChunk>>),
+    ChatStream(BoxStream<'static, HiLlmResult<ChatCompletionChunk>>),
     /// Text embedding.
     Embed(EmbeddingResponse),
     /// Model list.
@@ -256,7 +256,7 @@ pub enum LLMResponse {
     Ocr(OcrResponse),
 }
 
-impl LLMResponse {
+impl LlmResponse {
     #[must_use]
     pub fn usage(&self) -> Option<&Usage> {
         match self {
@@ -275,7 +275,7 @@ impl LLMResponse {
     }
 }
 
-impl std::fmt::Debug for LLMResponse {
+impl std::fmt::Debug for LlmResponse {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Chat(r) => f.debug_tuple("Chat").field(r).finish(),

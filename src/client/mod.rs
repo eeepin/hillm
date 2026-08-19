@@ -16,7 +16,7 @@ use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::error::{HiLLMError, HiLLMResult};
+use crate::error::{HiLlmError, HiLlmResult};
 use crate::types::audio::{CreateSpeechRequest, CreateTranscriptionRequest, TranscriptionResponse};
 use crate::types::batch::{
     BatchListQuery, BatchListResponse, BatchObject, BatchStatus, CreateBatchRequest,
@@ -77,8 +77,8 @@ pub enum BatchWaitError {
     Client { message: String, code: u32 },
 }
 
-impl From<HiLLMError> for BatchWaitError {
-    fn from(err: HiLLMError) -> Self {
+impl From<HiLlmError> for BatchWaitError {
+    fn from(err: HiLlmError) -> Self {
         Self::Client {
             code: u32::from(err.status_code()),
             message: err.to_string(),
@@ -120,24 +120,24 @@ pub trait ChatCompletionClient: Send + Sync {
     fn chat(
         &self,
         req: ChatCompletionRequest,
-    ) -> BoxFuture<'_, HiLLMResult<ChatCompletionResponse>>;
+    ) -> BoxFuture<'_, HiLlmResult<ChatCompletionResponse>>;
 
     fn chat_stream(
         &self,
         req: ChatCompletionRequest,
-    ) -> BoxFuture<'_, HiLLMResult<BoxStream<'static, HiLLMResult<ChatCompletionChunk>>>>;
+    ) -> BoxFuture<'_, HiLlmResult<BoxStream<'static, HiLlmResult<ChatCompletionChunk>>>>;
 
     fn chat_raw(
         &self,
         req: ChatCompletionRequest,
-    ) -> BoxFuture<'_, HiLLMResult<RawExchange<ChatCompletionResponse>>>;
+    ) -> BoxFuture<'_, HiLlmResult<RawExchange<ChatCompletionResponse>>>;
 
     fn chat_stream_raw(
         &self,
         req: ChatCompletionRequest,
     ) -> BoxFuture<
         '_,
-        HiLLMResult<RawStreamExchange<BoxStream<'static, HiLLMResult<ChatCompletionChunk>>>>,
+        HiLlmResult<RawStreamExchange<BoxStream<'static, HiLlmResult<ChatCompletionChunk>>>>,
     >;
 }
 
@@ -146,249 +146,249 @@ pub trait ChatCompletionClient {
     fn chat(
         &self,
         req: ChatCompletionRequest,
-    ) -> BoxFuture<'_, HiLLMResult<ChatCompletionResponse>>;
+    ) -> BoxFuture<'_, HiLlmResult<ChatCompletionResponse>>;
 
     fn chat_stream(
         &self,
         req: ChatCompletionRequest,
-    ) -> BoxFuture<'_, HiLLMResult<BoxStream<'static, HiLLMResult<ChatCompletionChunk>>>>;
+    ) -> BoxFuture<'_, HiLlmResult<BoxStream<'static, HiLlmResult<ChatCompletionChunk>>>>;
 
     fn chat_raw(
         &self,
         req: ChatCompletionRequest,
-    ) -> BoxFuture<'_, HiLLMResult<RawExchange<ChatCompletionResponse>>>;
+    ) -> BoxFuture<'_, HiLlmResult<RawExchange<ChatCompletionResponse>>>;
 
     fn chat_stream_raw(
         &self,
         req: ChatCompletionRequest,
     ) -> BoxFuture<
         '_,
-        HiLLMResult<RawStreamExchange<BoxStream<'static, HiLLMResult<ChatCompletionChunk>>>>,
+        HiLlmResult<RawStreamExchange<BoxStream<'static, HiLlmResult<ChatCompletionChunk>>>>,
     >;
 }
 
 /// OpenAI Embeddings API client.
 #[cfg(not(target_arch = "wasm32"))]
 pub trait EmbeddingClient: Send + Sync {
-    fn embed(&self, req: EmbeddingRequest) -> BoxFuture<'_, HiLLMResult<EmbeddingResponse>>;
+    fn embed(&self, req: EmbeddingRequest) -> BoxFuture<'_, HiLlmResult<EmbeddingResponse>>;
 
     fn embed_raw(
         &self,
         req: EmbeddingRequest,
-    ) -> BoxFuture<'_, HiLLMResult<RawExchange<EmbeddingResponse>>>;
+    ) -> BoxFuture<'_, HiLlmResult<RawExchange<EmbeddingResponse>>>;
 }
 
 #[cfg(target_arch = "wasm32")]
 pub trait EmbeddingClient {
-    fn embed(&self, req: EmbeddingRequest) -> BoxFuture<'_, HiLLMResult<EmbeddingResponse>>;
+    fn embed(&self, req: EmbeddingRequest) -> BoxFuture<'_, HiLlmResult<EmbeddingResponse>>;
 
     fn embed_raw(
         &self,
         req: EmbeddingRequest,
-    ) -> BoxFuture<'_, HiLLMResult<RawExchange<EmbeddingResponse>>>;
+    ) -> BoxFuture<'_, HiLlmResult<RawExchange<EmbeddingResponse>>>;
 }
 
 /// OpenAI Images API client.
 #[cfg(not(target_arch = "wasm32"))]
 pub trait ImageClient: Send + Sync {
     fn image_generate(&self, req: CreateImageRequest)
-    -> BoxFuture<'_, HiLLMResult<ImagesResponse>>;
+    -> BoxFuture<'_, HiLlmResult<ImagesResponse>>;
 
     fn image_generate_raw(
         &self,
         req: CreateImageRequest,
-    ) -> BoxFuture<'_, HiLLMResult<RawExchange<ImagesResponse>>>;
+    ) -> BoxFuture<'_, HiLlmResult<RawExchange<ImagesResponse>>>;
 }
 
 #[cfg(target_arch = "wasm32")]
 pub trait ImageClient {
     fn image_generate(&self, req: CreateImageRequest)
-    -> BoxFuture<'_, HiLLMResult<ImagesResponse>>;
+    -> BoxFuture<'_, HiLlmResult<ImagesResponse>>;
 
     fn image_generate_raw(
         &self,
         req: CreateImageRequest,
-    ) -> BoxFuture<'_, HiLLMResult<RawExchange<ImagesResponse>>>;
+    ) -> BoxFuture<'_, HiLlmResult<RawExchange<ImagesResponse>>>;
 }
 
 /// OpenAI Audio API client (speech and transcription).
 #[cfg(not(target_arch = "wasm32"))]
 pub trait AudioClient: Send + Sync {
-    fn speech(&self, req: CreateSpeechRequest) -> BoxFuture<'_, HiLLMResult<bytes::Bytes>>;
+    fn speech(&self, req: CreateSpeechRequest) -> BoxFuture<'_, HiLlmResult<bytes::Bytes>>;
 
     fn transcribe(
         &self,
         req: CreateTranscriptionRequest,
-    ) -> BoxFuture<'_, HiLLMResult<TranscriptionResponse>>;
+    ) -> BoxFuture<'_, HiLlmResult<TranscriptionResponse>>;
 
     fn transcribe_raw(
         &self,
         req: CreateTranscriptionRequest,
-    ) -> BoxFuture<'_, HiLLMResult<RawExchange<TranscriptionResponse>>>;
+    ) -> BoxFuture<'_, HiLlmResult<RawExchange<TranscriptionResponse>>>;
 }
 
 #[cfg(target_arch = "wasm32")]
 pub trait AudioClient {
-    fn speech(&self, req: CreateSpeechRequest) -> BoxFuture<'_, HiLLMResult<bytes::Bytes>>;
+    fn speech(&self, req: CreateSpeechRequest) -> BoxFuture<'_, HiLlmResult<bytes::Bytes>>;
 
     fn transcribe(
         &self,
         req: CreateTranscriptionRequest,
-    ) -> BoxFuture<'_, HiLLMResult<TranscriptionResponse>>;
+    ) -> BoxFuture<'_, HiLlmResult<TranscriptionResponse>>;
 
     fn transcribe_raw(
         &self,
         req: CreateTranscriptionRequest,
-    ) -> BoxFuture<'_, HiLLMResult<RawExchange<TranscriptionResponse>>>;
+    ) -> BoxFuture<'_, HiLlmResult<RawExchange<TranscriptionResponse>>>;
 }
 
 /// OpenAI Moderations API client.
 #[cfg(not(target_arch = "wasm32"))]
 pub trait ModerationClient: Send + Sync {
-    fn moderate(&self, req: ModerationRequest) -> BoxFuture<'_, HiLLMResult<ModerationResponse>>;
+    fn moderate(&self, req: ModerationRequest) -> BoxFuture<'_, HiLlmResult<ModerationResponse>>;
 
     fn moderate_raw(
         &self,
         req: ModerationRequest,
-    ) -> BoxFuture<'_, HiLLMResult<RawExchange<ModerationResponse>>>;
+    ) -> BoxFuture<'_, HiLlmResult<RawExchange<ModerationResponse>>>;
 }
 
 #[cfg(target_arch = "wasm32")]
 pub trait ModerationClient {
-    fn moderate(&self, req: ModerationRequest) -> BoxFuture<'_, HiLLMResult<ModerationResponse>>;
+    fn moderate(&self, req: ModerationRequest) -> BoxFuture<'_, HiLlmResult<ModerationResponse>>;
 
     fn moderate_raw(
         &self,
         req: ModerationRequest,
-    ) -> BoxFuture<'_, HiLLMResult<RawExchange<ModerationResponse>>>;
+    ) -> BoxFuture<'_, HiLlmResult<RawExchange<ModerationResponse>>>;
 }
 
 /// Rerank API client.
 #[cfg(not(target_arch = "wasm32"))]
 pub trait RerankClient: Send + Sync {
-    fn rerank(&self, req: RerankRequest) -> BoxFuture<'_, HiLLMResult<RerankResponse>>;
+    fn rerank(&self, req: RerankRequest) -> BoxFuture<'_, HiLlmResult<RerankResponse>>;
 
     fn rerank_raw(
         &self,
         req: RerankRequest,
-    ) -> BoxFuture<'_, HiLLMResult<RawExchange<RerankResponse>>>;
+    ) -> BoxFuture<'_, HiLlmResult<RawExchange<RerankResponse>>>;
 }
 
 #[cfg(target_arch = "wasm32")]
 pub trait RerankClient {
-    fn rerank(&self, req: RerankRequest) -> BoxFuture<'_, HiLLMResult<RerankResponse>>;
+    fn rerank(&self, req: RerankRequest) -> BoxFuture<'_, HiLlmResult<RerankResponse>>;
 
     fn rerank_raw(
         &self,
         req: RerankRequest,
-    ) -> BoxFuture<'_, HiLLMResult<RawExchange<RerankResponse>>>;
+    ) -> BoxFuture<'_, HiLlmResult<RawExchange<RerankResponse>>>;
 }
 
 /// Search API client.
 #[cfg(not(target_arch = "wasm32"))]
 pub trait SearchClient: Send + Sync {
-    fn search(&self, req: SearchRequest) -> BoxFuture<'_, HiLLMResult<SearchResponse>>;
+    fn search(&self, req: SearchRequest) -> BoxFuture<'_, HiLlmResult<SearchResponse>>;
 
     fn search_raw(
         &self,
         req: SearchRequest,
-    ) -> BoxFuture<'_, HiLLMResult<RawExchange<SearchResponse>>>;
+    ) -> BoxFuture<'_, HiLlmResult<RawExchange<SearchResponse>>>;
 }
 
 #[cfg(target_arch = "wasm32")]
 pub trait SearchClient {
-    fn search(&self, req: SearchRequest) -> BoxFuture<'_, HiLLMResult<SearchResponse>>;
+    fn search(&self, req: SearchRequest) -> BoxFuture<'_, HiLlmResult<SearchResponse>>;
 
     fn search_raw(
         &self,
         req: SearchRequest,
-    ) -> BoxFuture<'_, HiLLMResult<RawExchange<SearchResponse>>>;
+    ) -> BoxFuture<'_, HiLlmResult<RawExchange<SearchResponse>>>;
 }
 
 /// OCR API client.
 #[cfg(not(target_arch = "wasm32"))]
 pub trait OcrClient: Send + Sync {
-    fn ocr(&self, req: OcrRequest) -> BoxFuture<'_, HiLLMResult<OcrResponse>>;
+    fn ocr(&self, req: OcrRequest) -> BoxFuture<'_, HiLlmResult<OcrResponse>>;
 
-    fn ocr_raw(&self, req: OcrRequest) -> BoxFuture<'_, HiLLMResult<RawExchange<OcrResponse>>>;
+    fn ocr_raw(&self, req: OcrRequest) -> BoxFuture<'_, HiLlmResult<RawExchange<OcrResponse>>>;
 }
 
 #[cfg(target_arch = "wasm32")]
 pub trait OcrClient {
-    fn ocr(&self, req: OcrRequest) -> BoxFuture<'_, HiLLMResult<OcrResponse>>;
+    fn ocr(&self, req: OcrRequest) -> BoxFuture<'_, HiLlmResult<OcrResponse>>;
 
-    fn ocr_raw(&self, req: OcrRequest) -> BoxFuture<'_, HiLLMResult<RawExchange<OcrResponse>>>;
+    fn ocr_raw(&self, req: OcrRequest) -> BoxFuture<'_, HiLlmResult<RawExchange<OcrResponse>>>;
 }
 
 /// Models API client.
 #[cfg(not(target_arch = "wasm32"))]
 pub trait ModelClient: Send + Sync {
-    fn list_models(&self) -> BoxFuture<'_, HiLLMResult<ModelsListResponse>>;
+    fn list_models(&self) -> BoxFuture<'_, HiLlmResult<ModelsListResponse>>;
 }
 
 #[cfg(target_arch = "wasm32")]
 pub trait ModelClient {
-    fn list_models(&self) -> BoxFuture<'_, HiLLMResult<ModelsListResponse>>;
+    fn list_models(&self) -> BoxFuture<'_, HiLlmResult<ModelsListResponse>>;
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 pub trait FileClient: Send + Sync {
-    fn create_file(&self, req: CreateFileRequest) -> BoxFuture<'_, HiLLMResult<FileObject>>;
+    fn create_file(&self, req: CreateFileRequest) -> BoxFuture<'_, HiLlmResult<FileObject>>;
 
-    fn retrieve_file(&self, file_id: &str) -> BoxFuture<'_, HiLLMResult<FileObject>>;
+    fn retrieve_file(&self, file_id: &str) -> BoxFuture<'_, HiLlmResult<FileObject>>;
 
-    fn delete_file(&self, file_id: &str) -> BoxFuture<'_, HiLLMResult<DeleteResponse>>;
+    fn delete_file(&self, file_id: &str) -> BoxFuture<'_, HiLlmResult<DeleteResponse>>;
 
     fn list_files(
         &self,
         query: Option<FileListQuery>,
-    ) -> BoxFuture<'_, HiLLMResult<FileListResponse>>;
+    ) -> BoxFuture<'_, HiLlmResult<FileListResponse>>;
 
-    fn file_content(&self, file_id: &str) -> BoxFuture<'_, HiLLMResult<bytes::Bytes>>;
+    fn file_content(&self, file_id: &str) -> BoxFuture<'_, HiLlmResult<bytes::Bytes>>;
 }
 
 #[cfg(target_arch = "wasm32")]
 pub trait FileClient {
-    fn create_file(&self, req: CreateFileRequest) -> BoxFuture<'_, HiLLMResult<FileObject>>;
+    fn create_file(&self, req: CreateFileRequest) -> BoxFuture<'_, HiLlmResult<FileObject>>;
 
-    fn retrieve_file(&self, file_id: &str) -> BoxFuture<'_, HiLLMResult<FileObject>>;
+    fn retrieve_file(&self, file_id: &str) -> BoxFuture<'_, HiLlmResult<FileObject>>;
 
-    fn delete_file(&self, file_id: &str) -> BoxFuture<'_, HiLLMResult<DeleteResponse>>;
+    fn delete_file(&self, file_id: &str) -> BoxFuture<'_, HiLlmResult<DeleteResponse>>;
 
     fn list_files(
         &self,
         query: Option<FileListQuery>,
-    ) -> BoxFuture<'_, HiLLMResult<FileListResponse>>;
+    ) -> BoxFuture<'_, HiLlmResult<FileListResponse>>;
 
-    fn file_content(&self, file_id: &str) -> BoxFuture<'_, HiLLMResult<bytes::Bytes>>;
+    fn file_content(&self, file_id: &str) -> BoxFuture<'_, HiLlmResult<bytes::Bytes>>;
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 pub trait BatchClient: Send + Sync {
-    fn create_batch(&self, req: CreateBatchRequest) -> BoxFuture<'_, HiLLMResult<BatchObject>>;
+    fn create_batch(&self, req: CreateBatchRequest) -> BoxFuture<'_, HiLlmResult<BatchObject>>;
 
-    fn retrieve_batch(&self, batch_id: &str) -> BoxFuture<'_, HiLLMResult<BatchObject>>;
+    fn retrieve_batch(&self, batch_id: &str) -> BoxFuture<'_, HiLlmResult<BatchObject>>;
 
     fn list_batches(
         &self,
         query: Option<BatchListQuery>,
-    ) -> BoxFuture<'_, HiLLMResult<BatchListResponse>>;
+    ) -> BoxFuture<'_, HiLlmResult<BatchListResponse>>;
 
-    fn cancel_batch(&self, batch_id: &str) -> BoxFuture<'_, HiLLMResult<BatchObject>>;
+    fn cancel_batch(&self, batch_id: &str) -> BoxFuture<'_, HiLlmResult<BatchObject>>;
 }
 
 #[cfg(target_arch = "wasm32")]
 pub trait BatchClient {
-    fn create_batch(&self, req: CreateBatchRequest) -> BoxFuture<'_, HiLLMResult<BatchObject>>;
+    fn create_batch(&self, req: CreateBatchRequest) -> BoxFuture<'_, HiLlmResult<BatchObject>>;
 
-    fn retrieve_batch(&self, batch_id: &str) -> BoxFuture<'_, HiLLMResult<BatchObject>>;
+    fn retrieve_batch(&self, batch_id: &str) -> BoxFuture<'_, HiLlmResult<BatchObject>>;
 
     fn list_batches(
         &self,
         query: Option<BatchListQuery>,
-    ) -> BoxFuture<'_, HiLLMResult<BatchListResponse>>;
+    ) -> BoxFuture<'_, HiLlmResult<BatchListResponse>>;
 
-    fn cancel_batch(&self, batch_id: &str) -> BoxFuture<'_, HiLLMResult<BatchObject>>;
+    fn cancel_batch(&self, batch_id: &str) -> BoxFuture<'_, HiLlmResult<BatchObject>>;
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -396,7 +396,7 @@ pub trait ResponseClient: Send + Sync {
     fn create_response(
         &self,
         req: CreateResponseRequest,
-    ) -> BoxFuture<'_, HiLLMResult<ResponseObject>>;
+    ) -> BoxFuture<'_, HiLlmResult<ResponseObject>>;
 
     /// Creates a response through the OpenAI Responses API and streams the
     /// native Responses SSE events. Events are delivered as
@@ -405,11 +405,11 @@ pub trait ResponseClient: Send + Sync {
     fn create_response_stream(
         &self,
         req: CreateResponseRequest,
-    ) -> BoxFuture<'_, HiLLMResult<BoxStream<'static, HiLLMResult<ResponsesStreamEvent>>>>;
+    ) -> BoxFuture<'_, HiLlmResult<BoxStream<'static, HiLlmResult<ResponsesStreamEvent>>>>;
 
-    fn retrieve_response(&self, response_id: &str) -> BoxFuture<'_, HiLLMResult<ResponseObject>>;
+    fn retrieve_response(&self, response_id: &str) -> BoxFuture<'_, HiLlmResult<ResponseObject>>;
 
-    fn cancel_response(&self, response_id: &str) -> BoxFuture<'_, HiLLMResult<ResponseObject>>;
+    fn cancel_response(&self, response_id: &str) -> BoxFuture<'_, HiLlmResult<ResponseObject>>;
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -417,7 +417,7 @@ pub trait ResponseClient {
     fn create_response(
         &self,
         req: CreateResponseRequest,
-    ) -> BoxFuture<'_, HiLLMResult<ResponseObject>>;
+    ) -> BoxFuture<'_, HiLlmResult<ResponseObject>>;
 
     /// Creates a response through the OpenAI Responses API and streams the
     /// native Responses SSE events. Events are delivered as
@@ -426,11 +426,11 @@ pub trait ResponseClient {
     fn create_response_stream(
         &self,
         req: CreateResponseRequest,
-    ) -> BoxFuture<'_, HiLLMResult<BoxStream<'static, HiLLMResult<ResponsesStreamEvent>>>>;
+    ) -> BoxFuture<'_, HiLlmResult<BoxStream<'static, HiLlmResult<ResponsesStreamEvent>>>>;
 
-    fn retrieve_response(&self, response_id: &str) -> BoxFuture<'_, HiLLMResult<ResponseObject>>;
+    fn retrieve_response(&self, response_id: &str) -> BoxFuture<'_, HiLlmResult<ResponseObject>>;
 
-    fn cancel_response(&self, response_id: &str) -> BoxFuture<'_, HiLLMResult<ResponseObject>>;
+    fn cancel_response(&self, response_id: &str) -> BoxFuture<'_, HiLlmResult<ResponseObject>>;
 }
 
 use crate::types::anthropic::{
@@ -442,13 +442,13 @@ use crate::types::anthropic::{
 ///
 /// This trait only routes through [`provider::APIType::AnthropicMessages`].
 /// Calling it against a provider instance bound to another API type fails
-/// with [`HiLLMError::EndpointNotSupported`] before any request is sent.
+/// with [`HiLlmError::EndpointNotSupported`] before any request is sent.
 #[cfg(not(target_arch = "wasm32"))]
 pub trait AnthropicMessagesClient: Send + Sync {
     fn create_message(
         &self,
         req: AnthropicMessagesRequest,
-    ) -> BoxFuture<'_, HiLLMResult<AnthropicMessagesResponse>>;
+    ) -> BoxFuture<'_, HiLlmResult<AnthropicMessagesResponse>>;
 
     /// Creates a message and streams the native Anthropic SSE events
     /// (`message_start`, `content_block_delta`, …). Events are delivered as
@@ -457,7 +457,7 @@ pub trait AnthropicMessagesClient: Send + Sync {
     fn create_message_stream(
         &self,
         req: AnthropicMessagesRequest,
-    ) -> BoxFuture<'_, HiLLMResult<BoxStream<'static, HiLLMResult<AnthropicStreamEvent>>>>;
+    ) -> BoxFuture<'_, HiLlmResult<BoxStream<'static, HiLlmResult<AnthropicStreamEvent>>>>;
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -465,7 +465,7 @@ pub trait AnthropicMessagesClient {
     fn create_message(
         &self,
         req: AnthropicMessagesRequest,
-    ) -> BoxFuture<'_, HiLLMResult<AnthropicMessagesResponse>>;
+    ) -> BoxFuture<'_, HiLlmResult<AnthropicMessagesResponse>>;
 
     /// Creates a message and streams the native Anthropic SSE events
     /// (`message_start`, `content_block_delta`, …). Events are delivered as
@@ -474,7 +474,7 @@ pub trait AnthropicMessagesClient {
     fn create_message_stream(
         &self,
         req: AnthropicMessagesRequest,
-    ) -> BoxFuture<'_, HiLLMResult<BoxStream<'static, HiLLMResult<AnthropicStreamEvent>>>>;
+    ) -> BoxFuture<'_, HiLlmResult<BoxStream<'static, HiLlmResult<AnthropicStreamEvent>>>>;
 }
 
 /// Default client based on `reqwest`.
@@ -490,7 +490,7 @@ pub struct Client {
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 impl Client {
-    pub fn new(config: ClientConfig, provider: Option<String>) -> HiLLMResult<Self> {
+    pub fn new(config: ClientConfig, provider: Option<String>) -> HiLlmResult<Self> {
         let provider = build_provider(&config, provider)?;
 
         provider.validate()?;
@@ -507,7 +507,7 @@ impl Client {
                     config.api_key = secrecy::SecretString::from(val);
                 }
                 _ => {
-                    return Err(HiLLMError::Authentication {
+                    return Err(HiLlmError::Authentication {
                         message: format!(
                             "no API key provided and environment variable {env_var_name} is not set"
                         ),
@@ -520,13 +520,13 @@ impl Client {
         let mut header_map = reqwest::header::HeaderMap::new();
         for (k, v) in config.headers() {
             let name = reqwest::header::HeaderName::from_bytes(k.as_bytes()).map_err(|_| {
-                HiLLMError::InvalidHeader {
+                HiLlmError::InvalidHeader {
                     name: k.clone(),
                     reason: "pre-validated header name became invalid".into(),
                 }
             })?;
             let val = reqwest::header::HeaderValue::from_str(v).map_err(|_| {
-                HiLLMError::InvalidHeader {
+                HiLlmError::InvalidHeader {
                     name: k.clone(),
                     reason: "pre-validated header value became invalid".into(),
                 }
@@ -561,7 +561,7 @@ impl Client {
             let builder = builder.timeout(config.timeout);
             #[cfg(not(target_arch = "wasm32"))]
             let builder = config.transport.apply_to_builder(builder);
-            builder.build().map_err(HiLLMError::from)?
+            builder.build().map_err(HiLlmError::from)?
         };
 
         let cached_auth_header = provider
@@ -586,7 +586,7 @@ impl Client {
     async fn resolve_auth_header_for_provider(
         &self,
         prov: &dyn Provider,
-    ) -> HiLLMResult<Option<(String, String)>> {
+    ) -> HiLlmResult<Option<(String, String)>> {
         if let Some(ref cp) = self.config.credential_provider {
             let credential = cp.resolve().await?;
             match credential {
@@ -627,9 +627,9 @@ impl Client {
         endpoint_fn: impl FnOnce(&dyn Provider) -> &str,
         model: &str,
         stream: Option<bool>,
-    ) -> HiLLMResult<PreparedRequest> {
+    ) -> HiLlmResult<PreparedRequest> {
         if model.is_empty() {
-            return Err(HiLLMError::BadRequest {
+            return Err(HiLlmError::BadRequest {
                 message: "model must not be empty".into(),
                 status: 400,
             });
@@ -637,7 +637,7 @@ impl Client {
 
         let provider = self.provider.clone();
         if !provider.matches_model(model) {
-            return Err(HiLLMError::BadRequest {
+            return Err(HiLlmError::BadRequest {
                 message: format!("{} has no model named {}", provider.name(), model),
                 status: 400,
             });
@@ -664,7 +664,7 @@ impl Client {
         })
     }
 
-    async fn resolve_auth_header(&self) -> HiLLMResult<Option<(String, String)>> {
+    async fn resolve_auth_header(&self) -> HiLlmResult<Option<(String, String)>> {
         if let Some(ref cp) = self.config.credential_provider {
             let credential = cp.resolve().await?;
             match credential {
@@ -697,7 +697,7 @@ impl Client {
 fn build_provider(
     config: &ClientConfig,
     provider_name: Option<String>,
-) -> HiLLMResult<Arc<dyn Provider>> {
+) -> HiLlmResult<Arc<dyn Provider>> {
     match provider_name {
         // 1. Explicit name → try to resolve by name first
         Some(name) => {
@@ -733,7 +733,7 @@ fn build_provider(
                 }
 
                 // Not found + no custom_provider → error
-                (None, _) => Err(HiLLMError::ProviderNotFound { name }),
+                (None, _) => Err(HiLlmError::ProviderNotFound { name }),
             }
         }
 
@@ -769,5 +769,5 @@ fn build_provider(
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 pub trait BatchRetriever {
-    async fn fetch_batch_for_polling(&self, batch_id: &str) -> HiLLMResult<BatchObject>;
+    async fn fetch_batch_for_polling(&self, batch_id: &str) -> HiLlmResult<BatchObject>;
 }

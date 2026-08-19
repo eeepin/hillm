@@ -2,7 +2,7 @@
 
 use bytes::Bytes;
 
-use crate::error::{HiLLMError, HiLLMResult};
+use crate::error::{HiLlmError, HiLlmResult};
 use crate::provider::APIType;
 use crate::provider::codec::APITypeCodec;
 
@@ -19,27 +19,27 @@ impl APITypeCodec for OpenAIResponsesCodec {
         "/responses"
     }
 
-    fn encode_request(&self, request: &serde_json::Value) -> HiLLMResult<Bytes> {
+    fn encode_request(&self, request: &serde_json::Value) -> HiLlmResult<Bytes> {
         Ok(Bytes::from(serde_json::to_vec(request)?))
     }
 
-    fn decode_response(&self, bytes: &[u8]) -> HiLLMResult<serde_json::Value> {
+    fn decode_response(&self, bytes: &[u8]) -> HiLlmResult<serde_json::Value> {
         Ok(serde_json::from_slice(bytes)?)
     }
 
-    fn parse_stream_event(&self, data: &str) -> HiLLMResult<Option<serde_json::Value>> {
+    fn parse_stream_event(&self, data: &str) -> HiLlmResult<Option<serde_json::Value>> {
         // The Responses API uses SSE with event types inside the JSON payload.
         // Unlike Chat Completions, it has no "[DONE]" sentinel: if a "[DONE]"
         // marker ever appears here it is a protocol violation, not end-of-stream.
         if data == "[DONE]" {
-            return Err(HiLLMError::Streaming {
+            return Err(HiLlmError::Streaming {
                 message: "unexpected '[DONE]' sentinel in OpenAI Responses stream".into(),
             });
         }
         // Event types include: response.created, response.output_text.delta, etc.
         serde_json::from_str(data)
             .map(Some)
-            .map_err(|e| HiLLMError::Streaming {
+            .map_err(|e| HiLlmError::Streaming {
                 message: format!("Failed to parse Responses API event: {e}"),
             })
     }

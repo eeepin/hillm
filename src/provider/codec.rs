@@ -2,7 +2,7 @@
 
 use bytes::Bytes;
 
-use crate::error::HiLLMResult;
+use crate::error::HiLlmResult;
 use crate::provider::APIType;
 
 /// Codec trait for protocol-specific request/response encoding and decoding.
@@ -37,15 +37,15 @@ pub trait APITypeCodec: Send + Sync {
     }
 
     /// Encodes a request value into bytes for transmission.
-    fn encode_request(&self, request: &serde_json::Value) -> HiLLMResult<Bytes>;
+    fn encode_request(&self, request: &serde_json::Value) -> HiLlmResult<Bytes>;
 
     /// Decodes a response from bytes into a value.
-    fn decode_response(&self, bytes: &[u8]) -> HiLLMResult<serde_json::Value>;
+    fn decode_response(&self, bytes: &[u8]) -> HiLlmResult<serde_json::Value>;
 
     /// Parses a stream event from SSE data.
     ///
     /// Returns `Ok(None)` if the event should be skipped (e.g., OpenAI's `[DONE]` marker).
-    fn parse_stream_event(&self, data: &str) -> HiLLMResult<Option<serde_json::Value>>;
+    fn parse_stream_event(&self, data: &str) -> HiLlmResult<Option<serde_json::Value>>;
 
     /// Returns signing headers for the request, if any.
     ///
@@ -56,7 +56,7 @@ pub trait APITypeCodec: Send + Sync {
         _method: &str,
         _url: &str,
         _body: &[u8],
-    ) -> HiLLMResult<Vec<(String, String)>> {
+    ) -> HiLlmResult<Vec<(String, String)>> {
         Ok(vec![])
     }
 }

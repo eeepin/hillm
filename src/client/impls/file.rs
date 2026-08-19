@@ -1,5 +1,5 @@
 use crate::client::{BoxFuture, Client, FileClient};
-use crate::error::{HiLLMError, HiLLMResult};
+use crate::error::{HiLlmError, HiLlmResult};
 use crate::http;
 use crate::types::file::{
     CreateFileRequest, DeleteResponse, FileListQuery, FileListResponse, FileObject,
@@ -9,7 +9,7 @@ use super::super::str_pair;
 
 #[cfg(any(feature = "default-http", feature = "wasm-http"))]
 impl FileClient for Client {
-    fn create_file(&self, req: CreateFileRequest) -> BoxFuture<'_, HiLLMResult<FileObject>> {
+    fn create_file(&self, req: CreateFileRequest) -> BoxFuture<'_, HiLlmResult<FileObject>> {
         Box::pin(async move {
             let url = self.provider.build_url(self.provider.files_path(), "");
             let auth_header = self.resolve_auth_header().await?;
@@ -23,7 +23,7 @@ impl FileClient for Client {
             use base64::Engine;
             let file_bytes = base64::engine::general_purpose::STANDARD
                 .decode(&req.file)
-                .map_err(|e| HiLLMError::BadRequest {
+                .map_err(|e| HiLlmError::BadRequest {
                     message: format!("invalid base64 file data: {e}"),
                     status: 400,
                 })?;
@@ -40,11 +40,11 @@ impl FileClient for Client {
 
             let raw =
                 http::request::post_multipart(&self.http_client, &url, auth, &extra, form).await?;
-            serde_json::from_value::<FileObject>(raw).map_err(HiLLMError::from)
+            serde_json::from_value::<FileObject>(raw).map_err(HiLlmError::from)
         })
     }
 
-    fn retrieve_file(&self, file_id: &str) -> BoxFuture<'_, HiLLMResult<FileObject>> {
+    fn retrieve_file(&self, file_id: &str) -> BoxFuture<'_, HiLlmResult<FileObject>> {
         let file_id = file_id.to_owned();
         Box::pin(async move {
             let url = format!(
@@ -68,11 +68,11 @@ impl FileClient for Client {
                 self.config.max_retries,
             )
             .await?;
-            serde_json::from_value::<FileObject>(raw).map_err(HiLLMError::from)
+            serde_json::from_value::<FileObject>(raw).map_err(HiLlmError::from)
         })
     }
 
-    fn delete_file(&self, file_id: &str) -> BoxFuture<'_, HiLLMResult<DeleteResponse>> {
+    fn delete_file(&self, file_id: &str) -> BoxFuture<'_, HiLlmResult<DeleteResponse>> {
         let file_id = file_id.to_owned();
         Box::pin(async move {
             let url = format!(
@@ -96,14 +96,14 @@ impl FileClient for Client {
                 self.config.max_retries,
             )
             .await?;
-            serde_json::from_value::<DeleteResponse>(raw).map_err(HiLLMError::from)
+            serde_json::from_value::<DeleteResponse>(raw).map_err(HiLlmError::from)
         })
     }
 
     fn list_files(
         &self,
         query: Option<FileListQuery>,
-    ) -> BoxFuture<'_, HiLLMResult<FileListResponse>> {
+    ) -> BoxFuture<'_, HiLlmResult<FileListResponse>> {
         Box::pin(async move {
             let base_url = self.provider.build_url(self.provider.files_path(), "");
             let url = if let Some(ref q) = query {
@@ -141,11 +141,11 @@ impl FileClient for Client {
                 self.config.max_retries,
             )
             .await?;
-            serde_json::from_value::<FileListResponse>(raw).map_err(HiLLMError::from)
+            serde_json::from_value::<FileListResponse>(raw).map_err(HiLlmError::from)
         })
     }
 
-    fn file_content(&self, file_id: &str) -> BoxFuture<'_, HiLLMResult<bytes::Bytes>> {
+    fn file_content(&self, file_id: &str) -> BoxFuture<'_, HiLlmResult<bytes::Bytes>> {
         let file_id = file_id.to_owned();
         Box::pin(async move {
             let url = format!(

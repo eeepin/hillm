@@ -3,9 +3,9 @@ use std::task::{Context, Poll};
 use tower::Layer;
 use tower::Service;
 
-use super::types::{LLMRequest, LLMResponse};
+use super::types::{LlmRequest, LlmResponse};
 use crate::client::BoxFuture;
-use crate::error::{HiLLMError, HiLLMResult};
+use crate::error::{HiLlmError, HiLlmResult};
 use crate::provider::cost;
 
 pub struct CostTrackingLayer {
@@ -49,20 +49,20 @@ where
     }
 }
 
-impl<S> Service<LLMRequest> for CostTrackingService<S>
+impl<S> Service<LlmRequest> for CostTrackingService<S>
 where
-    S: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + Send + 'static,
+    S: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Send + 'static,
     S::Future: Send + 'static,
 {
-    type Response = LLMResponse;
-    type Error = HiLLMError;
-    type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
+    type Response = LlmResponse;
+    type Error = HiLlmError;
+    type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
         self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, req: LLMRequest) -> Self::Future {
+    fn call(&mut self, req: LlmRequest) -> Self::Future {
         let model = req.model().map(ToOwned::to_owned);
         let fut = self.inner.call(req);
         let provider = self.provider.clone();
@@ -75,7 +75,7 @@ where
     }
 }
 
-fn record_cost(provider: &str, model: &Option<String>, resp: &LLMResponse) {
+fn record_cost(provider: &str, model: &Option<String>, resp: &LlmResponse) {
     let Some(model) = model else { return };
     let Some(usage) = resp.usage() else { return };
 

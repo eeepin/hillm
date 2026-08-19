@@ -1,6 +1,6 @@
 use serde_json::{Value, json};
 
-use crate::error::{HiLLMError, HiLLMResult};
+use crate::error::{HiLlmError, HiLlmResult};
 use crate::provider::unix_timestamp_secs;
 use crate::types::{
     ChatCompletionChunk, FinishReason, PromptTokensDetails, StreamChoice, StreamDelta,
@@ -15,7 +15,7 @@ use super::{DEFAULT_MAX_TOKENS, HOSTED_TOOL_TYPES};
 /// Anthropic Messages request body.
 ///
 /// See the module docs for the information this conversion drops.
-pub(crate) fn convert_chat_request_to_anthropic(body: &mut Value) -> HiLLMResult<()> {
+pub(crate) fn convert_chat_request_to_anthropic(body: &mut Value) -> HiLlmResult<()> {
     let messages = body
         .as_object_mut()
         .and_then(|o| o.remove("messages"))
@@ -26,7 +26,7 @@ pub(crate) fn convert_chat_request_to_anthropic(body: &mut Value) -> HiLLMResult
         .unwrap_or_default();
 
     if messages.is_empty() {
-        return Err(HiLLMError::BadRequest {
+        return Err(HiLlmError::BadRequest {
             message: "messages array must not be empty".to_owned(),
             status: 400,
         });
@@ -224,7 +224,7 @@ fn prepend_system_block(body: &mut Value, instruction: Value) {
 /// Converts an Anthropic Messages response body in place into an OpenAI Chat
 /// Completions response body. Bodies without a `stop_reason` (e.g. error
 /// payloads) are left untouched.
-pub(crate) fn convert_anthropic_response_to_chat(body: &mut Value) -> HiLLMResult<()> {
+pub(crate) fn convert_anthropic_response_to_chat(body: &mut Value) -> HiLlmResult<()> {
     if body.get("stop_reason").is_none() {
         return Ok(());
     }
@@ -343,8 +343,8 @@ pub(crate) fn convert_anthropic_response_to_chat(body: &mut Value) -> HiLLMResul
 /// Completions chunk, if the event carries one.
 pub(crate) fn parse_anthropic_event_as_chat_chunk(
     event_data: &str,
-) -> HiLLMResult<Option<ChatCompletionChunk>> {
-    let event: Value = serde_json::from_str(event_data).map_err(|e| HiLLMError::Streaming {
+) -> HiLlmResult<Option<ChatCompletionChunk>> {
+    let event: Value = serde_json::from_str(event_data).map_err(|e| HiLlmError::Streaming {
         message: format!("failed to parse Anthropic SSE event: {e}"),
     })?;
 
@@ -499,7 +499,7 @@ pub(crate) fn parse_anthropic_event_as_chat_chunk(
                 .pointer("/error/message")
                 .and_then(|v| v.as_str())
                 .unwrap_or("unknown Anthropic streaming error");
-            Err(HiLLMError::Streaming {
+            Err(HiLlmError::Streaming {
                 message: message.to_owned(),
             })
         }

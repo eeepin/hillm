@@ -5,9 +5,9 @@ use std::task::{Context, Poll};
 use tower::Layer;
 use tower::Service;
 
-use super::types::{LLMRequest, LLMResponse};
+use super::types::{LlmRequest, LlmResponse};
 use crate::client::BoxFuture;
-use crate::error::{HiLLMError, HiLLMResult};
+use crate::error::{HiLlmError, HiLlmResult};
 use crate::guardrail::registry::GuardrailRegistry;
 use crate::guardrail::{GuardrailContext, GuardrailDecision, GuardrailStage};
 
@@ -60,20 +60,20 @@ impl<S: Clone> Clone for GuardrailService<S> {
     }
 }
 
-impl<S> Service<LLMRequest> for GuardrailService<S>
+impl<S> Service<LlmRequest> for GuardrailService<S>
 where
-    S: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError> + Send + 'static,
+    S: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError> + Send + 'static,
     S::Future: Send + 'static,
 {
-    type Response = LLMResponse;
-    type Error = HiLLMError;
-    type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
+    type Response = LlmResponse;
+    type Error = HiLlmError;
+    type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
         self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, req: LLMRequest) -> Self::Future {
+    fn call(&mut self, req: LlmRequest) -> Self::Future {
         let registry = Arc::clone(&self.registry);
         let metadata = Arc::clone(&self.metadata);
         let inner_fut = self.inner.call(req.clone());
@@ -82,7 +82,7 @@ where
             let request_json = match serde_json::to_value(&req) {
                 Ok(v) => v,
                 Err(e) => {
-                    return Err(HiLLMError::InternalError {
+                    return Err(HiLlmError::InternalError {
                         message: format!("guardrail: failed to serialize request: {e}"),
                     });
                 }
@@ -98,7 +98,7 @@ where
             let input_decision = registry.run_stage(GuardrailStage::Input, &input_ctx).await;
             match input_decision {
                 GuardrailDecision::Block { reason, code } => {
-                    return Err(HiLLMError::HookRejected {
+                    return Err(HiLlmError::HookRejected {
                         message: format!("guardrail blocked [code={code}]: {reason}"),
                     });
                 }
@@ -113,15 +113,15 @@ where
             let response = inner_fut.await?;
 
             let response_json = match &response {
-                LLMResponse::Chat(r) => match serde_json::to_value(r) {
+                LlmResponse::Chat(r) => match serde_json::to_value(r) {
                     Ok(v) => v,
                     Err(_) => return Ok(response),
                 },
-                LLMResponse::Embed(r) => match serde_json::to_value(r) {
+                LlmResponse::Embed(r) => match serde_json::to_value(r) {
                     Ok(v) => v,
                     Err(_) => return Ok(response),
                 },
-                LLMResponse::ListModels(r) => match serde_json::to_value(r) {
+                LlmResponse::ListModels(r) => match serde_json::to_value(r) {
                     Ok(v) => v,
                     Err(_) => return Ok(response),
                 },
@@ -139,7 +139,7 @@ where
                 .run_stage(GuardrailStage::Output, &output_ctx)
                 .await;
             match output_decision {
-                GuardrailDecision::Block { reason, code } => Err(HiLLMError::HookRejected {
+                GuardrailDecision::Block { reason, code } => Err(HiLlmError::HookRejected {
                     message: format!("guardrail blocked output [code={code}]: {reason}"),
                 }),
                 GuardrailDecision::Mutate { .. } => {

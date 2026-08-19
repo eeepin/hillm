@@ -3,9 +3,9 @@ use std::task::{Context, Poll};
 
 use tower::{Layer, Service, ServiceExt as _};
 
-use super::types::{LLMRequest, LLMResponse};
+use super::types::{LlmRequest, LlmResponse};
 use crate::client::BoxFuture;
-use crate::error::{HiLLMError, HiLLMResult};
+use crate::error::{HiLlmError, HiLlmResult};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RetryClass {
@@ -14,14 +14,14 @@ pub enum RetryClass {
 }
 
 pub trait RetryPolicy: Send + Sync + 'static {
-    fn classify(&self, error: &HiLLMError) -> RetryClass;
+    fn classify(&self, error: &HiLlmError) -> RetryClass;
 }
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DefaultRetryPolicy;
 
 impl RetryPolicy for DefaultRetryPolicy {
-    fn classify(&self, error: &HiLLMError) -> RetryClass {
+    fn classify(&self, error: &HiLlmError) -> RetryClass {
         if error.is_transient() {
             RetryClass::Transient
         } else {
@@ -98,9 +98,9 @@ impl<S: Clone, R: RetryPolicy> Clone for FallbackChainService<S, R> {
     }
 }
 
-impl<S, R> Service<LLMRequest> for FallbackChainService<S, R>
+impl<S, R> Service<LlmRequest> for FallbackChainService<S, R>
 where
-    S: Service<LLMRequest, Response = LLMResponse, Error = HiLLMError>
+    S: Service<LlmRequest, Response = LlmResponse, Error = HiLlmError>
         + Clone
         + Send
         + Sync
@@ -108,15 +108,15 @@ where
     S::Future: Send + 'static,
     R: RetryPolicy,
 {
-    type Response = LLMResponse;
-    type Error = HiLLMError;
-    type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
+    type Response = LlmResponse;
+    type Error = HiLlmError;
+    type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
 
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, request: LLMRequest) -> Self::Future {
+    fn call(&mut self, request: LlmRequest) -> Self::Future {
         let chain = Arc::clone(&self.chain);
         let policy = Arc::clone(&self.policy);
 
@@ -125,13 +125,13 @@ where
             tracing::debug!(chain_len, "fallback chain: starting walk");
 
             if chain.is_empty() {
-                return Err(HiLLMError::ServerError {
+                return Err(HiLlmError::ServerError {
                     message: "fallback chain is empty".into(),
                     status: 500,
                 });
             }
 
-            let mut last_err: Option<HiLLMError> = None;
+            let mut last_err: Option<HiLlmError> = None;
 
             for (attempt, svc_template) in chain.iter().enumerate() {
                 let mut svc = svc_template.clone();
@@ -196,7 +196,7 @@ where
                 }
             }
 
-            Err(last_err.unwrap_or(HiLLMError::ServerError {
+            Err(last_err.unwrap_or(HiLlmError::ServerError {
                 message: "fallback chain exhausted all services".into(),
                 status: 503,
             }))
@@ -207,7 +207,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tower::types::{LLMRequest, LLMResponse};
+    use crate::tower::types::{LlmRequest, LlmResponse};
     use crate::types::{
         AssistantMessage, ChatCompletionRequest, ChatCompletionResponse, Choice, Message,
         MessageContent, Usage,
@@ -216,9 +216,9 @@ mod tests {
     use std::task::{Context, Poll};
     use tower::{Service, ServiceExt};
 
-    fn create_chat_request(content: &str) -> LLMRequest {
-        LLMRequest {
-            kind: crate::tower::types::LLMRequestKind::Chat(ChatCompletionRequest {
+    fn create_chat_request(content: &str) -> LlmRequest {
+        LlmRequest {
+            kind: crate::tower::types::LlmRequestKind::Chat(ChatCompletionRequest {
                 model: "test-model".to_string(),
                 messages: vec![Message::User(crate::types::UserMessage {
                     content: MessageContent::Text(content.to_string()),
@@ -231,8 +231,8 @@ mod tests {
         }
     }
 
-    fn create_chat_response(content: &str) -> LLMResponse {
-        LLMResponse::Chat(ChatCompletionResponse {
+    fn create_chat_response(content: &str) -> LlmResponse {
+        LlmResponse::Chat(ChatCompletionResponse {
             id: "test-id".to_string(),
             object: "chat.completion".to_string(),
             created: 1234567890,
@@ -301,27 +301,27 @@ mod tests {
         }
     }
 
-    impl Service<LLMRequest> for MockService {
-        type Response = LLMResponse;
-        type Error = HiLLMError;
-        type Future = BoxFuture<'static, HiLLMResult<LLMResponse>>;
+    impl Service<LlmRequest> for MockService {
+        type Response = LlmResponse;
+        type Error = HiLlmError;
+        type Future = BoxFuture<'static, HiLlmResult<LlmResponse>>;
 
-        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLLMResult<()>> {
+        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<HiLlmResult<()>> {
             Poll::Ready(Ok(()))
         }
 
-        fn call(&mut self, _req: LLMRequest) -> Self::Future {
+        fn call(&mut self, _req: LlmRequest) -> Self::Future {
             self.call_count.fetch_add(1, Ordering::SeqCst);
             let behavior = self.behavior.clone();
             let label = self.label.clone();
             Box::pin(async move {
                 match behavior {
                     MockBehavior::Success => Ok(create_chat_response(&format!("{label} ok"))),
-                    MockBehavior::TransientFail => Err(HiLLMError::ServiceUnavailable {
+                    MockBehavior::TransientFail => Err(HiLlmError::ServiceUnavailable {
                         message: format!("{label} transient"),
                         status: 503,
                     }),
-                    MockBehavior::TerminalFail => Err(HiLLMError::BadRequest {
+                    MockBehavior::TerminalFail => Err(HiLlmError::BadRequest {
                         message: format!("{label} terminal"),
                         status: 400,
                     }),
@@ -459,11 +459,11 @@ mod tests {
     #[test]
     fn default_retry_policy_classifies_transient() {
         let policy = DefaultRetryPolicy;
-        let transient = HiLLMError::ServiceUnavailable {
+        let transient = HiLlmError::ServiceUnavailable {
             message: "t".into(),
             status: 503,
         };
-        let terminal = HiLLMError::BadRequest {
+        let terminal = HiLlmError::BadRequest {
             message: "t".into(),
             status: 400,
         };

@@ -1,5 +1,5 @@
 use super::{Provider, registry_get};
-use crate::error::{HiLLMError, HiLLMResult};
+use crate::error::{HiLlmError, HiLlmResult};
 use crate::provider::APIType;
 use crate::provider::codec::APITypeCodec;
 use std::borrow::Cow;
@@ -18,11 +18,11 @@ pub(crate) struct OpenAIProvider {
 
 impl OpenAIProvider {
     /// Creates a provider instance bound to `api_type`, failing with
-    /// [`HiLLMError::APITypeUnsupported`] if OpenAI does not support it.
-    pub(crate) fn with_api_type(api_type: APIType) -> HiLLMResult<Self> {
+    /// [`HiLlmError::APITypeUnsupported`] if OpenAI does not support it.
+    pub(crate) fn with_api_type(api_type: APIType) -> HiLlmResult<Self> {
         let available = [APIType::OpenAIChatCompletions, APIType::OpenAIResponses];
         if !available.contains(&api_type) {
-            return Err(HiLLMError::APITypeUnsupported {
+            return Err(HiLlmError::APITypeUnsupported {
                 api_type: api_type.to_string(),
                 provider: "openai".to_string(),
             });
