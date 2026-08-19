@@ -18,7 +18,7 @@ use crate::util::bound::SSE_BUFFER_MAX_BYTES;
 ///
 /// All fields are validated UTF-8. Multiple `data:` lines are joined with `\n`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SSEEvent {
+pub struct SseEvent {
     /// Concatenation of all `data:` lines, joined with `\n`.
     /// Empty string if no `data:` lines were present.
     pub data: String,
@@ -58,8 +58,8 @@ impl EventBuilder {
         self.data_line_count = 0;
     }
 
-    fn build(&self) -> HiLlmResult<SSEEvent> {
-        Ok(SSEEvent {
+    fn build(&self) -> HiLlmResult<SseEvent> {
+        Ok(SseEvent {
             data: String::from_utf8(self.data.clone()).map_err(|e| HiLlmError::Streaming {
                 message: format!("invalid UTF-8 in data field: {e}"),
             })?,
@@ -87,18 +87,18 @@ impl EventBuilder {
 }
 
 /// Incremental SSE decoder. Input: arbitrary `Bytes` chunks.
-/// Output: zero or more complete `SSEEvent`s per `decode()` call.
+/// Output: zero or more complete `SseEvent`s per `decode()` call.
 ///
 /// This type is NOT a Stream. It is a pure state machine that the caller
 /// drives from whatever polling context is appropriate (a Stream impl,
 /// a sync loop, a wasm callback, etc.).
-pub struct SSEDecoder {
+pub struct SseDecoder {
     buf: BytesMut,
     current: EventBuilder,
     has_data: bool,
 }
 
-impl SSEDecoder {
+impl SseDecoder {
     /// Create a new SSE decoder.
     pub fn new() -> Self {
         Self {
@@ -115,7 +115,7 @@ impl SSEDecoder {
     /// Returns `HiLlmError::Streaming` if:
     /// - Internal buffer exceeds `SSE_BUFFER_MAX_BYTES`.
     /// - A complete field contains invalid UTF-8.
-    pub fn decode(&mut self, chunk: Bytes) -> HiLlmResult<Vec<SSEEvent>> {
+    pub fn decode(&mut self, chunk: Bytes) -> HiLlmResult<Vec<SseEvent>> {
         // Check buffer overflow
         if self.buf.len() + chunk.len() > SSE_BUFFER_MAX_BYTES {
             return Err(HiLlmError::Streaming {
@@ -222,7 +222,7 @@ impl SSEDecoder {
     /// # Errors
     /// Returns `HiLlmError::Streaming` if the buffer ends mid-UTF-8-sequence
     /// or contains an incomplete field (data without a terminating newline).
-    pub fn finish(&mut self) -> HiLlmResult<Option<SSEEvent>> {
+    pub fn finish(&mut self) -> HiLlmResult<Option<SseEvent>> {
         // If there are remaining bytes without a terminating newline,
         // that is an incomplete field — return a truncation error.
         if !self.buf.is_empty() {
@@ -265,43 +265,43 @@ impl SSEDecoder {
     }
 }
 
-impl Default for SSEDecoder {
+impl Default for SseDecoder {
     fn default() -> Self {
         Self::new()
     }
 }
 
 pin_project! {
-    /// Wraps a byte-stream and an `SSEDecoder`, producing `SSEEvent`s.
+    /// Wraps a byte-stream and an `SseDecoder`, producing `SseEvent`s.
     /// This is transport-agnostic: the inner stream can be reqwest's
     /// `BytesStream`, a wasm fetch stream, or a test mock.
-    pub struct SSEStream<S> {
+    pub struct SseStream<S> {
         #[pin]
         inner: S,
-        decoder: SSEDecoder,
+        decoder: SseDecoder,
         done: bool,
-        pending: VecDeque<SSEEvent>,
+        pending: VecDeque<SseEvent>,
     }
 }
 
-impl<S> SSEStream<S> {
+impl<S> SseStream<S> {
     /// Create a new SSE stream wrapper.
     pub fn new(inner: S) -> Self {
         Self {
             inner,
-            decoder: SSEDecoder::new(),
+            decoder: SseDecoder::new(),
             done: false,
             pending: VecDeque::new(),
         }
     }
 }
 
-impl<S, E> Stream for SSEStream<S>
+impl<S, E> Stream for SseStream<S>
 where
     S: Stream<Item = Result<Bytes, E>>,
     E: Into<HiLlmError>,
 {
-    type Item = HiLlmResult<SSEEvent>;
+    type Item = HiLlmResult<SseEvent>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
@@ -364,7 +364,7 @@ mod tests {
 
     #[test]
     fn single_data_line() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
         let events = decoder
             .decode(Bytes::from_static(b"data: hello\n\n"))
             .unwrap();
@@ -377,7 +377,7 @@ mod tests {
 
     #[test]
     fn multiple_data_lines_joined() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
         let events = decoder
             .decode(Bytes::from_static(
                 b"data: line1\ndata: line2\ndata: line3\n\n",
@@ -389,7 +389,7 @@ mod tests {
 
     #[test]
     fn event_field() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
         let events = decoder
             .decode(Bytes::from_static(b"event: message\ndata: hello\n\n"))
             .unwrap();
@@ -400,7 +400,7 @@ mod tests {
 
     #[test]
     fn id_field() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
         let events = decoder
             .decode(Bytes::from_static(b"id: 123\ndata: hello\n\n"))
             .unwrap();
@@ -410,7 +410,7 @@ mod tests {
 
     #[test]
     fn retry_field() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
         let events = decoder
             .decode(Bytes::from_static(b"retry: 5000\ndata: hello\n\n"))
             .unwrap();
@@ -420,7 +420,7 @@ mod tests {
 
     #[test]
     fn retry_field_invalid_ignored() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
         let events = decoder
             .decode(Bytes::from_static(b"retry: not-a-number\ndata: hello\n\n"))
             .unwrap();
@@ -430,7 +430,7 @@ mod tests {
 
     #[test]
     fn comment_lines_ignored() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
         let events = decoder
             .decode(Bytes::from_static(b": this is a comment\ndata: hello\n\n"))
             .unwrap();
@@ -440,7 +440,7 @@ mod tests {
 
     #[test]
     fn heartbeat_comment_only() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
         let events = decoder
             .decode(Bytes::from_static(b": heartbeat\n\n"))
             .unwrap();
@@ -455,7 +455,7 @@ mod tests {
 
         // Split at every position
         for split_at in 0..payload.len() {
-            let mut decoder = SSEDecoder::new();
+            let mut decoder = SseDecoder::new();
             let chunk1 = Bytes::copy_from_slice(&payload[..split_at]);
             let chunk2 = Bytes::copy_from_slice(&payload[split_at..]);
 
@@ -483,7 +483,7 @@ mod tests {
 
         // Split at every byte position (Chinese chars are 3 bytes each)
         for split_at in 0..payload.len() {
-            let mut decoder = SSEDecoder::new();
+            let mut decoder = SseDecoder::new();
             let chunk1 = Bytes::copy_from_slice(&payload[..split_at]);
             let chunk2 = Bytes::copy_from_slice(&payload[split_at..]);
 
@@ -507,7 +507,7 @@ mod tests {
 
         // Split at every byte position (emoji are 4 bytes each)
         for split_at in 0..payload.len() {
-            let mut decoder = SSEDecoder::new();
+            let mut decoder = SseDecoder::new();
             let chunk1 = Bytes::copy_from_slice(&payload[..split_at]);
             let chunk2 = Bytes::copy_from_slice(&payload[split_at..]);
 
@@ -527,7 +527,7 @@ mod tests {
 
     #[test]
     fn field_name_split_across_chunks() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
 
         // Split "data:" across chunks
         let events1 = decoder.decode(Bytes::from_static(b"dat")).unwrap();
@@ -540,7 +540,7 @@ mod tests {
 
     #[test]
     fn crlf_split_across_chunks() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
 
         // Split \r\n across chunks
         let events1 = decoder
@@ -555,7 +555,7 @@ mod tests {
 
     #[test]
     fn blank_line_split_across_chunks() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
 
         // Split the terminating blank line
         let events1 = decoder
@@ -570,7 +570,7 @@ mod tests {
 
     #[test]
     fn multiple_events_in_single_chunk() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
         let events = decoder
             .decode(Bytes::from_static(
                 b"data: event1\n\ndata: event2\n\ndata: event3\n\n",
@@ -584,7 +584,7 @@ mod tests {
 
     #[test]
     fn complete_event_plus_partial_next() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
 
         let events1 = decoder
             .decode(Bytes::from_static(b"data: event1\n\ndata: eve"))
@@ -601,7 +601,7 @@ mod tests {
 
     #[test]
     fn lf_lf_terminates_event() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
         let events = decoder
             .decode(Bytes::from_static(b"data: hello\n\n"))
             .unwrap();
@@ -610,7 +610,7 @@ mod tests {
 
     #[test]
     fn crlf_crlf_terminates_event() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
         let events = decoder
             .decode(Bytes::from_static(b"data: hello\r\n\r\n"))
             .unwrap();
@@ -619,7 +619,7 @@ mod tests {
 
     #[test]
     fn crlf_lf_terminates_event() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
         let events = decoder
             .decode(Bytes::from_static(b"data: hello\r\n\n"))
             .unwrap();
@@ -628,7 +628,7 @@ mod tests {
 
     #[test]
     fn lf_crlf_terminates_event() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
         let events = decoder
             .decode(Bytes::from_static(b"data: hello\n\r\n"))
             .unwrap();
@@ -639,7 +639,7 @@ mod tests {
 
     #[test]
     fn empty_data_line() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
         let events = decoder.decode(Bytes::from_static(b"data:\n\n")).unwrap();
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].data, "");
@@ -647,7 +647,7 @@ mod tests {
 
     #[test]
     fn data_with_leading_space() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
         let events = decoder
             .decode(Bytes::from_static(b"data: hello\n\n"))
             .unwrap();
@@ -657,7 +657,7 @@ mod tests {
 
     #[test]
     fn data_without_space_after_colon() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
         let events = decoder
             .decode(Bytes::from_static(b"data:hello\n\n"))
             .unwrap();
@@ -667,7 +667,7 @@ mod tests {
 
     #[test]
     fn field_without_colon() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
         let events = decoder.decode(Bytes::from_static(b"data\n\n")).unwrap();
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].data, "");
@@ -675,7 +675,7 @@ mod tests {
 
     #[test]
     fn unknown_fields_ignored() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
         let events = decoder
             .decode(Bytes::from_static(b"unknown: value\ndata: hello\n\n"))
             .unwrap();
@@ -685,7 +685,7 @@ mod tests {
 
     #[test]
     fn buffer_overflow_error() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
         let large_chunk = vec![b'a'; SSE_BUFFER_MAX_BYTES + 1];
         let result = decoder.decode(Bytes::from(large_chunk));
         assert!(result.is_err());
@@ -696,7 +696,7 @@ mod tests {
 
     #[test]
     fn invalid_utf8_error() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
         // Invalid UTF-8 sequence
         let result = decoder.decode(Bytes::from_static(b"data: \xff\xfe\n\n"));
         assert!(result.is_err());
@@ -709,7 +709,7 @@ mod tests {
 
     #[test]
     fn finish_with_pending_event() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
         // Field line is complete (has newline), but event has no terminating blank line.
         // Compatibility policy: dispatch the event anyway.
         decoder
@@ -722,7 +722,7 @@ mod tests {
 
     #[test]
     fn finish_with_incomplete_field() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
         // No terminating newline — incomplete field, should error.
         decoder.decode(Bytes::from_static(b"data: hel")).unwrap();
         let result = decoder.finish();
@@ -734,7 +734,7 @@ mod tests {
 
     #[test]
     fn finish_with_incomplete_utf8() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
         // Incomplete UTF-8 sequence (first byte of 3-byte char)
         decoder.decode(Bytes::from_static(b"data: \xe4")).unwrap();
         let result = decoder.finish();
@@ -746,14 +746,14 @@ mod tests {
 
     #[test]
     fn finish_empty_buffer() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
         let event = decoder.finish().unwrap();
         assert!(event.is_none());
     }
 
     #[test]
     fn finish_only_whitespace() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
         decoder.decode(Bytes::from_static(b"   \n\n")).unwrap();
         let event = decoder.finish().unwrap();
         assert!(event.is_none());
@@ -769,7 +769,7 @@ mod tests {
             Ok(Bytes::from_static(b"data: event2\n\n")),
         ];
         let stream = futures_util::stream::iter(chunks);
-        let mut sse_stream = SSEStream::new(stream);
+        let mut sse_stream = SseStream::new(stream);
 
         use futures_util::StreamExt;
         let event1 = sse_stream.next().await.unwrap().unwrap();
@@ -792,7 +792,7 @@ mod tests {
             }),
         ];
         let stream = futures_util::stream::iter(chunks);
-        let mut sse_stream = SSEStream::new(stream);
+        let mut sse_stream = SseStream::new(stream);
 
         use futures_util::StreamExt;
         let event = sse_stream.next().await.unwrap().unwrap();
@@ -811,7 +811,7 @@ mod tests {
             b"data: event1\n\ndata: event2\n\ndata: event3\n\n",
         ))];
         let stream = futures_util::stream::iter(chunks);
-        let mut sse_stream = SSEStream::new(stream);
+        let mut sse_stream = SseStream::new(stream);
 
         use futures_util::StreamExt;
         let event1 = sse_stream.next().await.unwrap().unwrap();
@@ -831,7 +831,7 @@ mod tests {
 
     #[test]
     fn openai_style_stream() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
         let payload = b"data: {\"id\":\"1\",\"choices\":[{\"delta\":{\"content\":\"Hello\"}}]}\n\ndata: {\"id\":\"1\",\"choices\":[{\"delta\":{\"content\":\" world\"}}]}\n\ndata: [DONE]\n\n";
 
         let events = decoder.decode(Bytes::copy_from_slice(payload)).unwrap();
@@ -843,7 +843,7 @@ mod tests {
 
     #[test]
     fn anthropic_style_stream_with_event_field() {
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
         let payload = b"event: message_start\ndata: {\"type\":\"message_start\"}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\"}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n";
 
         let events = decoder.decode(Bytes::copy_from_slice(payload)).unwrap();
@@ -877,7 +877,7 @@ mod tests {
             }
         });
 
-        let sse_stream = SSEStream::new(stream);
+        let sse_stream = SseStream::new(stream);
         tokio::pin!(sse_stream);
 
         // Poll once to get an event
@@ -908,7 +908,7 @@ mod tests {
         // The SSE decoder should treat [DONE] as regular data.
         // Protocol-specific handling (e.g., OpenAI stopping on [DONE])
         // belongs in the provider codec, not the transport decoder.
-        let mut decoder = SSEDecoder::new();
+        let mut decoder = SseDecoder::new();
         let events = decoder
             .decode(Bytes::from_static(b"data: [DONE]\n\n"))
             .unwrap();

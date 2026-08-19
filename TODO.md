@@ -156,7 +156,7 @@ enum ModelMatch {
 
 ### 最小实现步骤
 
-- [x] 提取唯一的、与 reqwest 解耦的 `SSEDecoder`，输入 `Bytes`，输出完整 `SSEEvent`。
+- [x] 提取唯一的、与 reqwest 解耦的 `SseDecoder`，输入 `Bytes`，输出完整 `SseEvent`。
 - [x] 内部使用字节缓冲而不是对每个 HTTP chunk 转为 `&str`；只在完整字段行或完整事件形成后校验 UTF-8。
 - [x] 同时识别 `\n\n`、`\r\n\r\n`，并正确处理分隔符本身跨 chunk 的情况。
 - [x] 支持 `data`、`event`、`id`、`retry` 和 comment；按规范将多个 `data:` 行以换行连接。

@@ -415,7 +415,7 @@ pub(crate) fn unix_timestamp_secs() -> u64 {
 #[serde(rename_all = "snake_case")]
 pub enum StreamFormat {
     #[default]
-    SSE,
+    Sse,
     AwsEventStream,
 }
 
@@ -636,7 +636,7 @@ pub(crate) trait Provider: Send + Sync {
     // --- Legacy streaming ---
 
     fn stream_format(&self) -> StreamFormat {
-        StreamFormat::SSE
+        StreamFormat::Sse
     }
 
     fn parse_stream_event(&self, data: &str) -> HiLlmResult<Option<ChatCompletionChunk>> {

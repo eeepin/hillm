@@ -185,7 +185,7 @@ impl ChatCompletionClient for Client {
                 let auth = auth_header.as_ref().map(str_pair);
 
                 match prepared.provider.stream_format() {
-                    provider::StreamFormat::SSE => {
+                    provider::StreamFormat::Sse => {
                         let provider = Arc::clone(&prepared.provider);
                         let parse_event = move |data: &str| provider.parse_stream_event(data);
                         let stream = http::stream::post_stream(
@@ -298,7 +298,7 @@ impl ChatCompletionClient for Client {
             let auth = auth_header.as_ref().map(str_pair);
 
             let stream = match prepared.provider.stream_format() {
-                provider::StreamFormat::SSE => {
+                provider::StreamFormat::Sse => {
                     let provider = Arc::clone(&prepared.provider);
                     let parse_event = move |data: &str| provider.parse_stream_event(data);
                     http::stream::post_stream(

@@ -6,7 +6,7 @@ use futures_core::Stream;
 use pin_project_lite::pin_project;
 
 use crate::error::HiLlmResult;
-use crate::sse::SSEStream;
+use crate::sse::SseStream;
 use crate::types::ChatCompletionChunk;
 
 use super::request::with_retry;
@@ -38,7 +38,7 @@ where
     let resp =
         send_stream_request(client, url, auth_header, extra_headers, body, max_retries).await?;
     let byte_stream = resp.bytes_stream();
-    let stream = SSEParser::new(byte_stream, parse_event);
+    let stream = SseParser::new(byte_stream, parse_event);
     Ok(Box::pin(stream))
 }
 
@@ -77,7 +77,7 @@ where
     let resp =
         send_stream_request(client, url, auth_header, extra_headers, body, max_retries).await?;
     let byte_stream = resp.bytes_stream();
-    let stream = TypedSSEParser::new(byte_stream, parse_event);
+    let stream = TypedSseParser::new(byte_stream, parse_event);
     Ok(Box::pin(stream))
 }
 
@@ -118,28 +118,28 @@ async fn send_stream_request(
 }
 
 pin_project! {
-    /// Thin wrapper around SSEStream that maps SSEEvent to ChatCompletionChunk
+    /// Thin wrapper around SseStream that maps SseEvent to ChatCompletionChunk
     /// via the parse_event closure.
-    struct SSEParser<S, P> {
+    struct SseParser<S, P> {
         #[pin]
-        stream: SSEStream<S>,
+        stream: SseStream<S>,
         parse_event: P,
     }
 }
 
-impl<S, P> SSEParser<S, P>
+impl<S, P> SseParser<S, P>
 where
     P: Fn(&str) -> HiLlmResult<Option<ChatCompletionChunk>>,
 {
     fn new(inner: S, parse_event: P) -> Self {
         Self {
-            stream: SSEStream::new(inner),
+            stream: SseStream::new(inner),
             parse_event,
         }
     }
 }
 
-impl<S, P> Stream for SSEParser<S, P>
+impl<S, P> Stream for SseParser<S, P>
 where
     S: Stream<Item = Result<Bytes, reqwest::Error>>,
     P: Fn(&str) -> HiLlmResult<Option<ChatCompletionChunk>>,
@@ -167,28 +167,28 @@ where
 pin_project! {
     /// SSE stream whose events are decoded into a caller-chosen type `T`
     /// via the parse_event closure.
-    struct TypedSSEParser<S, P, T> {
+    struct TypedSseParser<S, P, T> {
         #[pin]
-        stream: SSEStream<S>,
+        stream: SseStream<S>,
         parse_event: P,
         _marker: std::marker::PhantomData<T>,
     }
 }
 
-impl<S, P, T> TypedSSEParser<S, P, T>
+impl<S, P, T> TypedSseParser<S, P, T>
 where
     P: Fn(&str) -> HiLlmResult<Option<T>>,
 {
     fn new(inner: S, parse_event: P) -> Self {
         Self {
-            stream: SSEStream::new(inner),
+            stream: SseStream::new(inner),
             parse_event,
             _marker: std::marker::PhantomData,
         }
     }
 }
 
-impl<S, P, T> Stream for TypedSSEParser<S, P, T>
+impl<S, P, T> Stream for TypedSseParser<S, P, T>
 where
     S: Stream<Item = Result<Bytes, reqwest::Error>>,
     P: Fn(&str) -> HiLlmResult<Option<T>>,
