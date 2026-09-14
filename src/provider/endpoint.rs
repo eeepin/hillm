@@ -101,10 +101,7 @@ impl Endpoint {
     pub fn supports_streaming(&self) -> bool {
         matches!(
             self,
-            Self::ChatCompletion
-                | Self::Response
-                | Self::AnthropicMessages
-                | Self::BedrockConverse
+            Self::ChatCompletion | Self::Response | Self::AnthropicMessages | Self::BedrockConverse
         )
     }
 
@@ -272,9 +269,7 @@ impl PartialEq for EndpointCapabilities {
         if self.supported.len() != other.supported.len() {
             return false;
         }
-        self.supported
-            .iter()
-            .all(|e| other.supported.contains(e))
+        self.supported.iter().all(|e| other.supported.contains(e))
     }
 }
 
@@ -362,9 +357,18 @@ mod tests {
 
     #[test]
     fn test_response_category() {
-        assert_eq!(Endpoint::ChatCompletion.response_category(), ResponseCategory::Json);
-        assert_eq!(Endpoint::AudioSpeech.response_category(), ResponseCategory::Binary);
-        assert_eq!(Endpoint::Files.response_category(), ResponseCategory::FileManagement);
+        assert_eq!(
+            Endpoint::ChatCompletion.response_category(),
+            ResponseCategory::Json
+        );
+        assert_eq!(
+            Endpoint::AudioSpeech.response_category(),
+            ResponseCategory::Binary
+        );
+        assert_eq!(
+            Endpoint::Files.response_category(),
+            ResponseCategory::FileManagement
+        );
     }
 
     #[test]
