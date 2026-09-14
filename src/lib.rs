@@ -42,8 +42,8 @@ pub use client::{
 pub use error::{HiLlmError, HiLlmResult};
 pub use http::transport::TransportConfig;
 pub use provider::{
-    AuthConfig, AuthType, ModelCapabilities, ProviderConfig, StreamFormat, all_providers,
-    capabilities,
+    AuthConfig, AuthType, Endpoint, EndpointCapabilities, EndpointOverride, ModelCapabilities,
+    ProviderConfig, ResponseCategory, StreamFormat, all_providers, capabilities,
     cost::{completion_cost, completion_cost_with_cache},
     custom::{
         AuthHeaderFormat, CustomProviderConfig, CustomProviderRegistry, register_custom_provider,
