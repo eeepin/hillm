@@ -5,11 +5,13 @@ pub mod codec;
 pub mod cost;
 pub(crate) mod custom;
 pub(crate) mod datadriven;
+pub mod endpoint;
 pub(crate) mod openai;
 pub mod outbound_policy;
 
 pub use api_type::ApiType;
 pub use codec::ApiTypeCodec;
+pub use endpoint::{Endpoint, EndpointCapabilities, EndpointOverride, ResponseCategory};
 #[cfg(all(
     any(feature = "default-http", feature = "wasm-http"),
     not(target_arch = "wasm32")
@@ -128,6 +130,8 @@ impl ProviderEntry {
             param_mappings: None,
             available_api_types: vec![], // Will use default [OpenAIChatCompletions]
             default_api_type: None,
+            endpoint_capabilities: EndpointCapabilities::default(),
+            endpoint_overrides: HashMap::new(),
         }
     }
 }
@@ -425,16 +429,27 @@ pub struct ProviderConfig {
     pub display_name: Option<String>,
     pub base_url: Option<String>,
     pub auth: Option<AuthConfig>,
+    /// Legacy endpoint list (deprecated, use `endpoint_capabilities` instead).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub endpoints: Option<Vec<String>>,
     pub models: Vec<String>,
     pub param_mappings: Option<HashMap<String, String>>,
     /// API types this provider supports. Empty defaults to `[OpenAIChatCompletions]`.
+    /// Deprecated: use `endpoint_capabilities` instead.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub available_api_types: Vec<ApiType>,
     /// The default API type to use when creating a provider instance.
     /// Must be one of `available_api_types` if both are set.
+    /// Deprecated: use `endpoint_capabilities` instead.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_api_type: Option<ApiType>,
+    /// Endpoint capabilities declaring which APIs this provider supports.
+    /// This is the modern replacement for `available_api_types`.
+    #[serde(default)]
+    pub endpoint_capabilities: EndpointCapabilities,
+    /// Endpoint-specific configuration overrides.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub endpoint_overrides: HashMap<Endpoint, EndpointOverride>,
 }
 
 impl ProviderConfig {
@@ -469,6 +484,43 @@ impl ProviderConfig {
             }
         }
         Ok(())
+    }
+
+    /// Returns whether this provider supports the specified endpoint.
+    ///
+    /// This checks the `endpoint_capabilities` field. For backward compatibility,
+    /// if `endpoint_capabilities` is empty but `available_api_types` is set,
+    /// it maps API types to endpoints.
+    pub fn supports_endpoint(&self, endpoint: Endpoint) -> bool {
+        // First check the modern endpoint_capabilities
+        if self.endpoint_capabilities.supports(endpoint) {
+            return true;
+        }
+
+        // Backward compatibility: map from available_api_types if endpoint_capabilities is empty
+        if self.endpoint_capabilities.supported.is_empty() && !self.available_api_types.is_empty() {
+            return self.available_api_types.iter().any(|api_type| {
+                matches!(
+                    (api_type, endpoint),
+                    (ApiType::OpenAIChatCompletions, Endpoint::ChatCompletion)
+                        | (ApiType::OpenAIResponses, Endpoint::Response)
+                        | (ApiType::AnthropicMessages, Endpoint::AnthropicMessages)
+                        | (ApiType::BedrockConverse, Endpoint::BedrockConverse)
+                )
+            });
+        }
+
+        false
+    }
+
+    /// Returns the effective path for the specified endpoint.
+    ///
+    /// Uses the endpoint override if present, otherwise the default path.
+    pub fn endpoint_path(&self, endpoint: Endpoint) -> String {
+        self.endpoint_overrides
+            .get(&endpoint)
+            .and_then(|o| o.path.clone())
+            .unwrap_or_else(|| endpoint.default_path().to_string())
     }
 }
 
@@ -1058,6 +1110,8 @@ mod tests {
             param_mappings: None,
             available_api_types: vec![],
             default_api_type: None,
+            endpoint_capabilities: EndpointCapabilities::default(),
+            endpoint_overrides: HashMap::new(),
         };
         assert_eq!(
             config.effective_api_types(),
@@ -1081,6 +1135,8 @@ mod tests {
             param_mappings: None,
             available_api_types: vec![ApiType::OpenAIChatCompletions],
             default_api_type: Some(ApiType::AnthropicMessages),
+            endpoint_capabilities: EndpointCapabilities::default(),
+            endpoint_overrides: HashMap::new(),
         };
         let result = config.validate_api_types();
         assert!(result.is_err());
@@ -1100,6 +1156,8 @@ mod tests {
             param_mappings: None,
             available_api_types: vec![ApiType::OpenAIChatCompletions, ApiType::OpenAIResponses],
             default_api_type: Some(ApiType::OpenAIResponses),
+            endpoint_capabilities: EndpointCapabilities::default(),
+            endpoint_overrides: HashMap::new(),
         };
         assert!(config.validate_api_types().is_ok());
         assert_eq!(
