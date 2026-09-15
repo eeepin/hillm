@@ -11,7 +11,10 @@ pub mod outbound_policy;
 
 pub use api_type::ApiType;
 pub use codec::ApiTypeCodec;
-pub use endpoint::{Endpoint, EndpointCapabilities, EndpointOverride, ResponseCategory};
+pub use endpoint::{
+    Endpoint, EndpointCapabilities, EndpointCodec, EndpointOverride, EndpointRequest,
+    EndpointResponse, EndpointStreamEvent, ResponseCategory,
+};
 #[cfg(all(
     any(feature = "default-http", feature = "wasm-http"),
     not(target_arch = "wasm32")

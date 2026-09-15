@@ -4,6 +4,15 @@
 //! API endpoints across all providers, replacing the fragmented legacy system where
 //! endpoint paths were scattered across Provider trait methods, ApiType enum, and
 //! individual codec implementations.
+//!
+//! # Submodules
+//!
+//! - [`codec`] - The [`EndpointCodec`](codec::EndpointCodec) trait and unified request/response types
+
+pub mod codec;
+
+// Re-export codec types for convenience
+pub use codec::{EndpointCodec, EndpointRequest, EndpointResponse, EndpointStreamEvent};
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
