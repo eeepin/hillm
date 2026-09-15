@@ -34,9 +34,7 @@ impl EndpointCodec for BedrockConverseCodec {
 
     fn encode(&self, request: &EndpointRequest) -> HiLlmResult<Bytes> {
         match request {
-            EndpointRequest::BedrockConverse(req) => {
-                Ok(Bytes::from(serde_json::to_vec(req)?))
-            }
+            EndpointRequest::BedrockConverse(req) => Ok(Bytes::from(serde_json::to_vec(req)?)),
             _ => Err(HiLlmError::InternalError {
                 message: format!(
                     "BedrockConverseCodec received invalid request type: expected BedrockConverse, got {:?}",
@@ -52,11 +50,10 @@ impl EndpointCodec for BedrockConverseCodec {
     }
 
     fn parse_stream_event(&self, data: &str) -> HiLlmResult<Option<EndpointStreamEvent>> {
-        let event: BedrockStreamEvent = serde_json::from_str(data).map_err(|e| {
-            HiLlmError::Streaming {
+        let event: BedrockStreamEvent =
+            serde_json::from_str(data).map_err(|e| HiLlmError::Streaming {
                 message: format!("Failed to parse BedrockStreamEvent: {e}"),
-            }
-        })?;
+            })?;
 
         Ok(Some(EndpointStreamEvent::BedrockConverse(event)))
     }
@@ -112,7 +109,10 @@ mod tests {
         }
         assert!(result.is_ok());
         if let EndpointResponse::BedrockConverse(response) = result.unwrap() {
-            assert_eq!(response.stop_reason, crate::types::bedrock::BedrockStopReason::EndTurn);
+            assert_eq!(
+                response.stop_reason,
+                crate::types::bedrock::BedrockStopReason::EndTurn
+            );
             assert!(response.usage.is_some());
         } else {
             panic!("Expected BedrockConverse response");
@@ -135,9 +135,8 @@ mod tests {
     #[test]
     fn test_codec_invalid_request_type() {
         let codec = BedrockConverseCodec;
-        let request = EndpointRequest::ChatCompletion(
-            crate::types::chat::ChatCompletionRequest::default(),
-        );
+        let request =
+            EndpointRequest::ChatCompletion(crate::types::chat::ChatCompletionRequest::default());
 
         let result = codec.encode(&request);
         assert!(result.is_err());

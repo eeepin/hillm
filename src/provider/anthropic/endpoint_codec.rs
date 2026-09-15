@@ -28,9 +28,7 @@ impl EndpointCodec for AnthropicMessagesCodec {
 
     fn encode(&self, request: &EndpointRequest) -> HiLlmResult<Bytes> {
         match request {
-            EndpointRequest::AnthropicMessages(req) => {
-                Ok(Bytes::from(serde_json::to_vec(req)?))
-            }
+            EndpointRequest::AnthropicMessages(req) => Ok(Bytes::from(serde_json::to_vec(req)?)),
             _ => Err(HiLlmError::InternalError {
                 message: format!(
                     "AnthropicMessagesCodec received invalid request type: expected AnthropicMessages, got {:?}",
@@ -46,11 +44,10 @@ impl EndpointCodec for AnthropicMessagesCodec {
     }
 
     fn parse_stream_event(&self, data: &str) -> HiLlmResult<Option<EndpointStreamEvent>> {
-        let event: AnthropicStreamEvent = serde_json::from_str(data).map_err(|e| {
-            HiLlmError::Streaming {
+        let event: AnthropicStreamEvent =
+            serde_json::from_str(data).map_err(|e| HiLlmError::Streaming {
                 message: format!("Failed to parse AnthropicStreamEvent: {e}"),
-            }
-        })?;
+            })?;
 
         Ok(Some(EndpointStreamEvent::AnthropicMessages(event)))
     }
@@ -133,9 +130,8 @@ mod tests {
     #[test]
     fn test_codec_invalid_request_type() {
         let codec = AnthropicMessagesCodec;
-        let request = EndpointRequest::ChatCompletion(
-            crate::types::chat::ChatCompletionRequest::default(),
-        );
+        let request =
+            EndpointRequest::ChatCompletion(crate::types::chat::ChatCompletionRequest::default());
 
         let result = codec.encode(&request);
         assert!(result.is_err());

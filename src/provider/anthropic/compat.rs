@@ -52,7 +52,9 @@ use crate::error::{HiLlmError, HiLlmResult};
 use crate::provider::ApiType;
 use crate::provider::anthropic::AnthropicProvider;
 use crate::provider::codec::ApiTypeCodec;
-use crate::provider::endpoint::{Endpoint, EndpointCodec, EndpointRequest, EndpointResponse, EndpointStreamEvent};
+use crate::provider::endpoint::{
+    Endpoint, EndpointCodec, EndpointRequest, EndpointResponse, EndpointStreamEvent,
+};
 use compat_convert::*;
 
 pub(crate) const DEFAULT_MAX_TOKENS: u64 = 4096;

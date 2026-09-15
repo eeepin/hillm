@@ -143,9 +143,9 @@ impl ChatCompletionClient for Client {
                     codec
                         .parse_stream_event(data)?
                         .map(|event| match event {
-                            crate::provider::endpoint::EndpointStreamEvent::ChatCompletion(chunk) => {
-                                Ok(chunk)
-                            }
+                            crate::provider::endpoint::EndpointStreamEvent::ChatCompletion(
+                                chunk,
+                            ) => Ok(chunk),
                             _ => Err(HiLlmError::InternalError {
                                 message: "Unexpected stream event type".into(),
                             }),

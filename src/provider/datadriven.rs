@@ -104,15 +104,11 @@ impl Provider for ConfigDrivenProvider {
             super::Endpoint::ImageGeneration => {
                 Some(Box::new(endpoint_codecs::OpenAIImageGenerationCodec))
             }
-            super::Endpoint::AudioSpeech => {
-                Some(Box::new(endpoint_codecs::OpenAIAudioSpeechCodec))
-            }
+            super::Endpoint::AudioSpeech => Some(Box::new(endpoint_codecs::OpenAIAudioSpeechCodec)),
             super::Endpoint::AudioTranscription => {
                 Some(Box::new(endpoint_codecs::OpenAIAudioTranscriptionCodec))
             }
-            super::Endpoint::Moderation => {
-                Some(Box::new(endpoint_codecs::OpenAIModerationCodec))
-            }
+            super::Endpoint::Moderation => Some(Box::new(endpoint_codecs::OpenAIModerationCodec)),
             _ => None,
         }
     }

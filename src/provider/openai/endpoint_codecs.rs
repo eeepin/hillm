@@ -42,9 +42,7 @@ impl EndpointCodec for OpenAIChatCompletionCodec {
 
     fn encode(&self, request: &EndpointRequest) -> HiLlmResult<Bytes> {
         match request {
-            EndpointRequest::ChatCompletion(req) => {
-                Ok(Bytes::from(serde_json::to_vec(req)?))
-            }
+            EndpointRequest::ChatCompletion(req) => Ok(Bytes::from(serde_json::to_vec(req)?)),
             _ => Err(HiLlmError::InternalError {
                 message: format!(
                     "OpenAIChatCompletionCodec received invalid request type: expected ChatCompletion, got {:?}",
@@ -65,11 +63,10 @@ impl EndpointCodec for OpenAIChatCompletionCodec {
             return Ok(None);
         }
 
-        let chunk: ChatCompletionChunk = serde_json::from_str(data).map_err(|e| {
-            HiLlmError::Streaming {
+        let chunk: ChatCompletionChunk =
+            serde_json::from_str(data).map_err(|e| HiLlmError::Streaming {
                 message: format!("Failed to parse ChatCompletionChunk: {e}"),
-            }
-        })?;
+            })?;
 
         Ok(Some(EndpointStreamEvent::ChatCompletion(chunk)))
     }
@@ -93,9 +90,7 @@ impl EndpointCodec for OpenAIResponseCodec {
 
     fn encode(&self, request: &EndpointRequest) -> HiLlmResult<Bytes> {
         match request {
-            EndpointRequest::Response(req) => {
-                Ok(Bytes::from(serde_json::to_vec(req)?))
-            }
+            EndpointRequest::Response(req) => Ok(Bytes::from(serde_json::to_vec(req)?)),
             _ => Err(HiLlmError::InternalError {
                 message: format!(
                     "OpenAIResponseCodec received invalid request type: expected Response, got {:?}",
@@ -113,11 +108,10 @@ impl EndpointCodec for OpenAIResponseCodec {
     fn parse_stream_event(&self, data: &str) -> HiLlmResult<Option<EndpointStreamEvent>> {
         // Responses API doesn't use "[DONE]" sentinel
         // Stream ends when connection closes
-        let event: ResponsesStreamEvent = serde_json::from_str(data).map_err(|e| {
-            HiLlmError::Streaming {
+        let event: ResponsesStreamEvent =
+            serde_json::from_str(data).map_err(|e| HiLlmError::Streaming {
                 message: format!("Failed to parse ResponsesStreamEvent: {e}"),
-            }
-        })?;
+            })?;
 
         Ok(Some(EndpointStreamEvent::Response(event)))
     }
@@ -140,9 +134,7 @@ impl EndpointCodec for OpenAIEmbeddingCodec {
 
     fn encode(&self, request: &EndpointRequest) -> HiLlmResult<Bytes> {
         match request {
-            EndpointRequest::Embedding(req) => {
-                Ok(Bytes::from(serde_json::to_vec(req)?))
-            }
+            EndpointRequest::Embedding(req) => Ok(Bytes::from(serde_json::to_vec(req)?)),
             _ => Err(HiLlmError::InternalError {
                 message: format!(
                     "OpenAIEmbeddingCodec received invalid request type: expected Embedding, got {:?}",
@@ -175,9 +167,7 @@ impl EndpointCodec for OpenAIImageGenerationCodec {
 
     fn encode(&self, request: &EndpointRequest) -> HiLlmResult<Bytes> {
         match request {
-            EndpointRequest::ImageGeneration(req) => {
-                Ok(Bytes::from(serde_json::to_vec(req)?))
-            }
+            EndpointRequest::ImageGeneration(req) => Ok(Bytes::from(serde_json::to_vec(req)?)),
             _ => Err(HiLlmError::InternalError {
                 message: format!(
                     "OpenAIImageGenerationCodec received invalid request type: expected ImageGeneration, got {:?}",
@@ -210,9 +200,7 @@ impl EndpointCodec for OpenAIAudioSpeechCodec {
 
     fn encode(&self, request: &EndpointRequest) -> HiLlmResult<Bytes> {
         match request {
-            EndpointRequest::AudioSpeech(req) => {
-                Ok(Bytes::from(serde_json::to_vec(req)?))
-            }
+            EndpointRequest::AudioSpeech(req) => Ok(Bytes::from(serde_json::to_vec(req)?)),
             _ => Err(HiLlmError::InternalError {
                 message: format!(
                     "OpenAIAudioSpeechCodec received invalid request type: expected AudioSpeech, got {:?}",
@@ -245,9 +233,7 @@ impl EndpointCodec for OpenAIAudioTranscriptionCodec {
 
     fn encode(&self, request: &EndpointRequest) -> HiLlmResult<Bytes> {
         match request {
-            EndpointRequest::AudioTranscription(req) => {
-                Ok(Bytes::from(serde_json::to_vec(req)?))
-            }
+            EndpointRequest::AudioTranscription(req) => Ok(Bytes::from(serde_json::to_vec(req)?)),
             _ => Err(HiLlmError::InternalError {
                 message: format!(
                     "OpenAIAudioTranscriptionCodec received invalid request type: expected AudioTranscription, got {:?}",
@@ -280,9 +266,7 @@ impl EndpointCodec for OpenAIModerationCodec {
 
     fn encode(&self, request: &EndpointRequest) -> HiLlmResult<Bytes> {
         match request {
-            EndpointRequest::Moderation(req) => {
-                Ok(Bytes::from(serde_json::to_vec(req)?))
-            }
+            EndpointRequest::Moderation(req) => Ok(Bytes::from(serde_json::to_vec(req)?)),
             _ => Err(HiLlmError::InternalError {
                 message: format!(
                     "OpenAIModerationCodec received invalid request type: expected Moderation, got {:?}",
@@ -305,10 +289,7 @@ impl EndpointCodec for OpenAIModerationCodec {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{
-        chat::ChatCompletionRequest,
-        embedding::EmbeddingRequest,
-    };
+    use crate::types::{chat::ChatCompletionRequest, embedding::EmbeddingRequest};
 
     #[test]
     fn test_chat_completion_codec_endpoint() {
