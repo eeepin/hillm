@@ -4,10 +4,15 @@ use std::borrow::Cow;
 use crate::error::HiLlmError;
 use crate::error::HiLlmResult;
 use crate::provider::bedrock::codec::BedrockConverseCodec;
+use crate::provider::endpoint::{Endpoint, EndpointCodec};
 use crate::provider::{ApiType, Provider, StreamFormat, codec::ApiTypeCodec, registry_get};
 use crate::types::ChatCompletionChunk;
 
 pub mod codec;
+pub mod endpoint_codec;
+
+#[allow(unused_imports)] // Exported for future use in Phase 3
+pub use endpoint_codec::BedrockConverseCodec as BedrockConverseEndpointCodec;
 
 /// Default AWS region for Bedrock when none is specified.
 const DEFAULT_REGION: &str = "us-east-1";
@@ -535,6 +540,13 @@ impl Provider for BedrockProvider {
         });
 
         Ok(())
+    }
+
+    fn codec_for_endpoint(&self, endpoint: Endpoint) -> Option<Box<dyn EndpointCodec>> {
+        match endpoint {
+            Endpoint::BedrockConverse => Some(Box::new(endpoint_codec::BedrockConverseCodec)),
+            _ => None,
+        }
     }
 
     fn signing_headers(&self, method: &str, url: &str, body: &[u8]) -> Vec<(String, String)> {
