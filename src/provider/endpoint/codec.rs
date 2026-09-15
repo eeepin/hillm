@@ -12,15 +12,16 @@
 //! while keeping provider-specific logic in the provider implementations.
 
 use bytes::Bytes;
-use serde::{Deserialize, Serialize};
 
 use super::Endpoint;
 use crate::error::{HiLlmError, HiLlmResult};
 
 // Re-export all request/response types for convenience
 use crate::types::{
+    anthropic::{AnthropicMessagesRequest, AnthropicMessagesResponse, AnthropicStreamEvent},
     audio::{CreateSpeechRequest, CreateTranscriptionRequest, TranscriptionResponse},
     batch::{BatchListQuery, BatchListResponse, BatchObject, CreateBatchRequest},
+    bedrock::{BedrockConverseRequest, BedrockConverseResponse, BedrockStreamEvent},
     chat::{ChatCompletionChunk, ChatCompletionRequest, ChatCompletionResponse},
     embedding::{EmbeddingRequest, EmbeddingResponse},
     file::{CreateFileRequest, DeleteResponse, FileListQuery, FileListResponse, FileObject},
@@ -127,7 +128,8 @@ impl EndpointRequest {
             Self::ChatCompletion(r) => Some(&r.model),
             Self::Response(r) => Some(&r.model),
             Self::AnthropicMessages(r) => Some(&r.model),
-            Self::BedrockConverse(r) => Some(&r.model_id),
+            // Bedrock model_id is part of the URL path, not the request body
+            Self::BedrockConverse(_) => None,
             Self::Embedding(r) => Some(&r.model),
             Self::ImageGeneration(r) => r.model.as_deref(),
             Self::AudioSpeech(r) => Some(&r.model),
@@ -149,7 +151,8 @@ impl EndpointRequest {
             Self::ChatCompletion(r) => r.stream.unwrap_or(false),
             Self::Response(r) => r.stream.unwrap_or(false),
             Self::AnthropicMessages(r) => r.stream.unwrap_or(false),
-            Self::BedrockConverse(r) => r.stream.unwrap_or(false),
+            // Bedrock streaming is determined by the endpoint URL, not the request body
+            Self::BedrockConverse(_) => false,
             _ => false,
         }
     }
@@ -309,59 +312,6 @@ pub trait EndpointCodec: Send + Sync {
             ),
         })
     }
-}
-
-// Note: We need to import the Anthropic and Bedrock types for the enum variants.
-// These are currently in the types module but may need to be re-exported or moved.
-// For now, we'll use placeholder types that will be replaced with the actual types
-// when we implement the codecs in Phase 2.3 and 2.4.
-
-/// Placeholder for Anthropic Messages request (will be replaced with actual type)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AnthropicMessagesRequest {
-    pub model: String,
-    #[serde(default)]
-    pub stream: Option<bool>,
-    #[serde(flatten)]
-    pub extra: serde_json::Value,
-}
-
-/// Placeholder for Anthropic Messages response (will be replaced with actual type)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AnthropicMessagesResponse {
-    #[serde(flatten)]
-    pub extra: serde_json::Value,
-}
-
-/// Placeholder for Anthropic stream event (will be replaced with actual type)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AnthropicStreamEvent {
-    #[serde(flatten)]
-    pub extra: serde_json::Value,
-}
-
-/// Placeholder for Bedrock Converse request (will be replaced with actual type)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BedrockConverseRequest {
-    pub model_id: String,
-    #[serde(default)]
-    pub stream: Option<bool>,
-    #[serde(flatten)]
-    pub extra: serde_json::Value,
-}
-
-/// Placeholder for Bedrock Converse response (will be replaced with actual type)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BedrockConverseResponse {
-    #[serde(flatten)]
-    pub extra: serde_json::Value,
-}
-
-/// Placeholder for Bedrock stream event (will be replaced with actual type)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BedrockStreamEvent {
-    #[serde(flatten)]
-    pub extra: serde_json::Value,
 }
 
 #[cfg(test)]
