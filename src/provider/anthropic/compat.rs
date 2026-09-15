@@ -48,10 +48,11 @@ use bytes::Bytes;
 use serde_json::Value;
 use std::collections::HashMap;
 
-use crate::error::HiLlmResult;
+use crate::error::{HiLlmError, HiLlmResult};
 use crate::provider::ApiType;
 use crate::provider::anthropic::AnthropicProvider;
 use crate::provider::codec::ApiTypeCodec;
+use crate::provider::endpoint::{Endpoint, EndpointCodec, EndpointRequest, EndpointResponse, EndpointStreamEvent};
 use compat_convert::*;
 
 pub(crate) const DEFAULT_MAX_TOKENS: u64 = 4096;
@@ -169,6 +170,62 @@ impl crate::provider::Provider for AnthropicChatCompatProvider {
         match api_type {
             ApiType::OpenAIChatCompletions => Some(Box::new(AnthropicChatCompatCodec)),
             _ => None,
+        }
+    }
+
+    fn codec_for_endpoint(&self, endpoint: Endpoint) -> Option<Box<dyn EndpointCodec>> {
+        match endpoint {
+            Endpoint::ChatCompletion => Some(Box::new(AnthropicChatCompatEndpointCodec)),
+            _ => None,
+        }
+    }
+}
+
+/// Endpoint codec for the Chat Completions → Anthropic Messages compatibility adapter.
+///
+/// This codec accepts `EndpointRequest::ChatCompletion` requests, converts them to
+/// Anthropic Messages format, sends them to `/messages`, and converts the responses
+/// back to Chat Completions format.
+struct AnthropicChatCompatEndpointCodec;
+
+impl EndpointCodec for AnthropicChatCompatEndpointCodec {
+    fn endpoint(&self) -> Endpoint {
+        // On the wire this is the Anthropic Messages endpoint
+        Endpoint::AnthropicMessages
+    }
+
+    fn encode(&self, request: &EndpointRequest) -> HiLlmResult<Bytes> {
+        match request {
+            EndpointRequest::ChatCompletion(req) => {
+                // Convert ChatCompletionRequest to Anthropic format
+                let mut body = serde_json::to_value(req)?;
+                convert_chat_request_to_anthropic(&mut body)?;
+                Ok(Bytes::from(serde_json::to_vec(&body)?))
+            }
+            _ => Err(HiLlmError::InternalError {
+                message: format!(
+                    "AnthropicChatCompatEndpointCodec received invalid request type: expected ChatCompletion, got {:?}",
+                    request.endpoint()
+                ),
+            }),
+        }
+    }
+
+    fn decode(&self, bytes: &[u8]) -> HiLlmResult<EndpointResponse> {
+        // Decode as Anthropic response first
+        let mut value: Value = serde_json::from_slice(bytes)?;
+        // Convert to Chat format
+        convert_anthropic_response_to_chat(&mut value)?;
+        // Parse as ChatCompletionResponse
+        let response: crate::types::ChatCompletionResponse = serde_json::from_value(value)?;
+        Ok(EndpointResponse::ChatCompletion(response))
+    }
+
+    fn parse_stream_event(&self, data: &str) -> HiLlmResult<Option<EndpointStreamEvent>> {
+        // Parse Anthropic event and convert to Chat chunk
+        match parse_anthropic_event_as_chat_chunk(data)? {
+            Some(chunk) => Ok(Some(EndpointStreamEvent::ChatCompletion(chunk))),
+            None => Ok(None),
         }
     }
 }

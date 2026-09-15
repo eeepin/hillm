@@ -1,6 +1,7 @@
 use crate::error::HiLlmError;
 use crate::error::HiLlmResult;
 use crate::provider::anthropic::codec::AnthropicMessagesCodec;
+use crate::provider::endpoint::{Endpoint, EndpointCodec};
 use crate::provider::{ApiType, Provider, codec::ApiTypeCodec, registry_get};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -22,6 +23,10 @@ const BETA_PDFS: &str = "pdfs-2024-09-25";
 
 pub mod codec;
 pub mod compat;
+pub mod endpoint_codec;
+
+#[allow(unused_imports)] // Exported for future use in Phase 3
+pub use endpoint_codec::AnthropicMessagesCodec as AnthropicMessagesEndpointCodec;
 
 /// Recursively check if any value in the JSON body contains a `cache_control` field.
 #[allow(dead_code)]
@@ -179,6 +184,13 @@ impl Provider for AnthropicProvider {
     fn codec_for(&self, api_type: ApiType) -> Option<Box<dyn ApiTypeCodec>> {
         match api_type {
             ApiType::AnthropicMessages => Some(Box::new(AnthropicMessagesCodec)),
+            _ => None,
+        }
+    }
+
+    fn codec_for_endpoint(&self, endpoint: Endpoint) -> Option<Box<dyn EndpointCodec>> {
+        match endpoint {
+            Endpoint::AnthropicMessages => Some(Box::new(endpoint_codec::AnthropicMessagesCodec)),
             _ => None,
         }
     }
