@@ -420,6 +420,38 @@ impl Provider for CustomProvider {
         }
         crate::provider::codec_for_api_type(api_type)
     }
+
+    fn codec_for_endpoint(
+        &self,
+        endpoint: crate::provider::Endpoint,
+    ) -> Option<Box<dyn crate::provider::endpoint::EndpointCodec>> {
+        use crate::provider::openai::endpoint_codecs;
+        // Custom providers are typically OpenAI-compatible, so we use OpenAI codecs
+        match endpoint {
+            crate::provider::Endpoint::ChatCompletion => {
+                Some(Box::new(endpoint_codecs::OpenAIChatCompletionCodec))
+            }
+            crate::provider::Endpoint::Response => {
+                Some(Box::new(endpoint_codecs::OpenAIResponseCodec))
+            }
+            crate::provider::Endpoint::Embedding => {
+                Some(Box::new(endpoint_codecs::OpenAIEmbeddingCodec))
+            }
+            crate::provider::Endpoint::ImageGeneration => {
+                Some(Box::new(endpoint_codecs::OpenAIImageGenerationCodec))
+            }
+            crate::provider::Endpoint::AudioSpeech => {
+                Some(Box::new(endpoint_codecs::OpenAIAudioSpeechCodec))
+            }
+            crate::provider::Endpoint::AudioTranscription => {
+                Some(Box::new(endpoint_codecs::OpenAIAudioTranscriptionCodec))
+            }
+            crate::provider::Endpoint::Moderation => {
+                Some(Box::new(endpoint_codecs::OpenAIModerationCodec))
+            }
+            _ => None,
+        }
+    }
 }
 
 #[cfg(test)]

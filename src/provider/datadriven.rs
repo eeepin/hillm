@@ -88,4 +88,32 @@ impl Provider for ConfigDrivenProvider {
         }
         super::codec_for_api_type(api_type)
     }
+
+    fn codec_for_endpoint(
+        &self,
+        endpoint: super::Endpoint,
+    ) -> Option<Box<dyn super::endpoint::EndpointCodec>> {
+        use super::openai::endpoint_codecs;
+        // Data-driven providers default to OpenAI codecs for compatibility
+        match endpoint {
+            super::Endpoint::ChatCompletion => {
+                Some(Box::new(endpoint_codecs::OpenAIChatCompletionCodec))
+            }
+            super::Endpoint::Response => Some(Box::new(endpoint_codecs::OpenAIResponseCodec)),
+            super::Endpoint::Embedding => Some(Box::new(endpoint_codecs::OpenAIEmbeddingCodec)),
+            super::Endpoint::ImageGeneration => {
+                Some(Box::new(endpoint_codecs::OpenAIImageGenerationCodec))
+            }
+            super::Endpoint::AudioSpeech => {
+                Some(Box::new(endpoint_codecs::OpenAIAudioSpeechCodec))
+            }
+            super::Endpoint::AudioTranscription => {
+                Some(Box::new(endpoint_codecs::OpenAIAudioTranscriptionCodec))
+            }
+            super::Endpoint::Moderation => {
+                Some(Box::new(endpoint_codecs::OpenAIModerationCodec))
+            }
+            _ => None,
+        }
+    }
 }

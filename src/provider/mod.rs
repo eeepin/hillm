@@ -593,6 +593,16 @@ pub(crate) trait Provider: Send + Sync {
         None
     }
 
+    /// Returns a codec for the specified endpoint, if supported.
+    ///
+    /// This is the new endpoint-based codec system that replaces the legacy
+    /// `codec_for(api_type)` method. It provides type-safe request/response
+    /// handling for all 14 API endpoints.
+    fn codec_for_endpoint(&self, endpoint: Endpoint) -> Option<Box<dyn EndpointCodec>> {
+        let _ = endpoint;
+        None
+    }
+
     /// Returns the complete map of environment variable names for this provider.
     ///
     /// Keys are semantic names (e.g., "api_key", "org_id"), values are the
@@ -766,6 +776,10 @@ impl Provider for BaseUrlOverride {
 
     fn codec_for(&self, api_type: ApiType) -> Option<Box<dyn codec::ApiTypeCodec>> {
         self.inner.codec_for(api_type)
+    }
+
+    fn codec_for_endpoint(&self, endpoint: Endpoint) -> Option<Box<dyn EndpointCodec>> {
+        self.inner.codec_for_endpoint(endpoint)
     }
 
     fn env_vars(&self) -> HashMap<&str, &str> {
